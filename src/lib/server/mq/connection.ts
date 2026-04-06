@@ -14,7 +14,7 @@ export async function publishTestMessage(queueName: string, message: object) {
     // 3. Gửi message (dưới dạng Buffer)
     const payload = JSON.stringify({
       ...message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     channel.sendToQueue(queueName, Buffer.from(payload));
@@ -24,7 +24,7 @@ export async function publishTestMessage(queueName: string, message: object) {
     // 4. Đóng kết nối sau khi gửi (chỉ dùng cho mục đích test khởi tạo)
     await channel.close();
   } catch (error) {
-    console.error("❌ [MQ] Publish failed:", error);
+    console.error('❌ [MQ] Publish failed:', error);
     throw error;
   } finally {
     if (connection) await connection.close();

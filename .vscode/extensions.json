@@ -1,18 +1,18 @@
 {
-	"recommendations": [
-		// Core
-		"svelte.svelte-vscode",
-		"bradlc.vscode-tailwindcss",
-		"esbenp.prettier-vscode",
-		"dbaeumer.vscode-eslint",
-		// DX
-		"mikestead.dotenv",
-		"aaron-bond.better-comments",
-		// Git
-		"mhutchie.git-graph",
-		// DB
-		"cweijan.vscode-postgresql-client2",
-		"prettier.prettier-vscode"
-	],
-	"unwantedRecommendations": ["hookyqr.beautify", "tabnine.tabnine-vscode"]
+  "recommendations": [
+    // Core
+    "svelte.svelte-vscode",
+    "bradlc.vscode-tailwindcss",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    // DX
+    "mikestead.dotenv",
+    "aaron-bond.better-comments",
+    // Git
+    "mhutchie.git-graph",
+    // DB
+    "cweijan.vscode-postgresql-client2",
+    "prettier.prettier-vscode"
+  ],
+  "unwantedRecommendations": ["hookyqr.beautify", "tabnine.tabnine-vscode"]
 }

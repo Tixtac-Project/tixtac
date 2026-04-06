@@ -27,7 +27,11 @@ export const Errors = {
   SEAT_CONFLICT: new AppError('SEAT_CONFLICT', 409, 'Ghế đã được người khác chọn'),
   LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 410, 'Hết thời gian giữ chỗ'),
   ORDER_NOT_OWNED: new AppError('ORDER_NOT_OWNED', 403, 'Đơn hàng không thuộc về bạn'),
-  ORDER_NOT_PENDING: new AppError('ORDER_NOT_PENDING', 400, 'Đơn hàng không ở trạng thái chờ thanh toán'),
+  ORDER_NOT_PENDING: new AppError(
+    'ORDER_NOT_PENDING',
+    400,
+    'Đơn hàng không ở trạng thái chờ thanh toán',
+  ),
 
   // Queue
   QUEUE_REQUIRED: new AppError('QUEUE_REQUIRED', 403, 'Vui lòng xếp hàng'),
