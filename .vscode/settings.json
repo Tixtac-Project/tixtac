@@ -1,0 +1,86 @@
+{
+	// ── Formatter ──────────────────────────────
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"editor.formatOnSave": true,
+	"editor.formatOnPaste": false,
+	// Svelte dùng formatter riêng
+	"[svelte]": {
+		"editor.defaultFormatter": "svelte.svelte-vscode"
+	},
+	// ── ESLint ─────────────────────────────────
+	"eslint.validate": [
+		"javascript",
+		"typescript",
+		"svelte"
+	],
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit",
+		"source.organizeImports": "explicit"
+	},
+	// ── Tailwind ───────────────────────────────
+	"files.associations": {
+		"*.css": "tailwindcss"
+	},
+	"tailwindCSS.includeLanguages": {
+		"svelte": "html"
+	},
+	"editor.quickSuggestions": {
+		"strings": "on"
+	},
+	// ── TypeScript ─────────────────────────────
+	"js/ts.preferences.importModuleSpecifier": "non-relative",
+	"js/ts.suggest.autoImports": true,
+	"js/ts.tsdk.path": "node_modules/typescript/lib",
+	// ── File Management ────────────────────────
+	"files.exclude": {
+		"**/.DS_Store": true,
+		"**/node_modules": true,
+		"**/.svelte-kit": true
+	},
+	"search.exclude": {
+		"**/node_modules": true,
+		"**/.svelte-kit": true,
+		"**/build": true,
+		"**/.vercel": true,
+		"**/drizzle": true
+	},
+	"files.eol": "\n",
+	"files.insertFinalNewline": true,
+	"files.trimTrailingWhitespace": true,
+	// ── Editor ─────────────────────────────────
+	"editor.tabSize": 2,
+	"editor.detectIndentation": false,
+	"editor.bracketPairColorization.enabled": true,
+	"editor.guides.bracketPairs": true,
+	"editor.minimap.enabled": false,
+	"editor.wordWrap": "on",
+	"editor.linkedEditing": true,
+	"editor.stickyScroll.enabled": true,
+	// ── Spell Check ────────────────────────────
+	"cSpell.words": [
+		"ticketrush",
+		"drizzle",
+		"svelte",
+		"sveltekit",
+		"tailwindcss",
+		"amqp",
+		"amqplib",
+		"lavinmq",
+		"cloudamqp",
+		"neon",
+		"upstash",
+		"bcryptjs",
+		"jsonwebtoken",
+		"timestamptz"
+	],
+	"cSpell.ignorePaths": [
+		"node_modules",
+		".svelte-kit",
+		"pnpm-lock.yaml",
+		"package-lock.json"
+	],
+	// ── Emmet ──────────────────────────────────
+	"emmet.includeLanguages": {
+		"svelte": "html"
+	}
+}
