@@ -2,19 +2,32 @@
 	let { data } = $props();
 </script>
 
-<main class="p-8 font-sans">
-	<h1 class="mb-4 text-2xl font-bold">TixTac Infra Test</h1>
+<div class="space-y-4 p-8">
+	<h1 class="text-2xl font-bold">TixTac Infrastructure Status</h1>
 
-	{#if data.status === 'Connected'}
-		<div class="rounded-lg border border-green-200 bg-green-100 p-4 text-green-800">
-			<p class="text-lg font-bold">✅ Kết nối Neon thành công!</p>
-			<p class="mt-2 text-sm"><b>DB Time:</b> {data.dbTime}</p>
-			<p class="mt-1 text-xs opacity-75"><b>Version:</b> {data.version}</p>
-		</div>
-	{:else}
-		<div class="rounded-lg border border-red-200 bg-red-100 p-4 text-red-800">
-			<p class="font-bold">❌ Lỗi kết nối Database:</p>
-			<p class="text-sm">{data.message}</p>
-		</div>
-	{/if}
-</main>
+	<div
+		class="rounded-md border p-4 {data.dbStatus.ok
+			? 'border-green-200 bg-green-50'
+			: 'border-red-200 bg-red-50'}"
+	>
+		<p class="font-semibold">
+			PostgreSQL (Neon): {data.dbStatus.ok ? '✅ Connected' : '❌ Failed'}
+		</p>
+		{#if data.dbStatus.ok}
+			<p class="text-sm text-green-700 opacity-70">DB Time: {data.dbStatus.time}</p>
+		{/if}
+	</div>
+
+	<div
+		class="rounded-md border p-4 {data.mqStatus.ok
+			? 'border-blue-200 bg-blue-50'
+			: 'border-red-200 bg-red-50'}"
+	>
+		<p class="font-semibold">
+			Message Queue (CloudAMQP): {data.mqStatus.ok ? '✅ Message Published' : '❌ Failed'}
+		</p>
+		{#if !data.mqStatus.ok}
+			<p class="text-sm text-red-700">{data.mqStatus.error}</p>
+		{/if}
+	</div>
+</div>

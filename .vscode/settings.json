@@ -8,11 +8,7 @@
 		"editor.defaultFormatter": "svelte.svelte-vscode"
 	},
 	// ── ESLint ─────────────────────────────────
-	"eslint.validate": [
-		"javascript",
-		"typescript",
-		"svelte"
-	],
+	"eslint.validate": ["javascript", "typescript", "svelte"],
 	"editor.codeActionsOnSave": {
 		"source.fixAll.eslint": "explicit",
 		"source.organizeImports": "explicit"
@@ -65,7 +61,7 @@
 		"tailwindcss",
 		"amqp",
 		"amqplib",
-		"lavinmq",
+		"rabbitmq",
 		"cloudamqp",
 		"neon",
 		"upstash",
@@ -73,12 +69,7 @@
 		"jsonwebtoken",
 		"timestamptz"
 	],
-	"cSpell.ignorePaths": [
-		"node_modules",
-		".svelte-kit",
-		"pnpm-lock.yaml",
-		"package-lock.json"
-	],
+	"cSpell.ignorePaths": ["node_modules", ".svelte-kit", "pnpm-lock.yaml", "package-lock.json"],
 	// ── Emmet ──────────────────────────────────
 	"emmet.includeLanguages": {
 		"svelte": "html"

@@ -1,24 +1,29 @@
 import { sql } from '$lib/server/db';
+import { publishTestMessage } from '$lib/server/mq/connection';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
+  let dbStatus = { ok: false, time: "" };
+  let mqStatus = { ok: false, error: "" };
+
+  // 1. Test Database
   try {
-    // Test kết nối bằng cách lấy thời gian hiện tại từ Postgres
-    const result = await sql`SELECT NOW() as now, version() as version`;
-
-    console.log("✅ Neon PostgreSQL Connected!");
-    console.log("🕒 DB Time:", result[0].now);
-
-    return {
-      status: "Connected",
-      dbTime: result[0].now,
-      version: result[0].version
-    };
-  } catch (error) {
-    console.error("❌ Neon Connection Failed:", error);
-    return {
-      status: "Error",
-      message: error instanceof Error ? error.message : "Unknown error"
-    };
+    const result = await sql`SELECT NOW() as now`;
+    dbStatus = { ok: true, time: result[0].now as string };
+  } catch (e) {
+    console.error(e);
   }
+
+  // 2. Test Message Queue
+  try {
+    await publishTestMessage("test-init-queue", {
+      event: "PROJECT_INIT",
+      message: "TixTac infra is online!"
+    });
+    mqStatus = { ok: true, error: "" };
+  } catch (e) {
+    mqStatus = { ok: false, error: e instanceof Error ? e.message : "MQ Error" };
+  }
+
+  return { dbStatus, mqStatus };
 };
