@@ -28,7 +28,7 @@ Nền tảng đặt vé sự kiện trực tuyến với khả năng chống tra
 | UI            | [TailwindCSS](https://tailwindcss.com/) + [shadcn-svelte](https://www.shadcn-svelte.com/) |
 | Database      | [Neon](https://neon.tech/) (PostgreSQL) ☁️                                                |
 | ORM           | [DrizzleORM](https://orm.drizzle.team/)                                                   |
-| Message Queue | [CloudAMQP](https://www.cloudamqp.com/) (LavinMQ) ☁️                                      |
+| Message Queue | [CloudAMQP](https://www.cloudamqp.com/) (RabbitMQ) ☁️                                     |
 | Auth          | JWT (httpOnly cookie) - SSR Auth                                                          |
 | Realtime      | Server-Sent Events (SSE)                                                                  |
 | Deploy        | [Render](https://render.com/) ☁️                                                          |
@@ -98,7 +98,7 @@ Mở `.env` và điền thông tin:
 # Database (Neon)
 DATABASE_URL=postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/ticketrush?sslmode=require
 
-# Message Queue (CloudAMQP -> LavinMQ)
+# Message Queue (CloudAMQP -> RabbitMQ)
 AMQP_URL=amqps://user:pass@rattlesnake.rmq.cloudamqp.com/vhost
 
 # Auth

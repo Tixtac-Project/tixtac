@@ -1,8 +1,6 @@
 type FetchFn = typeof fetch;
 
-type ApiResponse<T> =
-  | { data: T; error: null }
-  | { data: null; error: string; code?: string };
+type ApiResponse<T> = { data: T; error: null } | { data: null; error: string; code?: string };
 
 export async function api<T>(
   fetch: FetchFn,
