@@ -11,8 +11,7 @@
     // Git
     "mhutchie.git-graph",
     // DB
-    "cweijan.vscode-postgresql-client2",
-    "prettier.prettier-vscode"
+    "cweijan.vscode-postgresql-client2"
   ],
   "unwantedRecommendations": ["hookyqr.beautify", "tabnine.tabnine-vscode"]
 }
