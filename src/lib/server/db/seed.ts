@@ -158,12 +158,14 @@ async function createSections(
   }
 }
 
-seed()
-  .then(() => {
-    console.log('🏁 Xong!');
-    process.exit(0);
-  })
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+if (import.meta.main) {
+  seed()
+    .then(() => {
+      console.log('🏁 Xong!');
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}
