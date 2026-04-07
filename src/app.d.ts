@@ -6,12 +6,6 @@ declare global {
         role: 'admin' | 'customer';
       } | null;
     }
-
-    // Uncomment khi cần:
-    // interface Error {}
-    // interface PageData {}
-    // interface PageState {}
-    // interface Platform {}
   }
 }
 
