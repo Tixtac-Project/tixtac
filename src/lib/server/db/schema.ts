@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   date,
@@ -16,12 +17,7 @@ import {
 // ── Enums ──────────────────────────────────────
 export const roleEnum = pgEnum('role', ['admin', 'customer']);
 export const genderEnum = pgEnum('gender', ['male', 'female', 'other']);
-export const eventStatusEnum = pgEnum('event_status', [
-  'draft',
-  'published',
-  'cancelled',
-  'completed',
-]);
+export const eventStatusEnum = pgEnum('event_status', ['draft', 'published']);
 export const seatStatusEnum = pgEnum('seat_status', ['available', 'locked', 'sold']);
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'cancelled']);
 
@@ -50,8 +46,6 @@ export const events = pgTable('events', {
   eventDate: timestamp('event_date', { withTimezone: true }).notNull(),
   bannerImageUrl: varchar('banner_image_url', { length: 500 }),
   status: eventStatusEnum('status').notNull().default('draft'),
-  saleStartAt: timestamp('sale_start_at', { withTimezone: true }),
-  saleEndAt: timestamp('sale_end_at', { withTimezone: true }),
   createdBy: integer('created_by')
     .notNull()
     .references(() => users.id),
@@ -116,7 +110,9 @@ export const orders = pgTable(
   },
   (table) => [
     index('idx_orders_user').on(table.userId, table.status),
-    index('idx_orders_expires').on(table.status, table.expiresAt),
+    index('idx_orders_expires')
+      .on(table.status, table.expiresAt)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );
 // ── Order Items ────────────────────────────────

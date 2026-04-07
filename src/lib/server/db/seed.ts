@@ -72,7 +72,6 @@ export async function seed() {
       eventDate: new Date('2026-06-15T19:00:00Z'),
       bannerImageUrl: 'https://picsum.photos/seed/rock/800/400',
       status: 'published',
-      saleStartAt: new Date('2026-05-01T09:00:00Z'),
       createdBy: admin.id,
     })
     .returning();
@@ -92,7 +91,6 @@ export async function seed() {
       eventDate: new Date('2026-07-20T20:00:00Z'),
       bannerImageUrl: 'https://picsum.photos/seed/edm/800/400',
       status: 'published',
-      saleStartAt: new Date('2026-06-01T09:00:00Z'),
       createdBy: admin.id,
     })
     .returning();
