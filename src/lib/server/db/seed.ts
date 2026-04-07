@@ -1,11 +1,26 @@
 import { db } from '$lib/server/db';
 import { events, seatSections, seats, users } from '$lib/server/db/schema';
 
-// Mock function băm mật khẩu (Trong thực tế dùng argon2id như PRD trang 8 yêu cầu)
+/**
+ * Mock password-hashing helper used for development and testing.
+ *
+ * This function does not perform real cryptographic hashing; it returns a deterministic placeholder derived from the input.
+ *
+ * @param plain - The plaintext password to hash
+ * @returns The mocked hashed string in the form `hashed_<plain>`
+ */
 async function hashPassword(plain: string): Promise<string> {
   return `hashed_${plain}`;
 }
 
+/**
+ * Seed the development database with initial users, events, sections, and seats.
+ *
+ * Inserts an admin user and several customer users, creates two sample events
+ * ("Rock Festival 2026" and "EDM Night Saigon"), and for each event creates
+ * seat sections and generates seat rows/columns marked as available. Logs
+ * progress and a summary of seeded seat counts.
+ */
 export async function seed() {
   console.log('🌱 Bắt đầu seed data...');
 
@@ -93,7 +108,20 @@ export async function seed() {
   console.log(`🎟️  Event 2: ${3 * 15 + 5 * 20 + 10 * 25} = 395 seats`);
 }
 
-// ── Helper: Tạo sections + sinh ma trận ghế tự động ──
+/**
+ * Create seat sections for an event and insert the corresponding seat records.
+ *
+ * For each entry in `sections`, inserts a `seatSections` record for the given `eventId`
+ * and batch-inserts the generated seats for that section with status `'available'`.
+ *
+ * @param eventId - The ID of the event to attach sections and seats to
+ * @param sections - Array of section descriptors. Each descriptor must include:
+ *   - `name`: section name
+ *   - `rows`: number of seat rows (row labels start at "A")
+ *   - `cols`: number of seats per row (columns numbered from 1)
+ *   - `price`: price for the section
+ *   - `sortOrder`: ordering index for the section
+ */
 async function createSections(
   eventId: number,
   sections: { name: string; rows: number; cols: number; price: string; sortOrder: number }[],
