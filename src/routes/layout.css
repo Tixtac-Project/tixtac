@@ -3,6 +3,7 @@
 @import 'shadcn-svelte/tailwind.css';
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/figtree';
+@import '@fontsource-variable/montserrat';
 
 @custom-variant dark (&:is(.dark *));
 @plugin '@tailwindcss/typography';
@@ -116,7 +117,7 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-  --font-heading: 'Figtree Variable', sans-serif;
+  --font-heading: 'Montserrat Variable', sans-serif;
 }
 
 @layer base {
