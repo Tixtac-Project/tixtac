@@ -159,6 +159,10 @@ export const authService = {
       throw Errors.INVALID_CREDENTIALS;
     }
 
+    if (!user.isActive) {
+      throw Errors.INVALID_CREDENTIALS; // Or a specific ACCOUNT_DISABLED error
+    }
+
     // 2. Compare password (bằng file infra password.ts đã tạo ở task trước)
     const isPasswordValid = await verifyPassword(user.passwordHash, password);
     if (!isPasswordValid) {
