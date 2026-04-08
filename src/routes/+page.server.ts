@@ -1,18 +1,19 @@
-// import { sql } from '$lib/server/db';
-// import { publishTestMessage } from '$lib/server/mq/connection';
-// import type { PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { publishTestMessage } from '$lib/server/mq/connection';
+import { sql } from 'drizzle-orm';
+import type { PageServerLoad } from './$types';
 
-// export const load: PageServerLoad = async () => {
-//   let dbStatus = { ok: false, time: '' };
-//   let mqStatus = { ok: false, error: '' };
+export const load: PageServerLoad = async () => {
+  let dbStatus = { ok: false, time: '' };
+  let mqStatus: { ok: boolean; error: string };
 
-//   // 1. Test Database
-//   try {
-//     const result = await sql`SELECT NOW() as now`;
-//     dbStatus = { ok: true, time: result[0].now as string };
-//   } catch (e) {
-//     console.error(e);
-//   }
+  // 1. Test Database
+  try {
+    const result = await db.execute(sql`SELECT NOW() as now`);
+    dbStatus = { ok: true, time: String(result[0]?.now) };
+  } catch (e) {
+    console.error(e);
+  }
 
 //   // 2. Test Message Queue
 //   try {

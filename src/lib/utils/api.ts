@@ -62,7 +62,10 @@ async function fetchWrapper<T>(
       : {};
 
     if (!res.ok) {
-      const errorMessage: string = json.error || json.message || 'Có lỗi xảy ra từ hệ thống';
+      const errorMessage: string =
+        (typeof json.error === 'string' ? json.error : json.error?.message) ||
+        json.message ||
+        'Có lỗi xảy ra từ hệ thống';
 
       // 401 — Hết hạn session
       if (res.status === 401 && browser && !isRedirectingToLogin) {

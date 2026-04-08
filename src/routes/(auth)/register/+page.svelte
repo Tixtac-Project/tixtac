@@ -44,14 +44,12 @@
     if (!validate()) return;
     loading = true;
 
-    const { data, error } = await api.post('/api/auth/register', form);
+    const { data, error } = await api.post('/auth/register', form);
 
     loading = false;
     if (!error) {
       toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
       goto(resolve('/login'));
-    } else {
-      toast.error(error);
     }
   }
 </script>

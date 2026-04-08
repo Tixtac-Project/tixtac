@@ -8,11 +8,13 @@
 export class AppError extends Error {
   public code: string;
   public statusCode: number;
+  public details?: unknown;
 
-  constructor(code: string, statusCode: number, message?: string) {
+  constructor(code: string, statusCode: number, message?: string, details?: unknown) {
     super(message || code);
     this.code = code;
     this.statusCode = statusCode;
+    this.details = details;
   }
 }
 
@@ -43,6 +45,11 @@ export const Errors = {
 } as const;
 
 // Helper: clone error (vì mỗi throw cần instance mới)
-export function throwError(error: AppError, customMessage?: string): never {
-  throw new AppError(error.code, error.statusCode, customMessage || error.message);
+export function throwError(error: AppError, customMessage?: string, details?: unknown): never {
+  throw new AppError(
+    error.code,
+    error.statusCode,
+    customMessage || error.message,
+    details ?? error.details,
+  );
 }
