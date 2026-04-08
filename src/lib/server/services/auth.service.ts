@@ -135,8 +135,10 @@ export const authService = {
       throw Errors.VALIDATION;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // 1. Query user theo email
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
 
     if (!user) {
       throw Errors.INVALID_CREDENTIALS;
@@ -149,7 +151,7 @@ export const authService = {
     }
 
     // 3. Sign JWT
-    const token = signAuthToken({ sub: user.id, role: user.role });
+    const token = await signAuthToken({ sub: user.id, role: user.role });
 
     // 4. Loại bỏ passwordHash trước khi trả thông tin về client
     const { passwordHash: _hash, createdAt: _created, updatedAt: _updated, ...userInfo } = user;

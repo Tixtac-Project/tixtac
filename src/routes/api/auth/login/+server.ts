@@ -26,6 +26,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       return json({ error: { code: e.code, message: e.message } }, { status: e.statusCode });
     }
 
+    if (e instanceof SyntaxError) {
+      return json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Định dạng JSON không hợp lệ' } },
+        { status: 400 },
+      );
+    }
+
     console.error('Login API Error:', e);
     return json({ error: { code: 'INTERNAL_ERROR', message: 'Lỗi hệ thống' } }, { status: 500 });
   }
