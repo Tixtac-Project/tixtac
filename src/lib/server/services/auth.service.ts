@@ -1,7 +1,10 @@
+import { signAuthToken } from '$lib/server/auth/jwt';
 import { hashPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import { eq } from 'drizzle-orm';
+import { verifyPassword } from '$lib/server/auth/password';
 
 interface RegisterData {
   email: string;
@@ -123,5 +126,51 @@ export const authService = {
       }
       throw e;
     }
+  },
+
+  async login(data: { email?: string; password?: string }) {
+    if (
+      !data ||
+      typeof data !== "object" ||
+      Array.isArray(data)
+    ) {
+      throw Errors.VALIDATION;
+    }
+
+    const { email, password } = data;
+
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      throw Errors.VALIDATION;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password.trim()) {
+      throw Errors.VALIDATION;
+    }
+
+    // 1. Query user theo email
+    const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+
+    if (!user) {
+      throw Errors.INVALID_CREDENTIALS;
+    }
+
+    // 2. Compare password (bằng file infra password.ts đã tạo ở task trước)
+    const isPasswordValid = await verifyPassword(user.passwordHash, password);
+    if (!isPasswordValid) {
+      throw Errors.INVALID_CREDENTIALS;
+    }
+
+    // 3. Sign JWT
+    const token = await signAuthToken({ sub: user.id, role: user.role });
+
+    // 4. Loại bỏ passwordHash trước khi trả thông tin về client
+    const { passwordHash: _hash, createdAt: _created, updatedAt: _updated, ...userInfo } = user;
+
+    return { user: userInfo, token };
   },
 };
