@@ -58,6 +58,7 @@
   "dependencies": {
     "amqplib": "^1.0.3",
     "drizzle-orm": "^0.45.2",
+    "lucide-svelte": "^1.0.1",
     "pg": "^8.20.0",
     "svelte-adapter-bun": "^1.0.1"
   }
