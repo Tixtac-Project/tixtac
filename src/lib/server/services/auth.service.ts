@@ -129,14 +129,29 @@ export const authService = {
   },
 
   async login(data: { email?: string; password?: string }) {
+    if (
+      !data ||
+      typeof data !== "object" ||
+      Array.isArray(data)
+    ) {
+      throw Errors.VALIDATION;
+    }
+
     const { email, password } = data;
 
-    if (!email || !password) {
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
       throw Errors.VALIDATION;
     }
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    if (!normalizedEmail || !password.trim()) {
+      throw Errors.VALIDATION;
+    }
+    
     // 1. Query user theo email
     const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
 

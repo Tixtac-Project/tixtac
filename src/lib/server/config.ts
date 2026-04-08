@@ -5,4 +5,4 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]),
 });
 
-const env = envSchema.parse(process.env);
+envSchema.parse(process.env);

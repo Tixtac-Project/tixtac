@@ -21,12 +21,19 @@ export async function signAuthToken(payload: { sub: number; role: string }): Pro
 export async function verifyAuthToken(token: string) {
   try {
     const { payload } = await jwtVerify(token, secret);
+
+    const sub = Number(payload.sub);
+
+    if (!Number.isFinite(sub)) {
+      throw new Error("Invalid token: sub must be a number");
+    }
+
     return {
       ...payload,
-      sub: Number(payload.sub),
+      sub,
     };
-  } catch (error) {
-    throw new Error('Invalid or expired token', { cause: error });
+  } catch (err) {
+    throw new Error("Invalid or expired token");
   }
 }
 
