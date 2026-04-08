@@ -7,10 +7,35 @@ import { hashPassword } from '$lib/server/auth/password';
 export const authService = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async register(data: any) {
-    const { email, password, full_name, phone, date_of_birth, gender, avatar_url } = data;
+    let { email, password, full_name, phone, date_of_birth, gender, avatar_url } = data;
 
     if (!email || !password || !full_name || !date_of_birth || !phone) {
       throw Errors.VALIDATION; // Dùng error định nghĩa sẵn
+    }
+
+    // Tiền xử lý (Sanitize)
+    email = email.trim().toLowerCase();
+    full_name = full_name.trim();
+
+    // 1. Kiểm tra định dạng Email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new AppError('INVALID_EMAIL', 400, 'Định dạng email không hợp lệ');
+    }
+
+    // 2. Kiểm tra tuổi >= 16
+    const birthDate = new Date(date_of_birth);
+    if (isNaN(birthDate.getTime())) {
+      throw new AppError('INVALID_DATE', 400, 'Định dạng ngày sinh không hợp lệ');
+    }
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 16) {
+      throw new AppError('UNDERAGE', 400, 'Bạn phải từ 16 tuổi trở lên để đăng ký');
     }
 
     if (password.length < 8) {
