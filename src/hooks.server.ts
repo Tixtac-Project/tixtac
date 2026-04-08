@@ -2,7 +2,7 @@ import { verifyAuthToken } from "$lib/server/auth/jwt";
 import type { Handle } from "@sveltejs/kit";
 
 export const handle: Handle = async ({ event, resolve }) => {
-  const token = event.cookies.get('authen_token');
+  const token = event.cookies.get('auth_token');
 
   if (!token) {
     event.locals.user = null;
@@ -21,4 +21,4 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   return resolve(event);
-}
+};
