@@ -16,17 +16,28 @@ export const POST: RequestHandler = async ({ request }) => {
   } catch (e: unknown) {
     // Bắt lỗi theo chuẩn Pattern Mục 6 và Mục 7
     if (e instanceof SyntaxError) {
-      return json({ code: 'VALIDATION_ERROR', error: 'Malformed JSON' }, { status: 400 });
+      return json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Malformed JSON' } },
+        { status: 400 },
+      );
     }
     if (e instanceof AppError) {
-      const payload: Record<string, unknown> = { code: e.code, error: e.message };
-      if (e.details) {
-        payload.details = e.details;
-      }
-      return json(payload, { status: e.statusCode });
+      return json(
+        {
+          error: {
+            code: e.code,
+            message: e.message,
+            ...(e.details ? { details: e.details } : {}),
+          },
+        },
+        { status: e.statusCode },
+      );
     }
 
     console.error('Register Error:', e);
-    return json({ error: 'Internal Server Error' }, { status: 500 });
+    return json(
+      { error: { code: 'INTERNAL_ERROR', message: 'Internal Server Error' } },
+      { status: 500 },
+    );
   }
 };

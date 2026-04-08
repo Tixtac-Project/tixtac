@@ -24,7 +24,7 @@ export const authService = {
 
     const details: Record<string, string> = {};
     if (typeof email !== 'string' || !email.trim()) details.email = 'Email là bắt buộc';
-    if (typeof password !== 'string' || !password.trim()) details.password = 'Passowrd là bắt buộc';
+    if (typeof password !== 'string' || !password.trim()) details.password = 'Password là bắt buộc';
     if (typeof full_name !== 'string' || !full_name.trim())
       details.full_name = 'Tên đầy đủ là bắt buộc';
     if (typeof date_of_birth !== 'string' || !date_of_birth.trim())
@@ -57,13 +57,22 @@ export const authService = {
     if (isNaN(birthDate.getTime())) {
       throwError(Errors.VALIDATION, 'Định dạng ngày sinh không hợp lệ');
     }
+
     const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    if (age < 16) {
+    const minDate = new Date(
+      today.getUTCFullYear() - 16,
+      today.getUTCMonth(),
+      today.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+
+    // Normalize birthDate to local midnight if it's a date string like 'YYYY-MM-DD'
+    // or use UTC if you prefer consistency across server/client.
+    // For ISO date strings 'YYYY-MM-DD', new Date(date_of_birth) is UTC.
+    if (birthDate > minDate) {
       throwError(Errors.VALIDATION, 'Bạn phải từ 16 tuổi trở lên để đăng ký');
     }
 
