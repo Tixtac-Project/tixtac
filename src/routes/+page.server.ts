@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db';
-import { sql } from 'drizzle-orm';
 import { publishTestMessage } from '$lib/server/mq/connection';
+import { sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {

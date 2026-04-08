@@ -1,7 +1,7 @@
+import { AppError } from '$lib/server/errors';
+import { authService } from '$lib/server/services/auth.service';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authService } from '$lib/server/services/auth.service';
-import { AppError } from '$lib/server/errors';
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
@@ -13,13 +13,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // 3. Trả về response
     return json({ data: newUser }, { status: 201 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Bắt lỗi theo chuẩn Pattern Mục 6 và Mục 7
     if (e instanceof SyntaxError) {
       return json({ code: 'VALIDATION_ERROR', error: 'Malformed JSON' }, { status: 400 });
     }
     if (e instanceof AppError) {
-      const payload: Record<string, any> = { code: e.code, error: e.message };
+      const payload: Record<string, unknown> = { code: e.code, error: e.message };
       if (e.details) {
         payload.details = e.details;
       }

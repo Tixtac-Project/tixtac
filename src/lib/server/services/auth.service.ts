@@ -1,29 +1,41 @@
+import { hashPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
-import { Errors, AppError } from '$lib/server/errors';
-import { hashPassword } from '$lib/server/auth/password';
+import { Errors, throwError } from '$lib/server/errors';
+
+interface RegisterData {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  date_of_birth: string;
+  gender: string;
+  avatar_url?: string;
+}
 
 export const authService = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async register(data: any) {
+  async register(data: unknown) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw Errors.VALIDATION;
+      throwError(Errors.VALIDATION, 'Dữ liệu không hợp lệ');
     }
 
-    let { email, password, full_name, phone, date_of_birth, gender, avatar_url } = data;
+    let { email, password, full_name, phone, date_of_birth, gender, avatar_url } =
+      data as RegisterData;
 
-    if (
-      typeof email !== 'string' ||
-      typeof password !== 'string' ||
-      typeof full_name !== 'string' ||
-      typeof date_of_birth !== 'string' ||
-      typeof gender !== 'string'
-    ) {
-      throw Errors.VALIDATION;
+    const details: Record<string, string> = {};
+    if (typeof email !== 'string' || !email.trim()) details.email = 'Email là bắt buộc';
+    if (typeof password !== 'string' || !password.trim()) details.password = 'Passowrd là bắt buộc';
+    if (typeof full_name !== 'string' || !full_name.trim())
+      details.full_name = 'Tên đầy đủ là bắt buộc';
+    if (typeof date_of_birth !== 'string' || !date_of_birth.trim())
+      details.date_of_birth = 'Ngày sinh là bắt buộc';
+    if (typeof gender !== 'string' || !gender.trim()) details.gender = 'Giới tính là bắt buộc';
+    if (Object.keys(details).length > 0) {
+      throwError(Errors.VALIDATION, 'Dữ liệu không hợp lệ', details);
     }
 
     if (!email || !password || !full_name || !date_of_birth || !gender) {
-      throw Errors.VALIDATION; // Dùng error định nghĩa sẵn
+      throwError(Errors.VALIDATION, 'Dữ liệu không hợp lệ');
     }
 
     // Tiền xử lý (Sanitize)
@@ -31,19 +43,19 @@ export const authService = {
     full_name = full_name.trim();
 
     if (full_name.length < 2 || full_name.length > 100) {
-      throw new AppError('INVALID_NAME', 400, 'Tên phải từ 2 đến 100 ký tự');
+      throwError(Errors.VALIDATION, 'Tên phải từ 2 đến 100 ký tự');
     }
 
     // 1. Kiểm tra định dạng Email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      throw new AppError('INVALID_EMAIL', 400, 'Định dạng email không hợp lệ');
+      throwError(Errors.VALIDATION, 'Định dạng email không hợp lệ');
     }
 
     // 2. Kiểm tra tuổi >= 16
     const birthDate = new Date(date_of_birth);
     if (isNaN(birthDate.getTime())) {
-      throw new AppError('INVALID_DATE', 400, 'Định dạng ngày sinh không hợp lệ');
+      throwError(Errors.VALIDATION, 'Định dạng ngày sinh không hợp lệ');
     }
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -52,15 +64,15 @@ export const authService = {
       age--;
     }
     if (age < 16) {
-      throw new AppError('UNDERAGE', 400, 'Bạn phải từ 16 tuổi trở lên để đăng ký');
+      throwError(Errors.VALIDATION, 'Bạn phải từ 16 tuổi trở lên để đăng ký');
     }
 
     if (password.length < 8) {
-      throw new AppError('WEAK_PASSWORD', 400, 'Mật khẩu phải từ 8 ký tự trở lên');
+      throwError(Errors.VALIDATION, 'Mật khẩu phải từ 8 ký tự trở lên');
     }
 
     if (!['male', 'female', 'other'].includes(gender)) {
-      throw new AppError('INVALID_GENDER', 400, 'Giới tính không hợp lệ');
+      throwError(Errors.VALIDATION, 'Giới tính không hợp lệ');
     }
 
     // Băm mật khẩu (Gọi từ Infrastructure Layer)
@@ -94,9 +106,11 @@ export const authService = {
         });
 
       return newUser;
-    } catch (e: any) {
-      if (e.code === '23505') {
-        throw Errors.EMAIL_EXISTS;
+    } catch (e: unknown) {
+      const error = e as { code?: string };
+
+      if (error.code === '23505') {
+        throwError(Errors.EMAIL_EXISTS, 'Email đã được sử dụng');
       }
       throw e;
     }
