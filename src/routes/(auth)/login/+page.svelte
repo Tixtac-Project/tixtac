@@ -35,7 +35,7 @@
     if (!validate()) return;
 
     loading = true;
-    const { data, error } = await api.post<{ role: string }>('/api/auth/login', {
+    const { data, error } = await api.post<{ role: string }>('/auth/login', {
       email,
       password,
     });
