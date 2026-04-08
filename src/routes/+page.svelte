@@ -1,33 +1,23 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   let { data } = $props();
 </script>
 
-<div class="space-y-4 p-8">
-  <h1 class="text-2xl font-bold">TixTac Infrastructure Status</h1>
-
-  <div
-    class="rounded-md border p-4 {data.dbStatus.ok
-      ? 'border-green-200 bg-green-50'
-      : 'border-red-200 bg-red-50'}"
-  >
-    <p class="font-semibold">
-      PostgreSQL (Neon): {data.dbStatus.ok ? '✅ Connected' : '❌ Failed'}
-    </p>
-    {#if data.dbStatus.ok}
-      <p class="text-sm text-green-700 opacity-70">DB Time: {data.dbStatus.time}</p>
-    {/if}
-  </div>
-
-  <div
-    class="rounded-md border p-4 {data.mqStatus.ok
-      ? 'border-blue-200 bg-blue-50'
-      : 'border-red-200 bg-red-50'}"
-  >
-    <p class="font-semibold">
-      Message Queue (CloudAMQP): {data.mqStatus.ok ? '✅ Message Published' : '❌ Failed'}
-    </p>
-    {#if !data.mqStatus.ok}
-      <p class="text-sm text-red-700">{data.mqStatus.error}</p>
-    {/if}
+<div class="flex flex-col items-center justify-center gap-4">
+  <h1 class="text-2xl font-bold">Welcome to Tixtac!</h1>
+  <p class="text-gray-600">Your one-stop solution for ticket management.</p>
+  <div class="flex gap-4">
+    <a
+      href={resolve('/login')}
+      class="rounded bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
+    >
+      Login
+    </a>
+    <a
+      href={resolve('/register')}
+      class="rounded bg-green-500 px-4 py-2 text-white transition hover:bg-green-600"
+    >
+      Register
+    </a>
   </div>
 </div>
