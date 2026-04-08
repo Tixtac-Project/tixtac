@@ -4,9 +4,9 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "bun --bun vite dev",
+    "build": "bun --bun vite build",
+    "preview": "bun --bun vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -27,6 +27,8 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.2",
     "@types/amqplib": "^0.10.8",
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.2",
     "@types/pg": "^8.20.0",
     "bits-ui": "^2.17.2",
@@ -56,10 +58,11 @@
   },
   "dependencies": {
     "amqplib": "^1.0.3",
+    "argon2": "^0.44.0",
     "drizzle-orm": "^0.45.2",
+    "jsonwebtoken": "^9.0.3",
     "lucide-svelte": "^1.0.1",
     "pg": "^8.20.0",
-    "svelte-adapter-bun": "^1.0.1",
-    "argon2": "^0.44.0"
+    "svelte-adapter-bun": "^1.0.1"
   }
 }
