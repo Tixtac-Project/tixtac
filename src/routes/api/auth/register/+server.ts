@@ -13,10 +13,17 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // 3. Trả về response
     return json({ data: newUser }, { status: 201 });
-  } catch (e) {
+  } catch (e: any) {
     // Bắt lỗi theo chuẩn Pattern Mục 6 và Mục 7
+    if (e instanceof SyntaxError) {
+      return json({ code: 'VALIDATION_ERROR', error: 'Malformed JSON' }, { status: 400 });
+    }
     if (e instanceof AppError) {
-      return json({ error: e.message }, { status: e.statusCode });
+      const payload: Record<string, any> = { code: e.code, error: e.message };
+      if (e.details) {
+        payload.details = e.details;
+      }
+      return json(payload, { status: e.statusCode });
     }
 
     console.error('Register Error:', e);
