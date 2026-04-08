@@ -3,8 +3,8 @@ import { hashPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { eq } from "drizzle-orm";
-import { verifyPassword } from "$lib/server/auth/password";
+import { eq } from 'drizzle-orm';
+import { verifyPassword } from '$lib/server/auth/password';
 
 interface RegisterData {
   email: string;
@@ -128,32 +128,32 @@ export const authService = {
     }
   },
 
-  async login(data: any) {
+  async login(data: { email?: string; password?: string }) {
     const { email, password } = data;
 
     if (!email || !password) {
-        throw Errors.VALIDATION;
+      throw Errors.VALIDATION;
     }
 
     // 1. Query user theo email
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user) {
-        throw Errors.INVALID_CREDENTIALS;
+      throw Errors.INVALID_CREDENTIALS;
     }
 
     // 2. Compare password (bằng file infra password.ts đã tạo ở task trước)
     const isPasswordValid = await verifyPassword(user.passwordHash, password);
     if (!isPasswordValid) {
-        throw Errors.INVALID_CREDENTIALS;
+      throw Errors.INVALID_CREDENTIALS;
     }
 
     // 3. Sign JWT
     const token = signAuthToken({ sub: user.id, role: user.role });
 
     // 4. Loại bỏ passwordHash trước khi trả thông tin về client
-    const { passwordHash, createdAt, updatedAt, ...userInfo } = user;
+    const { passwordHash: _hash, createdAt: _created, updatedAt: _updated, ...userInfo } = user;
 
     return { user: userInfo, token };
-  }
+  },
 };

@@ -15,16 +15,16 @@ export const load: PageServerLoad = async () => {
     console.error(e);
   }
 
-//   // 2. Test Message Queue
-//   try {
-//     await publishTestMessage('test-init-queue', {
-//       event: 'PROJECT_INIT',
-//       message: 'TixTac infra is online!',
-//     });
-//     mqStatus = { ok: true, error: '' };
-//   } catch (e) {
-//     mqStatus = { ok: false, error: e instanceof Error ? e.message : 'MQ Error' };
-//   }
+  //   // 2. Test Message Queue
+  //   try {
+  //     await publishTestMessage('test-init-queue', {
+  //       event: 'PROJECT_INIT',
+  //       message: 'TixTac infra is online!',
+  //     });
+  //     mqStatus = { ok: true, error: '' };
+  //   } catch (e) {
+  //     mqStatus = { ok: false, error: e instanceof Error ? e.message : 'MQ Error' };
+  //   }
 
-//   return { dbStatus, mqStatus };
+  //   return { dbStatus, mqStatus };
 };
