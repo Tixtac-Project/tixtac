@@ -1,7 +1,8 @@
-import { env } from '$env/dynamic/private';
+import { z } from "zod";
 
-export const config = {
-  jwtSecret: env.JWT_SECRET || 'fallback_secret_for_local_development_only',
+const envSchema = z.object({
+  JWT_SECRET: z.string().min(1),
+  NODE_ENV: z.enum(["development", "production", "test"]),
+});
 
-  accessTokenDuration: Number(env.ACCESS_TOKEN_DURATION) || 300,
-};
+const env = envSchema.parse(process.env);
