@@ -13,7 +13,7 @@ export async function signAuthToken(payload: { sub: number; role: string }): Pro
   const token = await new SignJWT(jwtPayload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('24h')
+    .setExpirationTime(config.jwtExpiresIn)
     .sign(secret);
   return token;
 }
@@ -38,9 +38,9 @@ export async function verifyAuthToken(token: string) {
 }
 
 // Sprint 4: Seat Access Token
-export async function signAccessToken(payload: { sub: number; event_id: number }) {
-  return new SignJWT({ ...payload, type: 'seat_access' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime(`${config.accessTokenDuration}s`)
-    .sign(secret);
-}
+// export async function signAccessToken(payload: { sub: number; event_id: number }) {
+//   return new SignJWT({ ...payload, type: 'seat_access' })
+//     .setProtectedHeader({ alg: 'HS256' })
+//     .setExpirationTime(`${config.accessTokenDuration}s`)
+//     .sign(secret);
+// }
