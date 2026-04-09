@@ -3,30 +3,17 @@ import { hashPassword, verifyPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import { loginSchema, registerSchema } from '$lib/shared/schemas';
+import { validateInput } from '$lib/shared/validation';
 import { eq } from 'drizzle-orm';
-import { registerSchema, loginSchema } from '$lib/shared/schemas';
 
 export const authService = {
   async register(data: unknown) {
     // 1. VALIDATE BẰNG ZOD
-    const parsed = registerSchema.safeParse(data);
-
-    if (!parsed.success) {
-      const details: Record<string, string> = {};
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-
-      for (const [key, messages] of Object.entries(fieldErrors)) {
-        if (messages && messages.length > 0) {
-          details[key] = messages[0];
-        }
-      }
-
-      // SỬ DỤNG THEO CẤU TRÚC MỚI:
-      // Vì Errors.VALIDATION là một hàm, ta gọi nó và truyền details vào
-      throw Errors.VALIDATION(details);
-    }
-
-    const { email, password, full_name, phone, date_of_birth, gender, avatar_url } = parsed.data;
+    const { email, password, full_name, phone, date_of_birth, gender, avatar_url } = validateInput(
+      registerSchema,
+      data,
+    );
 
     // 2. TIỀN XỬ LÝ
     const normalizedEmail = email.trim().toLowerCase();
@@ -74,14 +61,14 @@ export const authService = {
   },
 
   async login(data: unknown) {
-    const parsed = loginSchema.safeParse(data);
-
-    if (!parsed.success) {
-      // Login sai định dạng trả luôn 401 để bảo mật
+    // Login validation: catch VALIDATION_ERROR and re-throw as INVALID_CREDENTIALS for security
+    let email: string;
+    let password: string;
+    try {
+      ({ email, password } = validateInput(loginSchema, data));
+    } catch {
       throwError(Errors.INVALID_CREDENTIALS);
     }
-
-    const { email, password } = parsed.data;
     const normalizedEmail = email.trim().toLowerCase();
 
     const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
@@ -98,7 +85,17 @@ export const authService = {
 
     const token = await signAuthToken({ sub: user.id, role: user.role });
 
-    const { passwordHash: _hash, createdAt: _created, updatedAt: _updated, ...userInfo } = user;
+    const userInfo = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      dateOfBirth: user.dateOfBirth,
+      gender: user.gender,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      isActive: user.isActive,
+    };
 
     return { user: userInfo, token };
   },
