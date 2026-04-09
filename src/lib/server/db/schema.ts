@@ -1,3 +1,4 @@
+// src/lib/server/db/schema.ts
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -18,7 +19,7 @@ import {
 export const roleEnum = pgEnum('role', ['admin', 'customer']);
 export const genderEnum = pgEnum('gender', ['male', 'female', 'other']);
 export const eventStatusEnum = pgEnum('event_status', ['draft', 'published']);
-export const seatStatusEnum = pgEnum('seat_status', ['available', 'locked', 'sold']);
+export const seatStatusEnum = pgEnum('seat_status', ['available', 'locked', 'sold', 'disabled']);
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'cancelled']);
 
 // ── Users ──────────────────────────────────────
@@ -63,6 +64,10 @@ export const seatSections = pgTable('seat_sections', {
   rows: integer('rows').notNull(),
   cols: integer('cols').notNull(),
   price: decimal('price', { precision: 12, scale: 2 }).notNull(),
+  layoutX: integer('layout_x').notNull().default(0),
+  layoutY: integer('layout_y').notNull().default(0),
+  startRowIndex: integer('start_row_index').notNull().default(0),
+  startColIndex: integer('start_col_index').notNull().default(1),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -85,7 +90,7 @@ export const seats = pgTable(
     lockedAt: timestamp('locked_at', { withTimezone: true }),
   },
   (table) => [
-    uniqueIndex('idx_seats_unique').on(table.sectionId, table.rowLabel, table.colNumber),
+    uniqueIndex('uq_seat_label_per_event').on(table.eventId, table.rowLabel, table.colNumber),
     index('idx_seats_event_status').on(table.eventId, table.status),
   ],
 );
@@ -115,6 +120,7 @@ export const orders = pgTable(
       .where(sql`${table.status} = 'pending'`),
   ],
 );
+
 // ── Order Items ────────────────────────────────
 export const orderItems = pgTable('order_items', {
   id: serial('id').primaryKey(),
