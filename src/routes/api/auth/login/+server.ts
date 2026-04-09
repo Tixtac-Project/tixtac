@@ -22,8 +22,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     return json({ data: user }, { status: 200 });
   } catch (e: unknown) {
     if (e instanceof AppError) {
-      // Trả về đúng format error được yêu cầu
-      return json({ error: { code: e.code, message: e.message } }, { status: e.statusCode });
+      return json(
+        {
+          error: {
+            code: e.code,
+            message: e.message,
+            ...(e.details && { details: e.details }), // ← include nếu có
+          },
+        },
+        { status: e.statusCode },
+      );
     }
 
     if (e instanceof SyntaxError) {

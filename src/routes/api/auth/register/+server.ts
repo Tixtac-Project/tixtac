@@ -27,7 +27,7 @@ export const POST: RequestHandler = async ({ request }) => {
           error: {
             code: e.code,
             message: e.message,
-            ...(e.details ? { details: e.details } : {}),
+            ...(e.details && { details: e.details }),
           },
         },
         { status: e.statusCode },
