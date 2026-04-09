@@ -25,7 +25,7 @@ export async function verifyAuthToken(token: string) {
     const sub = Number(payload.sub);
 
     if (!Number.isFinite(sub)) {
-      throw new Error("Invalid token: sub must be a number");
+      throw new Error('Invalid token: sub must be a number');
     }
 
     return {
@@ -33,7 +33,7 @@ export async function verifyAuthToken(token: string) {
       sub,
     };
   } catch (err) {
-    throw new Error("Invalid or expired token");
+    throw new Error('Invalid or expired token');
   }
 }
 

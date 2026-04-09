@@ -1,5 +1,5 @@
-import { verifyAuthToken } from "$lib/server/auth/jwt";
-import type { Handle } from "@sveltejs/kit";
+import { verifyAuthToken } from '$lib/server/auth/jwt';
+import type { Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
   const token = event.cookies.get('auth_token');
@@ -10,13 +10,19 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   try {
-    const payload = await verifyAuthToken(token);
+    const payload = (await verifyAuthToken(token)) as { sub: number; role: string };
+    const role = payload.role;
+
+    if (role !== 'admin' && role !== 'customer') {
+      throw new Error('Role trong token không hợp lệ!');
+    }
+
     event.locals.user = {
       id: Number(payload.sub),
-      role: payload.role as 'admin' | 'customer'
-    }
+      role: role as 'admin' | 'customer',
+    };
   } catch (e) {
-    event.cookies.delete('auth_token', { path: '/'});
+    event.cookies.delete('auth_token', { path: '/' });
     event.locals.user = null;
   }
 

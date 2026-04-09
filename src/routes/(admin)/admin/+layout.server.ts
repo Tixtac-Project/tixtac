@@ -1,5 +1,5 @@
-import { redirect } from "@sveltejs/kit";
-import { requireAdmin } from "$lib/server/auth/guards";
+import { redirect } from '@sveltejs/kit';
+import { requireAdmin } from '$lib/server/auth/guards';
 
 export const load = async ({ locals }) => {
   if (!locals.user) {

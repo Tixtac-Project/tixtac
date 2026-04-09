@@ -1,4 +1,4 @@
-import { error } from "@sveltejs/kit";
+import { error } from '@sveltejs/kit';
 
 export function requireAuth(locals: App.Locals) {
   if (!locals.user) {
