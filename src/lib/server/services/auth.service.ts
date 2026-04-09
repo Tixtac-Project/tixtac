@@ -129,20 +129,13 @@ export const authService = {
   },
 
   async login(data: { email?: string; password?: string }) {
-    if (
-      !data ||
-      typeof data !== "object" ||
-      Array.isArray(data)
-    ) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Errors.VALIDATION;
     }
 
     const { email, password } = data;
 
-    if (
-      typeof email !== "string" ||
-      typeof password !== "string"
-    ) {
+    if (typeof email !== 'string' || typeof password !== 'string') {
       throw Errors.VALIDATION;
     }
 

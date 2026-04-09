@@ -1,5 +1,6 @@
 import { db } from '$lib/server/db';
 import { events, seatSections, seats, users } from '$lib/server/db/schema';
+import * as argon2 from 'argon2';
 
 /**
  * Mock password-hashing helper used for development and testing.
@@ -9,8 +10,8 @@ import { events, seatSections, seats, users } from '$lib/server/db/schema';
  * @param plain - The plaintext password to hash
  * @returns The mocked hashed string in the form `hashed_<plain>`
  */
-async function hashPassword(plain: string): Promise<string> {
-  return `hashed_${plain}`;
+export async function hashPassword(password: string): Promise<string> {
+  return await argon2.hash(password, { type: argon2.argon2id });
 }
 
 /**

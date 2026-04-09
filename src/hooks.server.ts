@@ -1,20 +1,41 @@
+import { verifyAuthToken } from '$lib/server/auth/jwt';
 import type { Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
-  // TODO (#5): Đọc JWT từ cookie và verify
-  // const token = event.cookies.get('auth_token');
-  //
-  // if (token) {
-  //   try {
-  //     const payload = verifyToken(token);
-  //     event.locals.user = { id: payload.sub, role: payload.role };
-  //   } catch {
-  //     event.locals.user = null;
-  //     event.cookies.delete('auth_token', { path: '/' });
-  //   }
-  // }
+  const token = event.cookies.get('auth_token');
 
-  event.locals.user = null;
+  if (!token) {
+    event.locals.user = null;
+    return resolve(event);
+  }
+
+  try {
+    const raw = await verifyAuthToken(token);
+
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      typeof (raw as Record<string, unknown>).role !== 'string'
+    ) {
+      throw new Error('Malformed token payload');
+    }
+
+    const payload = raw as { sub: string | number; role: string };
+    const role = payload.role;
+
+    if (role !== 'admin' && role !== 'customer') {
+      throw new Error('Invalid role in token');
+    }
+
+    event.locals.user = {
+      id: typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : Number(payload.sub),
+      role: role as 'admin' | 'customer',
+    };
+  } catch (e) {
+    console.warn('[auth] Token validation failed:', e instanceof Error ? e.message : e);
+    event.cookies.delete('auth_token', { path: '/' });
+    event.locals.user = null;
+  }
 
   return resolve(event);
 };
