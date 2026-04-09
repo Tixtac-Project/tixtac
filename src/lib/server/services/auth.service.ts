@@ -2,7 +2,7 @@ import { signAuthToken } from '$lib/server/auth/jwt';
 import { hashPassword, verifyPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
-import { Errors, throwError } from '$lib/server/errors';
+import { AppError, Errors, throwError } from '$lib/server/errors';
 import { loginSchema, registerSchema } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
 import { eq } from 'drizzle-orm';
@@ -15,10 +15,6 @@ export const authService = {
       data,
     );
 
-    // 2. TIỀN XỬ LÝ
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedName = full_name.trim();
-
     // 3. BĂM MẬT KHẨU
     const passwordHash = await hashPassword(password);
 
@@ -27,9 +23,9 @@ export const authService = {
       const [newUser] = await db
         .insert(users)
         .values({
-          email: normalizedEmail,
+          email: email,
           passwordHash,
-          fullName: normalizedName,
+          fullName: full_name,
           phone: phone || null,
           dateOfBirth: date_of_birth,
           gender: gender,
@@ -61,13 +57,17 @@ export const authService = {
   },
 
   async login(data: unknown) {
-    // Login validation: catch VALIDATION_ERROR and re-throw as INVALID_CREDENTIALS for security
+    // Login validation: remap VALIDATION_ERROR → INVALID_CREDENTIALS for security
+    // (don't reveal which field is wrong), but rethrow unexpected errors
     let email: string;
     let password: string;
     try {
       ({ email, password } = validateInput(loginSchema, data));
-    } catch {
-      throwError(Errors.INVALID_CREDENTIALS);
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'VALIDATION_ERROR') {
+        throwError(Errors.INVALID_CREDENTIALS);
+      }
+      throw e;
     }
     const normalizedEmail = email.trim().toLowerCase();
 

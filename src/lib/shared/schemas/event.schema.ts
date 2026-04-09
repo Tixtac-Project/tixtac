@@ -22,9 +22,10 @@ export const createEventSchema = z.object({
   description: z.string(req('Mô tả là bắt buộc')).min(1, 'Mô tả không được trống'),
   venue: z.string(req('Địa điểm là bắt buộc')).min(1, 'Địa điểm không được trống'),
 
-  event_date: z.iso
-    .datetime('Ngày sự kiện không hợp lệ', req('Ngày sự kiện là bắt buộc'))
-    .refine((val) => new Date(val) > new Date(), 'Ngày sự kiện phải trong tương lai'),
+  event_date: z
+    .string(req('Ngày sự kiện là bắt buộc'))
+    .pipe(z.iso.datetime({ offset: true }))
+    .check(z.refine((val) => new Date(val) > new Date(), 'Ngày sự kiện phải trong tương lai')),
 
   banner_image_url: z.url('URL ảnh không hợp lệ').optional().or(z.literal('')),
 

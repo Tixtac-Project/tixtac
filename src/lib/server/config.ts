@@ -6,6 +6,7 @@ import { z } from 'zod';
 // Schema: single source of truth for env validation + type coercion
 const envSchema = z.object({
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+  JWT_EXPIRES_IN: z.string().default('24h'),
   SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
   MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
@@ -14,6 +15,7 @@ const envSchema = z.object({
 // Parse & validate (fail fast in ALL environments)
 const result = envSchema.safeParse({
   JWT_SECRET: env.JWT_SECRET,
+  JWT_EXPIRES_IN: env.JWT_EXPIRES_IN,
   SEAT_LOCK_DURATION: env.SEAT_LOCK_DURATION,
   MAX_CONCURRENT_USERS: env.MAX_CONCURRENT_USERS,
   ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
@@ -36,6 +38,8 @@ export const config = {
   isDev: dev,
   /** JWT signing secret */
   jwtSecret: parsed.JWT_SECRET,
+  /** JWT auth token expiration (e.g. '24h', '7d') — passed to jose setExpirationTime() */
+  jwtExpiresIn: parsed.JWT_EXPIRES_IN,
   /** Seat lock duration in seconds */
   seatLockDuration: parsed.SEAT_LOCK_DURATION,
   /** Virtual queue threshold */
