@@ -1,36 +1,49 @@
-import * as env from '$env/static/private';
-import * as env from '$env/static/private';
+// src/lib/server/config.ts
+import { dev } from '$app/environment';
+import { env } from '$env/dynamic/private';
+import { z } from 'zod';
 
-function requireEnv(name: string, value: string | undefined): string {
-  if (!value) throw new Error(`Missing required env: ${name}`);
-  return value;
+// Schema: single source of truth for env validation + type coercion
+const envSchema = z.object({
+  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+  JWT_EXPIRES_IN: z.string().default('24h'),
+  SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
+  MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
+  ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
+});
+
+// Parse & validate (fail fast in ALL environments)
+const result = envSchema.safeParse({
+  JWT_SECRET: env.JWT_SECRET,
+  JWT_EXPIRES_IN: env.JWT_EXPIRES_IN,
+  SEAT_LOCK_DURATION: env.SEAT_LOCK_DURATION,
+  MAX_CONCURRENT_USERS: env.MAX_CONCURRENT_USERS,
+  ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
+});
+
+if (!result.success) {
+  const message = result.error.issues
+    .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+    .join('\n  • ');
+
+  // Startup error → plain Error, NOT AppError (no HTTP context here)
+  throw new Error(`❌ Invalid environment configuration:\n  • ${message}`);
 }
 
-function toPositiveInt(name: string, value: string | undefined, fallback: number): number {
-  const parsed = Number(value ?? fallback);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid env ${name}: expected positive number`);
-  }
-  return parsed;
-}
+const parsed = result.data;
 
+// ─── Export typed, camelCase-only config ───
 export const config = {
-  // Database
-  databaseUrl: requireEnv('DATABASE_URL', env.DATABASE_URL),
-
-  // Message Queue
-  amqpUrl: requireEnv('AMQP_URL', env.AMQP_URL),
-
-  // Auth
-  jwtSecret: requireEnv('JWT_SECRET', env.JWT_SECRET),
-  jwtExpiresIn: '24h',
-
-  // Business Rules
-  seatLockDuration: toPositiveInt('SEAT_LOCK_DURATION', env.SEAT_LOCK_DURATION, 600),        // giây
-  maxConcurrentUsers: toPositiveInt('MAX_CONCURRENT_USERS', env.MAX_CONCURRENT_USERS, 200),
-  accessTokenDuration: toPositiveInt('ACCESS_TOKEN_DURATION', env.ACCESS_TOKEN_DURATION, 300),   // giây
-  queuePollingInterval: 3000,                                      // ms
-
-  // SSE
-  sseHeartbeatInterval: 30_000,                                    // ms
+  /** True in development mode (from SvelteKit's $app/environment) */
+  isDev: dev,
+  /** JWT signing secret */
+  jwtSecret: parsed.JWT_SECRET,
+  /** JWT auth token expiration (e.g. '24h', '7d') — passed to jose setExpirationTime() */
+  jwtExpiresIn: parsed.JWT_EXPIRES_IN,
+  /** Seat lock duration in seconds */
+  seatLockDuration: parsed.SEAT_LOCK_DURATION,
+  /** Virtual queue threshold */
+  maxConcurrentUsers: parsed.MAX_CONCURRENT_USERS,
+  /** Access token lifetime in seconds after queue*/
+  accessTokenDuration: parsed.ACCESS_TOKEN_DURATION,
 } as const;

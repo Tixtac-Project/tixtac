@@ -1,16 +1,22 @@
 // src/lib/server/errors.ts
-// Lớp lỗi tùy chỉnh cho ứng dụng
-// Mỗi lỗi sẽ có mã lỗi (code), mã trạng thái HTTP (statusCode) và thông điệp (message)
-// Các lỗi được định nghĩa sẵn trong đối tượng Errors để dễ sử dụng trong toàn bộ ứng dụng
-// Ví dụ: throw throwError(Errors.UNAUTHORIZED) để ném lỗi không được phép truy cập
-// Lưu ý: mỗi lần throw cần tạo instance mới của AppError để tránh lỗi bị ghi đè thông tin
 
+/**
+ * Base error class for all application-level (HTTP) errors.
+ * Caught by route handlers and serialized into JSON responses.
+ *
+ * Do NOT use for startup/config errors — use plain `Error` instead.
+ */
 export class AppError extends Error {
   public code: string;
   public statusCode: number;
-  public details?: unknown;
+  public details?: Record<string, string>;
 
-  constructor(code: string, statusCode: number, message?: string, details?: unknown) {
+  constructor(
+    code: string,
+    statusCode: number,
+    message?: string,
+    details?: Record<string, string>,
+  ) {
     super(message || code);
     this.code = code;
     this.statusCode = statusCode;
@@ -18,6 +24,21 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * Pre-defined error catalog.
+ *
+ * Two kinds of entries:
+ *
+ * 1. **Static singletons** (e.g. `Errors.UNAUTHORIZED`)
+ *    – Fixed code + statusCode + message. No dynamic data.
+ *    – Usage: `throwError(Errors.UNAUTHORIZED)`
+ *      (throwError clones them so the singleton is never mutated)
+ *
+ * 2. **Factory functions** (e.g. `Errors.VALIDATION(details)`)
+ *    – Need dynamic data (like field-level details) at call site.
+ *    – Usage: `throw Errors.VALIDATION(details)`
+ *      (already creates a new instance, no need for throwError)
+ */
 export const Errors = {
   // Auth
   UNAUTHORIZED: new AppError('UNAUTHORIZED', 401, 'Vui lòng đăng nhập'),
@@ -25,31 +46,40 @@ export const Errors = {
   EMAIL_EXISTS: new AppError('EMAIL_EXISTS', 409, 'Email đã được sử dụng'),
   INVALID_CREDENTIALS: new AppError('INVALID_CREDENTIALS', 401, 'Email hoặc mật khẩu không đúng'),
 
-  // Booking
-  SEAT_CONFLICT: new AppError('SEAT_CONFLICT', 409, 'Ghế đã được người khác chọn'),
-  LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 410, 'Hết thời gian giữ chỗ'),
-  ORDER_NOT_OWNED: new AppError('ORDER_NOT_OWNED', 403, 'Đơn hàng không thuộc về bạn'),
-  ORDER_NOT_PENDING: new AppError(
-    'ORDER_NOT_PENDING',
-    400,
-    'Đơn hàng không ở trạng thái chờ thanh toán',
-  ),
-
-  // Queue
-  QUEUE_REQUIRED: new AppError('QUEUE_REQUIRED', 403, 'Vui lòng xếp hàng'),
-  QUEUE_NOT_FOUND: new AppError('QUEUE_NOT_FOUND', 404, 'Không tìm thấy vị trí trong hàng chờ'),
-
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
-  VALIDATION: new AppError('VALIDATION_ERROR', 400, 'Dữ liệu không hợp lệ'),
+
+  // Validation (factory — accepts dynamic details)
+  VALIDATION: (details?: Record<string, string>) =>
+    new AppError('VALIDATION_ERROR', 400, 'Dữ liệu không hợp lệ', details),
 } as const;
 
-// Helper: clone error (vì mỗi throw cần instance mới)
-export function throwError(error: AppError, customMessage?: string, details?: unknown): never {
+/**
+ * Throws a **clone** of a static error singleton from `Errors`.
+ * This prevents mutating the original singleton when overriding message/details.
+ *
+ * When to use each pattern:
+ *
+ * | Pattern                              | When to use                                    |
+ * |--------------------------------------|------------------------------------------------|
+ * | `throwError(Errors.UNAUTHORIZED)`    | Static errors — no dynamic data needed         |
+ * | `throwError(Errors.NOT_FOUND, '...')`| Static errors — override message at call site  |
+ * | `throw Errors.VALIDATION(details)`   | Factory errors — pass dynamic data directly    |
+ * | `throw new AppError(...)`            | One-off errors that don't fit the catalog      |
+ *
+ * @param error   - A static AppError singleton from `Errors`
+ * @param message - Optional override message (defaults to the singleton's message)
+ * @param details - Optional override details (defaults to the singleton's details)
+ */
+export function throwError(
+  error: AppError,
+  message?: string,
+  details?: Record<string, string>,
+): never {
   throw new AppError(
     error.code,
     error.statusCode,
-    customMessage || error.message,
+    message || error.message,
     details ?? error.details,
   );
 }

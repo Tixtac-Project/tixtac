@@ -1,106 +1,34 @@
 import { signAuthToken } from '$lib/server/auth/jwt';
-import { hashPassword } from '$lib/server/auth/password';
+import { hashPassword, verifyPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
-import { Errors, throwError } from '$lib/server/errors';
+import { AppError, Errors, throwError } from '$lib/server/errors';
+import { loginSchema, registerSchema } from '$lib/shared/schemas';
+import { validateInput } from '$lib/shared/validation';
 import { eq } from 'drizzle-orm';
-import { verifyPassword } from '$lib/server/auth/password';
-
-interface RegisterData {
-  email: string;
-  password: string;
-  full_name: string;
-  phone?: string;
-  date_of_birth: string;
-  gender: string;
-  avatar_url?: string;
-}
 
 export const authService = {
   async register(data: unknown) {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throwError(Errors.VALIDATION, 'Dữ liệu không hợp lệ');
-    }
-
-    let { email, password, full_name, phone, date_of_birth, gender, avatar_url } =
-      data as RegisterData;
-
-    const details: Record<string, string> = {};
-    if (typeof email !== 'string' || !email.trim()) details.email = 'Email là bắt buộc';
-    if (typeof password !== 'string' || !password.trim()) details.password = 'Password là bắt buộc';
-    if (typeof full_name !== 'string' || !full_name.trim())
-      details.full_name = 'Tên đầy đủ là bắt buộc';
-    if (typeof date_of_birth !== 'string' || !date_of_birth.trim())
-      details.date_of_birth = 'Ngày sinh là bắt buộc';
-    if (typeof gender !== 'string' || !gender.trim()) details.gender = 'Giới tính là bắt buộc';
-    if (Object.keys(details).length > 0) {
-      throwError(Errors.VALIDATION, 'Dữ liệu không hợp lệ', details);
-    }
-
-    if (!email || !password || !full_name || !date_of_birth || !gender) {
-      throwError(Errors.VALIDATION, 'Dữ liệu không hợp lệ');
-    }
-
-    // Tiền xử lý (Sanitize)
-    email = email.trim().toLowerCase();
-    full_name = full_name.trim();
-
-    if (full_name.length < 2 || full_name.length > 100) {
-      throwError(Errors.VALIDATION, 'Tên phải từ 2 đến 100 ký tự');
-    }
-
-    // 1. Kiểm tra định dạng Email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      throwError(Errors.VALIDATION, 'Định dạng email không hợp lệ');
-    }
-
-    // 2. Kiểm tra tuổi >= 16
-    const birthDate = new Date(date_of_birth);
-    if (isNaN(birthDate.getTime())) {
-      throwError(Errors.VALIDATION, 'Định dạng ngày sinh không hợp lệ');
-    }
-
-    const today = new Date();
-    const minDate = new Date(
-      today.getUTCFullYear() - 16,
-      today.getUTCMonth(),
-      today.getUTCDate(),
-      0,
-      0,
-      0,
-      0,
+    // 1. VALIDATE BẰNG ZOD
+    const { email, password, full_name, phone, date_of_birth, gender, avatar_url } = validateInput(
+      registerSchema,
+      data,
     );
 
-    // Normalize birthDate to local midnight if it's a date string like 'YYYY-MM-DD'
-    // or use UTC if you prefer consistency across server/client.
-    // For ISO date strings 'YYYY-MM-DD', new Date(date_of_birth) is UTC.
-    if (birthDate > minDate) {
-      throwError(Errors.VALIDATION, 'Bạn phải từ 16 tuổi trở lên để đăng ký');
-    }
-
-    if (password.length < 8) {
-      throwError(Errors.VALIDATION, 'Mật khẩu phải từ 8 ký tự trở lên');
-    }
-
-    if (!['male', 'female', 'other'].includes(gender)) {
-      throwError(Errors.VALIDATION, 'Giới tính không hợp lệ');
-    }
-
-    // Băm mật khẩu (Gọi từ Infrastructure Layer)
+    // 3. BĂM MẬT KHẨU
     const passwordHash = await hashPassword(password);
 
+    // 4. LƯU DATABASE
     try {
-      // Insert vào DB
       const [newUser] = await db
         .insert(users)
         .values({
-          email,
+          email: email,
           passwordHash,
           fullName: full_name,
-          phone,
+          phone: phone || null,
           dateOfBirth: date_of_birth,
-          gender: gender as 'male' | 'female' | 'other',
+          gender: gender,
           avatarUrl: avatar_url || null,
         })
         .returning({
@@ -120,53 +48,54 @@ export const authService = {
       return newUser;
     } catch (e: unknown) {
       const error = e as { code?: string };
-
       if (error.code === '23505') {
-        throwError(Errors.EMAIL_EXISTS, 'Email đã được sử dụng');
+        // Dùng helper throwError để clone lỗi EMAIL_EXISTS
+        throwError(Errors.EMAIL_EXISTS);
       }
       throw e;
     }
   },
 
-  async login(data: { email?: string; password?: string }) {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw Errors.VALIDATION;
+  async login(data: unknown) {
+    // Login validation: remap VALIDATION_ERROR → INVALID_CREDENTIALS for security
+    // (don't reveal which field is wrong), but rethrow unexpected errors
+    let email: string;
+    let password: string;
+    try {
+      ({ email, password } = validateInput(loginSchema, data));
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'VALIDATION_ERROR') {
+        throwError(Errors.INVALID_CREDENTIALS);
+      }
+      throw e;
     }
-
-    const { email, password } = data;
-
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      throw Errors.VALIDATION;
-    }
-
     const normalizedEmail = email.trim().toLowerCase();
 
-    if (!normalizedEmail || !password.trim()) {
-      throw Errors.VALIDATION;
-    }
-
-    // 1. Query user theo email
     const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
 
-    if (!user) {
-      throw Errors.INVALID_CREDENTIALS;
+    // Kiểm tra user tồn tại và đang hoạt động
+    if (!user || !user.isActive) {
+      throwError(Errors.INVALID_CREDENTIALS);
     }
 
-    if (!user.isActive) {
-      throw Errors.INVALID_CREDENTIALS; // Or a specific ACCOUNT_DISABLED error
-    }
-
-    // 2. Compare password (bằng file infra password.ts đã tạo ở task trước)
     const isPasswordValid = await verifyPassword(user.passwordHash, password);
     if (!isPasswordValid) {
-      throw Errors.INVALID_CREDENTIALS;
+      throwError(Errors.INVALID_CREDENTIALS);
     }
 
-    // 3. Sign JWT
     const token = await signAuthToken({ sub: user.id, role: user.role });
 
-    // 4. Loại bỏ passwordHash trước khi trả thông tin về client
-    const { passwordHash: _hash, createdAt: _created, updatedAt: _updated, ...userInfo } = user;
+    const userInfo = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      dateOfBirth: user.dateOfBirth,
+      gender: user.gender,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      isActive: user.isActive,
+    };
 
     return { user: userInfo, token };
   },
