@@ -1,36 +1,80 @@
+// src/lib/server/db/seed.ts
 import { db } from '$lib/server/db';
-import { events, seatSections, seats, users } from '$lib/server/db/schema';
+import { events, orderItems, orders, seatSections, seats, users } from '$lib/server/db/schema';
 import * as argon2 from 'argon2';
+import { sql } from 'drizzle-orm';
+
+// ── Helpers ────────────────────────────────────
 
 /**
- * Mock password-hashing helper used for development and testing.
- *
- * This function does not perform real cryptographic hashing; it returns a deterministic placeholder derived from the input.
- *
- * @param plain - The plaintext password to hash
- * @returns The mocked hashed string in the form `hashed_<plain>`
+ * Hash a plaintext password using argon2id.
  */
 export async function hashPassword(password: string): Promise<string> {
   return await argon2.hash(password, { type: argon2.argon2id });
 }
 
 /**
+ * Convert a 0-based index to a row label.
+ * 0→A, 1→B, 25→Z, 26→AA, 27→AB
+ */
+function getRowLabel(index: number): string {
+  let label = '';
+  let i = index;
+  while (i >= 0) {
+    label = String.fromCharCode(65 + (i % 26)) + label;
+    i = Math.floor(i / 26) - 1;
+  }
+  return label;
+}
+
+// ── Types ──────────────────────────────────────
+
+interface SectionSeed {
+  name: string;
+  rows: number;
+  cols: number;
+  price: string;
+  layoutX: number;
+  layoutY: number;
+  startRowIndex: number;
+  startColIndex: number;
+  sortOrder: number;
+  disabledSeats?: string[];
+}
+
+// ── Seed ───────────────────────────────────────
+
+/**
  * Seed the development database with initial users, events, sections, and seats.
  *
- * Inserts an admin user and several customer users, creates two sample events
- * ("Rock Festival 2026" and "EDM Night Saigon"), and for each event creates
- * seat sections and generates seat rows/columns marked as available. Logs
- * progress and a summary of seeded seat counts.
+ * Cleans all existing data first (FK-safe order), then inserts:
+ * - 1 admin + 5 customers
+ * - Event 1: "Rock Festival 2026" — VIP split Left/Right + Standard (flex layout demo)
+ * - Event 2: "EDM Night Saigon" — 3 sections with disabled seats demo
  */
 export async function seed() {
   console.log('🌱 Bắt đầu seed data...');
 
-  // await db.delete(seats);
-  // await db.delete(seatSections);
-  // await db.delete(events);
-  // await db.delete(users);
+  // ════════════════════════════════════════════
+  // 🧹 Cleanup — xóa data cũ theo thứ tự FK (con → cha)
+  // ════════════════════════════════════════════
+  console.log('🧹 Cleaning existing data...');
+  await db.delete(orderItems);
+  await db.delete(orders);
+  await db.delete(seats);
+  await db.delete(seatSections);
+  await db.delete(events);
+  await db.delete(users);
 
-  // ── Admin ──
+  // Reset auto-increment sequences để ID bắt đầu từ 1
+  await db.execute(sql`ALTER SEQUENCE users_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE events_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE seat_sections_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE seats_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE orders_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE order_items_id_seq RESTART WITH 1`);
+
+  // ── Admin ──────────────────────────────────
   const [admin] = await db
     .insert(users)
     .values({
@@ -63,7 +107,19 @@ export async function seed() {
     });
   }
 
-  // ── Event 1: Rock Festival ──
+  // ── Event 1: Rock Festival — VIP chia Trái/Phải + Standard ──
+  // Demo: flex layout với lối đi giữa 2 block VIP
+  //
+  // [SÂN KHẤU]
+  //
+  // VIP-Trái (A1–A5)   [lối đi]   VIP-Phải (A6–A10)
+  // VIP-Trái (B1–B5)   [lối đi]   VIP-Phải (B6–B10)
+  // VIP-Trái (C1–C5)   [lối đi]   VIP-Phải (C6–C10)
+  //
+  // Standard (D1–D20)
+  // ...
+  // Standard (M1–M20)
+
   const [event1] = await db
     .insert(events)
     .values({
@@ -78,11 +134,55 @@ export async function seed() {
     .returning();
 
   await createSections(event1.id, [
-    { name: 'VIP', rows: 5, cols: 20, price: '2000000', sortOrder: 0 },
-    { name: 'Standard', rows: 10, cols: 30, price: '500000', sortOrder: 1 },
+    {
+      name: 'VIP - Trái',
+      rows: 3,
+      cols: 5,
+      price: '2000000',
+      layoutX: 0,
+      layoutY: 100,
+      startRowIndex: 0, // A
+      startColIndex: 1, // 1–5
+      sortOrder: 0,
+    },
+    {
+      name: 'VIP - Phải',
+      rows: 3,
+      cols: 5,
+      price: '2000000',
+      layoutX: 80, // Cách block trái → tạo lối đi
+      layoutY: 100, // Cùng hàng ngang
+      startRowIndex: 0, // Vẫn A
+      startColIndex: 6, // 6–10 → liền mạch với bên trái
+      sortOrder: 1,
+    },
+    {
+      name: 'Standard',
+      rows: 10,
+      cols: 20,
+      price: '500000',
+      layoutX: 0,
+      layoutY: 250, // Phía sau VIP
+      startRowIndex: 3, // D (nối tiếp sau hàng C của VIP)
+      startColIndex: 1,
+      sortOrder: 2,
+    },
   ]);
 
-  // ── Event 2: EDM Night ──
+  const event1TotalSeats = 3 * 5 + 3 * 5 + 10 * 20; // 230
+
+  // ── Event 2: EDM Night — Có disabled seats ──
+  // Demo: ghế bị vô hiệu hóa do cột chắn tầm nhìn
+  //
+  // Diamond:  A1–A15 (hàng đầu, không bị chắn)
+  //           B1–B15 (B8 disabled — cột chắn)
+  //           C1–C15 (C8 disabled — cột chắn)
+  //
+  // Gold:     D1–D20
+  // ...
+  // Silver:   I1–I25
+  // ...
+
   const [event2] = await db
     .insert(events)
     .values({
@@ -97,34 +197,66 @@ export async function seed() {
     .returning();
 
   await createSections(event2.id, [
-    { name: 'Diamond', rows: 3, cols: 15, price: '3000000', sortOrder: 0 },
-    { name: 'Gold', rows: 5, cols: 20, price: '1500000', sortOrder: 1 },
-    { name: 'Silver', rows: 10, cols: 25, price: '700000', sortOrder: 2 },
+    {
+      name: 'Diamond',
+      rows: 3,
+      cols: 15,
+      price: '3000000',
+      layoutX: 0,
+      layoutY: 50,
+      startRowIndex: 0, // A
+      startColIndex: 1,
+      sortOrder: 0,
+      disabledSeats: ['B8', 'C8'], // Cột chắn tầm nhìn
+    },
+    {
+      name: 'Gold',
+      rows: 5,
+      cols: 20,
+      price: '1500000',
+      layoutX: 0,
+      layoutY: 180,
+      startRowIndex: 3, // D (nối tiếp Diamond)
+      startColIndex: 1,
+      sortOrder: 1,
+    },
+    {
+      name: 'Silver',
+      rows: 10,
+      cols: 25,
+      price: '700000',
+      layoutX: 0,
+      layoutY: 380,
+      startRowIndex: 8, // I (nối tiếp Gold)
+      startColIndex: 1,
+      sortOrder: 2,
+      disabledSeats: ['I13', 'J13', 'K13'], // Cột chắn giữa Silver
+    },
   ]);
 
+  const event2DisabledCount = 2 + 3; // Diamond: 2, Silver: 3
+  const event2TotalSeats = 3 * 15 + 5 * 20 + 10 * 25; // 395 total grid
+  const event2AvailableSeats = event2TotalSeats - event2DisabledCount; // 390 available
+
+  // ── Summary ────────────────────────────────
   console.log('✅ Seed completed!');
-  console.log(`🎟️  Event 1: ${5 * 20 + 10 * 30} = 400 seats`);
-  console.log(`🎟️  Event 2: ${3 * 15 + 5 * 20 + 10 * 25} = 395 seats`);
+  console.log(`🎟️  Event 1: "${event1.title}" — ${event1TotalSeats} seats (VIP split Left/Right)`);
+  console.log(
+    `🎟️  Event 2: "${event2.title}" — ${event2AvailableSeats} available + ${event2DisabledCount} disabled = ${event2TotalSeats} total`,
+  );
 }
 
 /**
  * Create seat sections for an event and insert the corresponding seat records.
  *
- * For each entry in `sections`, inserts a `seatSections` record for the given `eventId`
- * and batch-inserts the generated seats for that section with status `'available'`.
+ * Supports flex seat layout:
+ * - `layoutX`/`layoutY`: position on the canvas (grid units)
+ * - `startRowIndex`/`startColIndex`: offset for row/col numbering
+ * - `disabledSeats`: array of seat labels (e.g. "B4") to mark as disabled
  *
- * @param eventId - The ID of the event to attach sections and seats to
- * @param sections - Array of section descriptors. Each descriptor must include:
- *   - `name`: section name
- *   - `rows`: number of seat rows (row labels start at "A")
- *   - `cols`: number of seats per row (columns numbered from 1)
- *   - `price`: price for the section
- *   - `sortOrder`: ordering index for the section
+ * Seats are batch-inserted in chunks of 1000 for performance.
  */
-async function createSections(
-  eventId: number,
-  sections: { name: string; rows: number; cols: number; price: string; sortOrder: number }[],
-) {
+async function createSections(eventId: number, sections: SectionSeed[]) {
   for (const s of sections) {
     const [section] = await db
       .insert(seatSections)
@@ -134,29 +266,43 @@ async function createSections(
         rows: s.rows,
         cols: s.cols,
         price: s.price,
+        layoutX: s.layoutX,
+        layoutY: s.layoutY,
+        startRowIndex: s.startRowIndex,
+        startColIndex: s.startColIndex,
         sortOrder: s.sortOrder,
       })
       .returning();
 
-    // Sinh ma trận ghế
+    // Sinh ma trận ghế với offset + disabled support
+    const disabledSet = new Set(s.disabledSeats ?? []);
     const seatValues = [];
+
     for (let r = 0; r < s.rows; r++) {
-      const rowLabel = String.fromCharCode(65 + r); // A, B, C, D,...
-      for (let c = 1; c <= s.cols; c++) {
+      const rowLabel = getRowLabel(s.startRowIndex + r);
+
+      for (let c = 0; c < s.cols; c++) {
+        const colNumber = s.startColIndex + c;
+        const label = `${rowLabel}${colNumber}`;
+
         seatValues.push({
           sectionId: section.id,
           eventId,
           rowLabel,
-          colNumber: c,
-          status: 'available' as const,
+          colNumber,
+          status: disabledSet.has(label) ? ('disabled' as const) : ('available' as const),
         });
       }
     }
-    // Batch insert để tối ưu hiệu năng
-    await db.insert(seats).values(seatValues);
+
+    // Batch insert (chunk 1000) để tối ưu hiệu năng
+    for (let i = 0; i < seatValues.length; i += 1000) {
+      await db.insert(seats).values(seatValues.slice(i, i + 1000));
+    }
   }
 }
 
+// ── Entry point ────────────────────────────────
 if (import.meta.main) {
   seed()
     .then(() => {
