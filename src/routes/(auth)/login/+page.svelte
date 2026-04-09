@@ -44,7 +44,7 @@
     if (!error && data) {
       toast.success('Đăng nhập thành công!');
       if (data.role === 'admin') {
-        goto(resolve('/admin'));
+        goto(resolve('/(admin)/admin'));
       } else {
         goto(resolve('/'));
       }
