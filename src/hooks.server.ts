@@ -10,18 +10,29 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   try {
-    const payload = (await verifyAuthToken(token)) as { sub: number; role: string };
+    const raw = await verifyAuthToken(token);
+
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      typeof (raw as Record<string, unknown>).role !== 'string'
+    ) {
+      throw new Error('Malformed token payload');
+    }
+
+    const payload = raw as { sub: string | number; role: string };
     const role = payload.role;
 
     if (role !== 'admin' && role !== 'customer') {
-      throw new Error('Role trong token không hợp lệ!');
+      throw new Error('Invalid role in token');
     }
 
     event.locals.user = {
-      id: Number(payload.sub),
+      id: typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : Number(payload.sub),
       role: role as 'admin' | 'customer',
     };
   } catch (e) {
+    console.warn('[auth] Token validation failed:', e instanceof Error ? e.message : e);
     event.cookies.delete('auth_token', { path: '/' });
     event.locals.user = null;
   }
