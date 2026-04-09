@@ -1,4 +1,5 @@
 // src/lib/shared/schemas/event.schema.ts
+import { getRowLabel, parseSeatLabel, rowLabelToIndex } from '$lib/utils/seat-label';
 import { z } from 'zod';
 
 // ── Helpers ────────────────────────────────────
@@ -9,7 +10,7 @@ const req = (msg: string) => ({
 const seatLabelRegex = /^[A-Z]+\d+$/; // A1, B12, AA3...
 
 // ── Section Schema ─────────────────────────────
-const sectionSchema = z.object({
+const baseSectionSchema = z.object({
   name: z.string(req('Tên khu vực là bắt buộc')).min(1, 'Tên khu vực không được trống'),
 
   rows: z
@@ -26,22 +27,65 @@ const sectionSchema = z.object({
 
   price: z.number(req('Giá là bắt buộc')).positive('Giá phải lớn hơn 0'),
 
-  // ── Flex Seat — Layout ──
   layout_x: z.number().int().min(0, 'layout_x không được âm').default(0),
-
   layout_y: z.number().int().min(0, 'layout_y không được âm').default(0),
 
-  // ── Flex Seat — Offset ──
   start_row_index: z.number().int().min(0, 'start_row_index không được âm').default(0),
-
   start_col_index: z.number().int().min(1, 'start_col_index phải >= 1').default(1),
 
-  // ── Disabled Seats ──
   disabled_seats: z
     .array(z.string().regex(seatLabelRegex, 'Seat label phải có dạng A1, B12, AA3...'))
     .default([]),
 
   sort_order: z.number().int().min(0).default(0),
+});
+
+// Thêm cross-field validation: disabled_seats phải nằm trong phạm vi section
+const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
+  if (!section.disabled_seats || section.disabled_seats.length === 0) return;
+
+  const startRow = section.start_row_index;
+  const endRow = startRow + section.rows - 1;
+  const startCol = section.start_col_index;
+  const endCol = startCol + section.cols - 1;
+
+  // Tính valid row labels để hiển thị trong error message
+  const minRowLabel = getRowLabel(startRow);
+  const maxRowLabel = getRowLabel(endRow);
+
+  const invalidSeats: string[] = [];
+
+  for (const label of section.disabled_seats) {
+    const parsed = parseSeatLabel(label);
+
+    if (!parsed) {
+      invalidSeats.push(label);
+      continue;
+    }
+
+    const rowIndex = rowLabelToIndex(parsed.rowLabel);
+
+    if (
+      rowIndex < startRow ||
+      rowIndex > endRow ||
+      parsed.colNumber < startCol ||
+      parsed.colNumber > endCol
+    ) {
+      invalidSeats.push(label);
+    }
+  }
+
+  if (invalidSeats.length > 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['disabled_seats'],
+      message:
+        `Các ghế không nằm trong phạm vi section (` +
+        `hàng ${minRowLabel}-${maxRowLabel}, ` +
+        `cột ${startCol}-${endCol}): ` +
+        `${invalidSeats.join(', ')}`,
+    });
+  }
 });
 
 // ── Event Schema ───────────────────────────────
@@ -72,7 +116,7 @@ export const createEventSchema = z
     }, 'Tổng số ghế không được vượt quá 50,000'),
   );
 
-// ── Update Sections Schema (cho PUT endpoint) ──
+// ── Update Sections Schema ─────────────────────
 export const updateSectionsSchema = z.object({
   sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
 });

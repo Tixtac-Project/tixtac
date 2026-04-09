@@ -30,7 +30,7 @@ export function rowLabelToIndex(label: string): number {
  * Parse "C5" → { rowLabel: "C", colNumber: 5 }
  */
 export function parseSeatLabel(label: string): { rowLabel: string; colNumber: number } | null {
-  const match = label.match(/^([A-Z]+)(\d+)$/);
+  const match = label.match(/^([A-Z]+)([1-9]\d*)$/);
   if (!match) return null;
   return { rowLabel: match[1], colNumber: parseInt(match[2], 10) };
 }
