@@ -2,7 +2,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { config } from '$lib/server/config';
 
-const secret = new TextEncoder().encode(config.JWT_SECRET);
+const secret = new TextEncoder().encode(config.jwtSecret);
 
 export async function signAuthToken(payload: { sub: number; role: string }): Promise<string> {
   const jwtPayload = {

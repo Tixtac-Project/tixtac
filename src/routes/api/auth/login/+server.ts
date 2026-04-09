@@ -1,8 +1,9 @@
 // src/routes/api/auth/login/+server.ts
+import { config } from '$lib/server/config';
+import { AppError } from '$lib/server/errors';
+import { authService } from '$lib/server/services/auth.service';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { authService } from '$lib/server/services/auth.service';
-import { AppError } from '$lib/server/errors';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
@@ -15,7 +16,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: !config.isDev,
       maxAge: 86400, // 24 giờ
     });
 
