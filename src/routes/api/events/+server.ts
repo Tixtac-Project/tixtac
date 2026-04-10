@@ -5,11 +5,16 @@ import { json } from '@sveltejs/kit';
 
 export const GET = apiHandler(async ({ url, locals }) => {
   const role = locals.user?.role;
+  const userId = locals.user?.id;
+  const pageParam = url.searchParams.get('page');
+  const limitParam = url.searchParams.get('limit');
+
   const data = await eventService.listEvents({
-    q: url.searchParams.get('q') || undefined,
-    page: url.searchParams.has('page') ? Number(url.searchParams.get('page')) : undefined,
-    limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined,
+    q: url.searchParams.get('q') ?? undefined,
+    page: pageParam !== null && !Number.isNaN(Number(pageParam)) ? Number(pageParam) : undefined,
+    limit: limitParam !== null && !Number.isNaN(Number(limitParam)) ? Number(limitParam) : undefined,
     role,
+    userId,
   });
   return json({ data });
 });

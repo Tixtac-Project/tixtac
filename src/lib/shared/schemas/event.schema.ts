@@ -134,3 +134,6 @@ export const eventQuerySchema = z.object({
 });
 
 export type EventQueryInput = z.infer<typeof eventQuerySchema>;
+
+// ── Event ID Schema (path param validation) ────
+export const eventIdSchema = z.coerce.number().int().positive('ID sự kiện không hợp lệ');

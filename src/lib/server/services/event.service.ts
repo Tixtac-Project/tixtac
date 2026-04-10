@@ -3,6 +3,7 @@ import { events, seatSections, seats } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import {
   createEventSchema,
+  eventIdSchema,
   eventQuerySchema,
   updateSectionsSchema,
   type SectionInput,
@@ -105,12 +106,16 @@ async function insertSectionsWithSeats(
 export const eventService = {
   async listEvents(params: {
     q?: string;
-    page?: number;
-    limit?: number;
+    page?: string | number;
+    limit?: string | number;
     role?: string;
     userId?: number;
   }) {
-    const { q, page, limit } = validateInput(eventQuerySchema, params);
+    const { q, page, limit } = validateInput(eventQuerySchema, {
+      q: params.q,
+      page: params.page,
+      limit: params.limit,
+    });
     const { role, userId } = params;
     const offset = (page - 1) * limit;
 
@@ -177,7 +182,9 @@ export const eventService = {
     };
   },
 
-  async getEventDetail(eventId: number, role?: string, userId?: number) {
+  async getEventDetail(rawEventId: string | number, role?: string, userId?: number) {
+    const eventId = validateInput(eventIdSchema, rawEventId);
+
     // 1. Get event basic info
     const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
 

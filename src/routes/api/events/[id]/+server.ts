@@ -4,6 +4,7 @@ import { json } from '@sveltejs/kit';
 
 export const GET = apiHandler(async ({ params, locals }) => {
   const role = locals.user?.role;
-  const data = await eventService.getEventDetail(Number(params.id), role);
+  const userId = locals.user?.id;
+  const data = await eventService.getEventDetail(Number(params.id), role, userId);
   return json({ data });
 });
