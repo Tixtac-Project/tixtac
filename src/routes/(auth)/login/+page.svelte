@@ -5,6 +5,8 @@
   import * as Card from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
+  import { formatZodErrors } from '$lib/shared/format-errors';
+  import { loginSchema } from '$lib/shared/schemas/auth.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { Eye, EyeOff, Loader } from 'lucide-svelte';
@@ -16,30 +18,45 @@
 
   let errors = $state<Record<string, string>>({});
 
-  function validate() {
-    errors = {};
-    if (!email) {
-      errors.email = 'Vui lòng nhập email';
-    } else if (!email.includes('@')) {
-      errors.email = 'Email không hợp lệ';
+  function clearError(field: string) {
+    if (!errors[field]) return;
+    const next = { ...errors };
+    delete next[field];
+    errors = next;
+  }
+
+  function validateField(field: string) {
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const allErrors = formatZodErrors(result.error);
+      if (allErrors[field]) {
+        errors = { ...errors, [field]: allErrors[field] };
+      } else {
+        clearError(field);
+      }
+    } else {
+      clearError(field);
     }
-    if (!password) {
-      errors.password = 'Vui lòng nhập mật khẩu';
-    } else if (password.length < 8) {
-      errors.password = 'Mật khẩu phải ít nhất 8 ký tự';
-    }
-    return Object.keys(errors).length === 0;
   }
 
   async function handleLogin() {
-    if (!validate()) return;
+    // Client-side validation using shared Zod schema
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      errors = formatZodErrors(result.error);
+      return;
+    }
+    errors = {};
 
     loading = true;
-    const { data, error } = await api.post<{ role: string }>('/auth/login', {
-      email,
-      password,
-    });
+    const { data, error, details } = await api.post<{ role: string }>('/auth/login', result.data);
     loading = false;
+
+    if (details) {
+      // Server returned field-level validation errors — map them to the form
+      errors = details;
+      return;
+    }
 
     if (!error && data) {
       toast.success('Đăng nhập thành công!');
@@ -69,7 +86,14 @@
       <Card.Content class="grid gap-4">
         <div class="grid gap-2">
           <Label for="email">Email</Label>
-          <Input id="email" type="email" placeholder="name@example.com" bind:value={email} />
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            bind:value={email}
+            onfocus={() => clearError('email')}
+            onblur={() => validateField('email')}
+          />
           {#if errors.email}
             <span class="text-xs text-destructive">{errors.email}</span>
           {/if}
@@ -83,6 +107,8 @@
               type={showPassword ? 'text' : 'password'}
               bind:value={password}
               class="pr-10"
+              onfocus={() => clearError('password')}
+              onblur={() => validateField('password')}
             />
             <button
               type="button"
