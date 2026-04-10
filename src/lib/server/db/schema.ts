@@ -63,6 +63,7 @@ export const seatSections = pgTable(
       .notNull()
       .references(() => events.id),
     name: varchar('name', { length: 50 }).notNull(),
+    prefix: varchar('prefix', { length: 10 }).notNull(),
     rows: integer('rows').notNull(),
     cols: integer('cols').notNull(),
     price: decimal('price', { precision: 12, scale: 2 }).notNull(),
@@ -87,6 +88,7 @@ export const seats = pgTable(
     eventId: integer('event_id')
       .notNull()
       .references(() => events.id),
+    prefix: varchar('prefix', { length: 10 }).notNull(),
     rowLabel: varchar('row_label', { length: 5 }).notNull(),
     colNumber: integer('col_number').notNull(),
     status: seatStatusEnum('status').notNull().default('available'),
@@ -94,7 +96,12 @@ export const seats = pgTable(
     lockedAt: timestamp('locked_at', { withTimezone: true }),
   },
   (table) => [
-    uniqueIndex('uq_seat_label_per_event').on(table.eventId, table.rowLabel, table.colNumber),
+    uniqueIndex('uq_seat_label_per_event').on(
+      table.eventId,
+      table.prefix,
+      table.rowLabel,
+      table.colNumber,
+    ),
     index('idx_seats_event_status').on(table.eventId, table.status),
     index('idx_seats_section').on(table.sectionId),
   ],

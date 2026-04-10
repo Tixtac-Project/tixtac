@@ -27,10 +27,20 @@ export function rowLabelToIndex(label: string): number {
 }
 
 /**
- * Parse "C5" → { rowLabel: "C", colNumber: 5 }
+ * Parse "VIP-C5" → { prefix: "VIP", rowLabel: "C", colNumber: 5 }
  */
-export function parseSeatLabel(label: string): { rowLabel: string; colNumber: number } | null {
-  const match = label.match(/^([A-Z]+)([1-9]\d*)$/);
+export function parseSeatLabel(
+  label: string,
+): { prefix: string; rowLabel: string; colNumber: number } | null {
+  const match = label.match(/^([A-Z0-9]+)-([A-Z]+)([1-9]\d*)$/);
   if (!match) return null;
-  return { rowLabel: match[1], colNumber: parseInt(match[2], 10) };
+  return { prefix: match[1], rowLabel: match[2], colNumber: parseInt(match[3], 10) };
+}
+
+/**
+ * Build a full seat label from its parts.
+ * ("VIP", "A", 1) → "VIP-A1"
+ */
+export function buildSeatLabel(prefix: string, rowLabel: string, colNumber: number): string {
+  return `${prefix}-${rowLabel}${colNumber}`;
 }

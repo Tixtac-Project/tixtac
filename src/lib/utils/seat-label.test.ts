@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { getRowLabel, rowLabelToIndex, parseSeatLabel } from './seat-label';
+import { getRowLabel, rowLabelToIndex, parseSeatLabel, buildSeatLabel } from './seat-label';
 
 describe('seat-label utils', () => {
   describe('getRowLabel', () => {
@@ -31,18 +31,31 @@ describe('seat-label utils', () => {
   });
 
   describe('parseSeatLabel', () => {
-    it('parses valid seat labels', () => {
-      expect(parseSeatLabel('A1')).toEqual({ rowLabel: 'A', colNumber: 1 });
-      expect(parseSeatLabel('C10')).toEqual({ rowLabel: 'C', colNumber: 10 });
-      expect(parseSeatLabel('AA25')).toEqual({ rowLabel: 'AA', colNumber: 25 });
+    it('parses valid seat labels with prefix', () => {
+      expect(parseSeatLabel('VIP-A1')).toEqual({ prefix: 'VIP', rowLabel: 'A', colNumber: 1 });
+      expect(parseSeatLabel('STD-C10')).toEqual({ prefix: 'STD', rowLabel: 'C', colNumber: 10 });
+      expect(parseSeatLabel('V1-AA25')).toEqual({ prefix: 'V1', rowLabel: 'AA', colNumber: 25 });
+      expect(parseSeatLabel('DIA-B8')).toEqual({ prefix: 'DIA', rowLabel: 'B', colNumber: 8 });
     });
 
     it('returns null for invalid seat labels', () => {
+      expect(parseSeatLabel('A1')).toBeNull(); // missing prefix
       expect(parseSeatLabel('1A')).toBeNull();
       expect(parseSeatLabel('ABC')).toBeNull();
       expect(parseSeatLabel('123')).toBeNull();
-      expect(parseSeatLabel('A-1')).toBeNull();
+      expect(parseSeatLabel('-A1')).toBeNull(); // empty prefix
+      expect(parseSeatLabel('VIP-')).toBeNull(); // no row/col
+      expect(parseSeatLabel('vip-A1')).toBeNull(); // lowercase prefix
+      expect(parseSeatLabel('V-1-A1')).toBeNull(); // hyphen in prefix
       expect(parseSeatLabel('')).toBeNull();
+    });
+  });
+
+  describe('buildSeatLabel', () => {
+    it('builds a full seat label from parts', () => {
+      expect(buildSeatLabel('VIP', 'A', 1)).toBe('VIP-A1');
+      expect(buildSeatLabel('STD', 'C', 10)).toBe('STD-C10');
+      expect(buildSeatLabel('V1', 'AA', 25)).toBe('V1-AA25');
     });
   });
 });
