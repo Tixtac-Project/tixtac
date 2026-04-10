@@ -125,3 +125,12 @@ export const updateSectionsSchema = z.object({
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateSectionsInput = z.infer<typeof updateSectionsSchema>;
 export type SectionInput = z.infer<typeof sectionSchema>;
+
+// ── Event Query Schema (Public List API) ───────
+export const eventQuerySchema = z.object({
+  q: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(12),
+});
+
+export type EventQueryInput = z.infer<typeof eventQuerySchema>;

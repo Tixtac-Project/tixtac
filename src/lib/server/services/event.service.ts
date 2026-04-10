@@ -1,10 +1,15 @@
 import { db } from '$lib/server/db';
 import { events, seatSections, seats } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { createEventSchema, updateSectionsSchema, type SectionInput } from '$lib/shared/schemas';
+import {
+  createEventSchema,
+  eventQuerySchema,
+  updateSectionsSchema,
+  type SectionInput,
+} from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
 import { getRowLabel } from '$lib/utils/seat-label';
-import { and, eq, type InferInsertModel } from 'drizzle-orm';
+import { and, count, eq, ilike, min, sql, type InferInsertModel } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 const BATCH_SIZE = 1000;
 
@@ -98,6 +103,156 @@ async function insertSectionsWithSeats(
 }
 
 export const eventService = {
+  async listEvents(params: {
+    q?: string;
+    page?: number;
+    limit?: number;
+    role?: string;
+    userId?: number;
+  }) {
+    const { q, page, limit } = validateInput(eventQuerySchema, params);
+    const { role, userId } = params;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE conditions
+    const conditions = [];
+
+    // Admin sees published + own drafts; others see only published
+    if (role === 'admin' && userId) {
+      conditions.push(
+        sql`(${events.status} = 'published' OR (${events.status} = 'draft' AND ${events.createdBy} = ${userId}))`,
+      );
+    } else {
+      conditions.push(eq(events.status, 'published'));
+    }
+
+    if (q) {
+      conditions.push(ilike(events.title, `%${q}%`));
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Count total matching events
+    const [{ total }] = await db.select({ total: count() }).from(events).where(whereClause);
+
+    // Query events with seat aggregation
+    const rows = await db
+      .select({
+        id: events.id,
+        title: events.title,
+        venue: events.venue,
+        eventDate: events.eventDate,
+        bannerImageUrl: events.bannerImageUrl,
+        status: events.status,
+        minPrice: min(seatSections.price),
+        totalSeats: count(sql`CASE WHEN ${seats.status} != 'disabled' THEN 1 END`),
+        availableSeats: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
+      })
+      .from(events)
+      .leftJoin(seatSections, eq(seatSections.eventId, events.id))
+      .leftJoin(seats, eq(seats.sectionId, seatSections.id))
+      .where(whereClause)
+      .groupBy(events.id)
+      .orderBy(events.eventDate)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      events: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        venue: r.venue,
+        event_date: r.eventDate,
+        banner_image_url: r.bannerImageUrl,
+        status: r.status,
+        min_price: r.minPrice ? Number(r.minPrice) : 0,
+        total_seats: r.totalSeats,
+        available_seats: r.availableSeats,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        total_pages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  async getEventDetail(eventId: number, role?: string, userId?: number) {
+    // 1. Get event basic info
+    const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+
+    if (!event) throwError(Errors.NOT_FOUND);
+
+    // Draft events are only visible to the admin who created them
+    if (event.status !== 'published') {
+      if (role !== 'admin' || event.createdBy !== userId) {
+        throwError(Errors.NOT_FOUND);
+      }
+    }
+
+    // 2. Get sections ordered by sort_order
+    const sections = await db
+      .select()
+      .from(seatSections)
+      .where(eq(seatSections.eventId, eventId))
+      .orderBy(seatSections.sortOrder);
+
+    // 3. Aggregate seat counts per section in a single query (avoid N+1)
+    const seatCounts = await db
+      .select({
+        sectionId: seats.sectionId,
+        seatCount: count(),
+        availableCount: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
+        disabledCount: count(sql`CASE WHEN ${seats.status} = 'disabled' THEN 1 END`),
+      })
+      .from(seats)
+      .where(eq(seats.eventId, eventId))
+      .groupBy(seats.sectionId);
+
+    // 4. Build a map for O(1) lookup
+    const countsMap = new Map(
+      seatCounts.map((sc) => [
+        sc.sectionId,
+        {
+          seat_count: sc.seatCount,
+          available_count: sc.availableCount,
+          disabled_count: sc.disabledCount,
+        },
+      ]),
+    );
+
+    return {
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      venue: event.venue,
+      event_date: event.eventDate,
+      banner_image_url: event.bannerImageUrl,
+      status: event.status,
+      sections: sections.map((s) => {
+        const counts = countsMap.get(s.id) || {
+          seat_count: 0,
+          available_count: 0,
+          disabled_count: 0,
+        };
+        return {
+          id: s.id,
+          name: s.name,
+          price: Number(s.price),
+          rows: s.rows,
+          cols: s.cols,
+          layout_x: s.layoutX,
+          layout_y: s.layoutY,
+          start_row_index: s.startRowIndex,
+          start_col_index: s.startColIndex,
+          seat_count: counts.seat_count,
+          available_count: counts.available_count,
+          disabled_count: counts.disabled_count,
+        };
+      }),
+    };
+  },
+
   async createEvent(adminId: number, data: unknown) {
     const { sections, ...eventData } = validateInput(createEventSchema, data);
     validateEventRequirements(sections);
