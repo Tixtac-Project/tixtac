@@ -9,6 +9,8 @@ const DEFAULT_TIMEOUT = 15_000;
 type ApiResponse<T> = {
   data?: T;
   error?: string;
+  /** Field-level validation errors returned by the server (code: VALIDATION_ERROR) */
+  details?: Record<string, string>;
   status: number;
 };
 
@@ -62,10 +64,15 @@ async function fetchWrapper<T>(
       : {};
 
     if (!res.ok) {
+      const errorObj = json.error && typeof json.error === 'object' ? json.error : null;
       const errorMessage: string =
-        (typeof json.error === 'string' ? json.error : json.error?.message) ||
+        (typeof json.error === 'string' ? json.error : errorObj?.message) ||
         json.message ||
         'Có lỗi xảy ra từ hệ thống';
+
+      // Extract field-level details from VALIDATION_ERROR responses
+      const details: Record<string, string> | undefined =
+        errorObj?.code === 'VALIDATION_ERROR' && errorObj?.details ? errorObj.details : undefined;
 
       // 401 — Hết hạn session
       if (res.status === 401 && browser && !isRedirectingToLogin) {
@@ -88,7 +95,7 @@ async function fetchWrapper<T>(
       if (!customOptions?.silent) {
         toast.error(errorMessage);
       }
-      return { error: errorMessage, status: res.status };
+      return { error: errorMessage, details, status: res.status };
     }
 
     // ── Success ──

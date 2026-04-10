@@ -6,6 +6,8 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import * as Select from '$lib/components/ui/select';
+  import { formatZodErrors } from '$lib/shared/format-errors';
+  import { registerSchema } from '$lib/shared/schemas/auth.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { Eye, EyeOff, Loader } from 'lucide-svelte';
@@ -30,23 +32,46 @@
 
   let genderLabel = $derived(genderOptions.find((o) => o.value === form.gender)?.label);
 
-  function validate() {
-    errors = {};
-    if (!form.email.includes('@')) errors.email = 'Email không hợp lệ';
-    if (form.password.length < 8) errors.password = 'Mật khẩu phải ít nhất 8 ký tự';
-    if (!form.full_name) errors.full_name = 'Vui lòng nhập họ tên';
-    if (!form.date_of_birth) errors.date_of_birth = 'Vui lòng chọn ngày sinh';
-    if (!form.gender) errors.gender = 'Vui lòng chọn giới tính';
-    return Object.keys(errors).length === 0;
+  function clearError(field: string) {
+    if (!errors[field]) return;
+    const next = { ...errors };
+    delete next[field];
+    errors = next;
+  }
+
+  function validateField(field: string) {
+    const result = registerSchema.safeParse(form);
+    if (!result.success) {
+      const allErrors = formatZodErrors(result.error);
+      if (allErrors[field]) {
+        errors = { ...errors, [field]: allErrors[field] };
+      } else {
+        clearError(field);
+      }
+    } else {
+      clearError(field);
+    }
   }
 
   async function handleRegister() {
-    if (!validate()) return;
+    // Client-side validation using shared Zod schema
+    const result = registerSchema.safeParse(form);
+    if (!result.success) {
+      errors = formatZodErrors(result.error);
+      return;
+    }
+    errors = {};
+
     loading = true;
-
-    const { data, error } = await api.post('/auth/register', form);
-
+    const { error, details } = await api.post('/auth/register', result.data);
     loading = false;
+
+    if (details) {
+      // Server returned field-level validation errors — map them to the form
+      errors = details;
+      return;
+    }
+
     if (!error) {
       toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
       goto(resolve('/login'));
@@ -72,7 +97,13 @@
         <div class="grid gap-4">
           <div class="grid gap-2">
             <Label for="full_name">Họ và tên</Label>
-            <Input id="full_name" bind:value={form.full_name} placeholder="Nguyễn Văn A" />
+            <Input
+              id="full_name"
+              bind:value={form.full_name}
+              placeholder="Nguyễn Văn A"
+              onfocus={() => clearError('full_name')}
+              onblur={() => validateField('full_name')}
+            />
             {#if errors.full_name}
               <span class="text-xs text-destructive">{errors.full_name}</span>
             {/if}
@@ -80,7 +111,14 @@
 
           <div class="grid gap-2">
             <Label for="email">Email</Label>
-            <Input id="email" type="email" bind:value={form.email} placeholder="name@example.com" />
+            <Input
+              id="email"
+              type="email"
+              bind:value={form.email}
+              placeholder="name@example.com"
+              onfocus={() => clearError('email')}
+              onblur={() => validateField('email')}
+            />
             {#if errors.email}
               <span class="text-xs text-destructive">{errors.email}</span>
             {/if}
@@ -94,6 +132,8 @@
                 type={showPassword ? 'text' : 'password'}
                 bind:value={form.password}
                 class="pr-10"
+                onfocus={() => clearError('password')}
+                onblur={() => validateField('password')}
               />
               <button
                 type="button"
@@ -117,14 +157,27 @@
           <div class="grid grid-cols-2 gap-4">
             <div class="grid gap-2">
               <Label for="dob">Ngày sinh</Label>
-              <Input id="dob" type="date" bind:value={form.date_of_birth} />
+              <Input
+                id="dob"
+                type="date"
+                bind:value={form.date_of_birth}
+                onfocus={() => clearError('date_of_birth')}
+                onblur={() => validateField('date_of_birth')}
+              />
               {#if errors.date_of_birth}
                 <span class="text-xs text-destructive">{errors.date_of_birth}</span>
               {/if}
             </div>
             <div class="grid gap-2">
               <Label for="gender">Giới tính</Label>
-              <Select.Root type="single" bind:value={form.gender}>
+              <Select.Root
+                type="single"
+                bind:value={form.gender}
+                onOpenChange={(open) => {
+                  if (open) clearError('gender');
+                  else validateField('gender');
+                }}
+              >
                 <Select.Trigger class="w-full">
                   {#if genderLabel}
                     {genderLabel}
@@ -135,7 +188,7 @@
                 <Select.Content>
                   <Select.Group>
                     <Select.Label>Giới tính</Select.Label>
-                    {#each genderOptions as option}
+                    {#each genderOptions as option (option.value)}
                       <Select.Item value={option.value}>{option.label}</Select.Item>
                     {/each}
                   </Select.Group>
