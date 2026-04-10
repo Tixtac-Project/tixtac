@@ -3,7 +3,10 @@ import type { SectionInput } from '$lib/shared/schemas';
 import { parseSeatLabel, rowLabelToIndex } from '$lib/utils/seat-label';
 
 export function validateDisabledSeats(sections: SectionInput[]): void {
-  for (const section of sections) {
+  const details: Record<string, string> = {};
+
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
     const startRow = section.start_row_index ?? 0;
     const startCol = section.start_col_index ?? 1;
     const endRow = startRow + section.rows - 1;
@@ -30,9 +33,12 @@ export function validateDisabledSeats(sections: SectionInput[]): void {
     }
 
     if (invalid.length > 0) {
-      throw Errors.VALIDATION({
-        disabled_seats: `Khu vực "${section.name}" có ghế hỏng không hợp lệ: ${invalid.join(', ')}`,
-      });
+      details[`sections[${i}].disabled_seats`] =
+        `Khu vực "${section.name}" có ghế hỏng không hợp lệ: ${invalid.join(', ')}`;
     }
+  }
+
+  if (Object.keys(details).length > 0) {
+    throw Errors.VALIDATION(details);
   }
 }
