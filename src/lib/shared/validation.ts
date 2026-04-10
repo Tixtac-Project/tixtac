@@ -1,27 +1,19 @@
 /**
  * @file src/lib/shared/validation.ts
  * @description Provides utilities for data validation using Zod.
- * Includes functions for formatting Zod validation errors into a flat record
- * and a generic wrapper for enforcing schemas with consistent error handling.
+ * Re-exports the client-safe formatZodErrors from format-errors.ts
+ * and provides the server-only validateInput wrapper with AppError integration.
+ *
+ * NOTE: This file imports from $lib/server/errors, making it server-only.
+ * Client components should import formatZodErrors from '$lib/shared/format-errors' instead.
  */
 
 import { Errors } from '$lib/server/errors';
 import { z } from 'zod';
+import { formatZodErrors } from './format-errors';
 
-/**
- * Converts a ZodError into a flat key-value object where keys are field paths.
- *
- * @param error - The ZodError object containing validation issues.
- * @returns A record where keys are dot-notated field paths and values are the first error message for that field.
- */
-export function formatZodErrors(error: z.ZodError): Record<string, string> {
-  const details: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const field = issue.path.join('.');
-    if (!details[field]) details[field] = issue.message;
-  }
-  return details;
-}
+// Re-export so existing server imports still work
+export { formatZodErrors };
 
 /**
  * Validates data against a Zod schema.
