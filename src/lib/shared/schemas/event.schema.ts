@@ -7,11 +7,18 @@ const req = (msg: string) => ({
   error: (issue: { input: unknown }) => (issue.input === undefined ? msg : undefined),
 });
 
-const seatLabelRegex = /^[A-Z]+\d+$/; // A1, B12, AA3...
+const seatLabelRegex = /^[A-Z0-9]+-[A-Z]+[1-9]\d*$/; // VIP-A1, STD-B12, V1-AA3...
+const prefixRegex = /^[A-Z0-9]+$/; // Only uppercase letters and digits, no hyphens
 
 // ── Section Schema ─────────────────────────────
 const baseSectionSchema = z.object({
   name: z.string(req('Tên khu vực là bắt buộc')).min(1, 'Tên khu vực không được trống'),
+
+  prefix: z
+    .string(req('Mã tiền tố là bắt buộc'))
+    .min(1, 'Mã tiền tố không được trống')
+    .max(10, 'Mã tiền tố tối đa 10 ký tự')
+    .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
 
   rows: z
     .number(req('Số hàng là bắt buộc'))
@@ -34,13 +41,13 @@ const baseSectionSchema = z.object({
   start_col_index: z.number().int().min(1, 'start_col_index phải >= 1').default(1),
 
   disabled_seats: z
-    .array(z.string().regex(seatLabelRegex, 'Seat label phải có dạng A1, B12, AA3...'))
+    .array(z.string().regex(seatLabelRegex, 'Seat label phải có dạng VIP-A1, STD-B12...'))
     .default([]),
 
   sort_order: z.number().int().min(0).default(0),
 });
 
-// Thêm cross-field validation: disabled_seats phải nằm trong phạm vi section
+// Thêm cross-field validation: disabled_seats phải nằm trong phạm vi section và có đúng prefix
 const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
   if (!section.disabled_seats || section.disabled_seats.length === 0) return;
 
@@ -54,12 +61,19 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
   const maxRowLabel = getRowLabel(endRow);
 
   const invalidSeats: string[] = [];
+  const wrongPrefix: string[] = [];
 
   for (const label of section.disabled_seats) {
     const parsed = parseSeatLabel(label);
 
     if (!parsed) {
       invalidSeats.push(label);
+      continue;
+    }
+
+    // Check prefix matches the section's prefix
+    if (parsed.prefix !== section.prefix) {
+      wrongPrefix.push(label);
       continue;
     }
 
@@ -73,6 +87,16 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
     ) {
       invalidSeats.push(label);
     }
+  }
+
+  if (wrongPrefix.length > 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['disabled_seats'],
+      message:
+        `Các ghế có prefix không khớp với khu vực "${section.prefix}": ` +
+        `${wrongPrefix.join(', ')}`,
+    });
   }
 
   if (invalidSeats.length > 0) {

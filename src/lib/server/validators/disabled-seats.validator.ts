@@ -21,6 +21,12 @@ export function validateDisabledSeats(sections: SectionInput[]): void {
         continue;
       }
 
+      // Check prefix matches the section's prefix
+      if (parsed.prefix !== section.prefix) {
+        invalid.push(label);
+        continue;
+      }
+
       const rowIndex = rowLabelToIndex(parsed.rowLabel);
       if (
         rowIndex < startRow ||

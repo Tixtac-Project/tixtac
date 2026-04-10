@@ -31,6 +31,7 @@ function getRowLabel(index: number): string {
 
 interface SectionSeed {
   name: string;
+  prefix: string;
   rows: number;
   cols: number;
   price: string;
@@ -136,6 +137,7 @@ export async function seed() {
   await createSections(event1.id, [
     {
       name: 'VIP - Trái',
+      prefix: 'VIPL',
       rows: 3,
       cols: 5,
       price: '2000000',
@@ -147,6 +149,7 @@ export async function seed() {
     },
     {
       name: 'VIP - Phải',
+      prefix: 'VIPR',
       rows: 3,
       cols: 5,
       price: '2000000',
@@ -158,6 +161,7 @@ export async function seed() {
     },
     {
       name: 'Standard',
+      prefix: 'STD',
       rows: 10,
       cols: 20,
       price: '500000',
@@ -199,6 +203,7 @@ export async function seed() {
   await createSections(event2.id, [
     {
       name: 'Diamond',
+      prefix: 'DIA',
       rows: 3,
       cols: 15,
       price: '3000000',
@@ -207,10 +212,11 @@ export async function seed() {
       startRowIndex: 0, // A
       startColIndex: 1,
       sortOrder: 0,
-      disabledSeats: ['B8', 'C8'], // Cột chắn tầm nhìn
+      disabledSeats: ['DIA-B8', 'DIA-C8'], // Cột chắn tầm nhìn
     },
     {
       name: 'Gold',
+      prefix: 'GOLD',
       rows: 5,
       cols: 20,
       price: '1500000',
@@ -222,6 +228,7 @@ export async function seed() {
     },
     {
       name: 'Silver',
+      prefix: 'SIL',
       rows: 10,
       cols: 25,
       price: '700000',
@@ -230,7 +237,7 @@ export async function seed() {
       startRowIndex: 8, // I (nối tiếp Gold)
       startColIndex: 1,
       sortOrder: 2,
-      disabledSeats: ['I13', 'J13', 'K13'], // Cột chắn giữa Silver
+      disabledSeats: ['SIL-I13', 'SIL-J13', 'SIL-K13'], // Cột chắn giữa Silver
     },
   ]);
 
@@ -263,6 +270,7 @@ async function createSections(eventId: number, sections: SectionSeed[]) {
       .values({
         eventId,
         name: s.name,
+        prefix: s.prefix,
         rows: s.rows,
         cols: s.cols,
         price: s.price,
@@ -283,11 +291,12 @@ async function createSections(eventId: number, sections: SectionSeed[]) {
 
       for (let c = 0; c < s.cols; c++) {
         const colNumber = s.startColIndex + c;
-        const label = `${rowLabel}${colNumber}`;
+        const label = `${s.prefix}-${rowLabel}${colNumber}`;
 
         seatValues.push({
           sectionId: section.id,
           eventId,
+          prefix: s.prefix,
           rowLabel,
           colNumber,
           status: disabledSet.has(label) ? ('disabled' as const) : ('available' as const),

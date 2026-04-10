@@ -24,7 +24,7 @@ export function validateEventRequirements(sections: SectionInput[]): void {
     for (let r = 0; r < section.rows; r++) {
       const rowLabel = getRowLabel(startRow + r);
       for (let c = 0; c < section.cols; c++) {
-        const key = `${rowLabel}${startCol + c}`;
+        const key = `${section.prefix}-${rowLabel}${startCol + c}`;
         if (seatSet.has(key)) conflicts.push(key);
         else seatSet.add(key);
       }
