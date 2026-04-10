@@ -55,22 +55,26 @@ export const events = pgTable('events', {
 });
 
 // ── Seat Sections ──────────────────────────────
-export const seatSections = pgTable('seat_sections', {
-  id: serial('id').primaryKey(),
-  eventId: integer('event_id')
-    .notNull()
-    .references(() => events.id),
-  name: varchar('name', { length: 50 }).notNull(),
-  rows: integer('rows').notNull(),
-  cols: integer('cols').notNull(),
-  price: decimal('price', { precision: 12, scale: 2 }).notNull(),
-  layoutX: integer('layout_x').notNull().default(0),
-  layoutY: integer('layout_y').notNull().default(0),
-  startRowIndex: integer('start_row_index').notNull().default(0),
-  startColIndex: integer('start_col_index').notNull().default(1),
-  sortOrder: integer('sort_order').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const seatSections = pgTable(
+  'seat_sections',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id),
+    name: varchar('name', { length: 50 }).notNull(),
+    rows: integer('rows').notNull(),
+    cols: integer('cols').notNull(),
+    price: decimal('price', { precision: 12, scale: 2 }).notNull(),
+    layoutX: integer('layout_x').notNull().default(0),
+    layoutY: integer('layout_y').notNull().default(0),
+    startRowIndex: integer('start_row_index').notNull().default(0),
+    startColIndex: integer('start_col_index').notNull().default(1),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('idx_seat_sections_event').on(table.eventId)],
+);
 
 // ── Seats ──────────────────────────────────────
 export const seats = pgTable(
@@ -92,6 +96,7 @@ export const seats = pgTable(
   (table) => [
     uniqueIndex('uq_seat_label_per_event').on(table.eventId, table.rowLabel, table.colNumber),
     index('idx_seats_event_status').on(table.eventId, table.status),
+    index('idx_seats_section').on(table.sectionId),
   ],
 );
 
