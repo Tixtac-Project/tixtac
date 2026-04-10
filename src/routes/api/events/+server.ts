@@ -12,7 +12,8 @@ export const GET = apiHandler(async ({ url, locals }) => {
   const data = await eventService.listEvents({
     q: url.searchParams.get('q') ?? undefined,
     page: pageParam !== null && !Number.isNaN(Number(pageParam)) ? Number(pageParam) : undefined,
-    limit: limitParam !== null && !Number.isNaN(Number(limitParam)) ? Number(limitParam) : undefined,
+    limit:
+      limitParam !== null && !Number.isNaN(Number(limitParam)) ? Number(limitParam) : undefined,
     role,
     userId,
   });

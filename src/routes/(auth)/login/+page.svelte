@@ -70,7 +70,7 @@
 </script>
 
 <div class="flex h-screen w-screen flex-col items-center justify-center">
-  <Card.Root class="w-full max-w-90" style="view-transition-name: auth-card;">
+  <Card.Root class="w-5/6 max-w-90 md:w-full" style="view-transition-name: auth-card;">
     <Card.Header class="space-y-1 text-center">
       <Card.Title class="text-2xl font-bold">Đăng nhập</Card.Title>
       <Card.Description>Nhập email và mật khẩu của bạn</Card.Description>
@@ -118,9 +118,9 @@
               aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
             >
               {#if showPassword}
-                <EyeOff class="h-4 w-4" />
+                <EyeOff class="size-5" />
               {:else}
-                <Eye class="h-4 w-4" />
+                <Eye class="size-5" />
               {/if}
             </button>
           </div>

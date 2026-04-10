@@ -1,0 +1,384 @@
+<script lang="ts">
+  import { Button } from '$lib/components/ui/button';
+  import * as Tooltip from '$lib/components/ui/tooltip';
+  import { getRowLabel } from '$lib/utils/seat-label';
+  import { Plus } from 'lucide-svelte';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import SectionItem from './SectionItem.svelte';
+
+  type Section = {
+    name: string;
+    price: number;
+    rows: number;
+    cols: number;
+    layout_x: number;
+    layout_y: number;
+    start_row_index: number;
+    start_col_index: number;
+    disabled_seats: string;
+    sort_order: number;
+  };
+
+  let {
+    sections = $bindable(),
+    errors = {},
+  }: {
+    sections: Section[];
+    errors?: Record<string, string>;
+  } = $props();
+
+  function createDefaultSection(): Section {
+    return {
+      name: '',
+      price: 0,
+      rows: 1,
+      cols: 1,
+      layout_x: 0,
+      layout_y: 0,
+      start_row_index: 0,
+      start_col_index: 1,
+      disabled_seats: '',
+      sort_order: sections.length,
+    };
+  }
+
+  function addSection() {
+    sections = [...sections, createDefaultSection()];
+  }
+
+  function removeSection(index: number) {
+    sections = sections.filter((_, i) => i !== index);
+  }
+
+  let totalSeats = $derived(
+    sections.reduce((sum, s) => {
+      const r = s.rows > 0 ? s.rows : 0;
+      const c = s.cols > 0 ? s.cols : 0;
+      return sum + r * c;
+    }, 0),
+  );
+
+  // ── Color palette for sections ──
+  const SECTION_COLORS = [
+    {
+      bg: 'bg-blue-100 dark:bg-blue-900/40',
+      border: 'border-blue-300 dark:border-blue-700',
+      text: 'text-blue-700 dark:text-blue-300',
+      label: 'bg-blue-500',
+    },
+    {
+      bg: 'bg-emerald-100 dark:bg-emerald-900/40',
+      border: 'border-emerald-300 dark:border-emerald-700',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      label: 'bg-emerald-500',
+    },
+    {
+      bg: 'bg-amber-100 dark:bg-amber-900/40',
+      border: 'border-amber-300 dark:border-amber-700',
+      text: 'text-amber-700 dark:text-amber-300',
+      label: 'bg-amber-500',
+    },
+    {
+      bg: 'bg-purple-100 dark:bg-purple-900/40',
+      border: 'border-purple-300 dark:border-purple-700',
+      text: 'text-purple-700 dark:text-purple-300',
+      label: 'bg-purple-500',
+    },
+    {
+      bg: 'bg-rose-100 dark:bg-rose-900/40',
+      border: 'border-rose-300 dark:border-rose-700',
+      text: 'text-rose-700 dark:text-rose-300',
+      label: 'bg-rose-500',
+    },
+    {
+      bg: 'bg-cyan-100 dark:bg-cyan-900/40',
+      border: 'border-cyan-300 dark:border-cyan-700',
+      text: 'text-cyan-700 dark:text-cyan-300',
+      label: 'bg-cyan-500',
+    },
+  ];
+
+  const MAX_GRID_ROWS = 30;
+  const MAX_GRID_COLS = 40;
+
+  // ── Build unified seat grid ──
+  type SeatCell = {
+    sectionIndex: number;
+    sectionName: string;
+    seatLabel: string;
+    isDisabled: boolean;
+    isOverlap: boolean;
+    overlapWith?: string;
+  };
+
+  let gridData = $derived.by(() => {
+    if (sections.length === 0) return null;
+
+    // Compute bounding box across all sections
+    let minRow = Infinity,
+      maxRow = -Infinity;
+    let minCol = Infinity,
+      maxCol = -Infinity;
+
+    const parsedSections = sections.map((s, idx) => {
+      // Seat labeling (determines seat names like A1, B5, etc.)
+      const labelStartRow = Math.max(s.start_row_index, 0);
+      const labelStartCol = Math.max(s.start_col_index, 1);
+      const rows = Math.max(s.rows, 0);
+      const cols = Math.max(s.cols, 0);
+
+      // Visual position on venue map (layout_x = column offset, layout_y = row offset)
+      const gridStartRow = Math.max(s.layout_y, 0);
+      const gridStartCol = Math.max(s.layout_x, 0);
+      const gridEndRow = gridStartRow + rows - 1;
+      const gridEndCol = gridStartCol + cols - 1;
+
+      if (rows > 0 && cols > 0) {
+        minRow = Math.min(minRow, gridStartRow);
+        maxRow = Math.max(maxRow, gridEndRow);
+        minCol = Math.min(minCol, gridStartCol);
+        maxCol = Math.max(maxCol, gridEndCol);
+      }
+
+      const disabledSet = new SvelteSet(
+        s.disabled_seats
+          ? s.disabled_seats
+              .split(',')
+              .map((d) => d.trim().toUpperCase())
+              .filter(Boolean)
+          : [],
+      );
+
+      return {
+        idx,
+        labelStartRow,
+        labelStartCol,
+        rows,
+        cols,
+        gridStartRow,
+        gridStartCol,
+        gridEndRow,
+        gridEndCol,
+        disabledSet,
+        name: s.name || `Khu vực ${idx + 1}`,
+      };
+    });
+
+    if (minRow > maxRow) return null;
+
+    const totalRows = maxRow - minRow + 1;
+    const totalCols = maxCol - minCol + 1;
+    const isTruncated = totalRows > MAX_GRID_ROWS || totalCols > MAX_GRID_COLS;
+    const displayRows = Math.min(totalRows, MAX_GRID_ROWS);
+    const displayCols = Math.min(totalCols, MAX_GRID_COLS);
+
+    // Build 2D grid
+    const grid: (SeatCell | null)[][] = [];
+    for (let r = 0; r < displayRows; r++) {
+      const row: (SeatCell | null)[] = [];
+      for (let c = 0; c < displayCols; c++) {
+        row.push(null);
+      }
+      grid.push(row);
+    }
+
+    // Build a seat-label → section-name map to detect duplicate labels across sections
+    const seatLabelOwner = new SvelteMap<string, string>();
+    const duplicateLabels = new SvelteSet<string>();
+
+    // First pass: detect duplicate seat labels (matches server validation)
+    for (const sec of parsedSections) {
+      if (sec.rows <= 0 || sec.cols <= 0) continue;
+      for (let r = 0; r < sec.rows; r++) {
+        for (let c = 0; c < sec.cols; c++) {
+          const rowLabel = getRowLabel(sec.labelStartRow + r);
+          const colNum = sec.labelStartCol + c;
+          const seatLabel = `${rowLabel}${colNum}`;
+          if (seatLabelOwner.has(seatLabel)) {
+            duplicateLabels.add(seatLabel);
+          } else {
+            seatLabelOwner.set(seatLabel, sec.name);
+          }
+        }
+      }
+    }
+
+    // Second pass: fill grid cells
+    let overlapCount = duplicateLabels.size;
+    for (const sec of parsedSections) {
+      if (sec.rows <= 0 || sec.cols <= 0) continue;
+      for (let r = 0; r < sec.rows; r++) {
+        for (let c = 0; c < sec.cols; c++) {
+          // Grid position from layout_x / layout_y
+          const gridAbsRow = sec.gridStartRow + r;
+          const gridAbsCol = sec.gridStartCol + c;
+          const gridR = gridAbsRow - minRow;
+          const gridC = gridAbsCol - minCol;
+          if (gridR >= displayRows || gridC >= displayCols) continue;
+          // Seat label from start_row_index / start_col_index (independent of layout position)
+          const rowLabel = getRowLabel(sec.labelStartRow + r);
+          const colNum = sec.labelStartCol + c;
+          const seatLabel = `${rowLabel}${colNum}`;
+          const isDuplicate = duplicateLabels.has(seatLabel);
+          const duplicateOwner = isDuplicate ? seatLabelOwner.get(seatLabel) : undefined;
+
+          grid[gridR][gridC] = {
+            sectionIndex: sec.idx,
+            sectionName: sec.name,
+            seatLabel,
+            isDisabled: sec.disabledSet.has(seatLabel),
+            isOverlap: isDuplicate,
+            overlapWith: isDuplicate && duplicateOwner !== sec.name ? duplicateOwner : undefined,
+          };
+        }
+      }
+    }
+
+    // Row labels for display
+    const rowLabels: string[] = [];
+    for (let r = 0; r < displayRows; r++) {
+      rowLabels.push(getRowLabel(minRow + r));
+    }
+
+    // Col labels for display
+    const colLabels: number[] = [];
+    for (let c = 0; c < displayCols; c++) {
+      colLabels.push(minCol + c);
+    }
+
+    return { grid, rowLabels, colLabels, isTruncated, displayRows, displayCols, overlapCount };
+  });
+</script>
+
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h3 class="text-base font-semibold text-foreground">📦 Khu vực ghế ngồi</h3>
+    <div class="flex items-center gap-3">
+      <span class="text-sm text-muted-foreground">
+        Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
+        ghế
+      </span>
+    </div>
+  </div>
+
+  {#if errors['sections']}
+    <p class="text-sm text-destructive">{errors['sections']}</p>
+  {/if}
+
+  {#each sections as section, i (section)}
+    <SectionItem bind:section={sections[i]} index={i} onremove={() => removeSection(i)} {errors} />
+  {/each}
+
+  <Button type="button" variant="outline" class="w-full border-dashed" onclick={addSection}>
+    <Plus class="mr-2 h-4 w-4" />
+    Thêm khu vực ghế
+  </Button>
+
+  <!-- Total seat map preview -->
+  {#if gridData}
+    <div class="rounded-lg border bg-card p-4 shadow-sm">
+      <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <h3 class="text-sm font-semibold text-foreground">🗺️ Sơ đồ ghế tổng thể</h3>
+        <div class="flex flex-wrap gap-2">
+          {#if gridData.overlapCount > 0}
+            <span
+              class="rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+            >
+              ⚠️ {gridData.overlapCount} vị trí bị chồng lấn
+            </span>
+          {/if}
+          {#if gridData.isTruncated}
+            <span class="text-xs text-amber-600">
+              (Thu gọn: hiển thị tối đa {MAX_GRID_ROWS} hàng × {MAX_GRID_COLS} cột)
+            </span>
+          {/if}
+        </div>
+      </div>
+
+      <div class="overflow-x-auto pb-0.5">
+        <div class="inline-flex flex-col gap-px">
+          <!-- Column header -->
+          <div class="flex items-center gap-px">
+            <span class="w-7 shrink-0"></span>
+            {#each gridData.colLabels as col (col)}
+              <span
+                class="flex h-4 w-4 shrink-0 items-center justify-center font-mono text-[8px] text-muted-foreground"
+              >
+                {col}
+              </span>
+            {/each}
+          </div>
+
+          <!-- Rows -->
+          {#each gridData.grid as row, r (gridData.rowLabels[r])}
+            <div class="flex items-center gap-px">
+              <span class="w-7 shrink-0 pr-1 text-right font-mono text-[9px] text-muted-foreground">
+                {gridData.rowLabels[r]}
+              </span>
+              {#each row as cell, c (`${r}-${c}`)}
+                {#if cell}
+                  {@const color = SECTION_COLORS[cell.sectionIndex % SECTION_COLORS.length]}
+                  <Tooltip.Root>
+                    <Tooltip.Trigger>
+                      <div
+                        class="h-4 w-4 shrink-0 rounded-[2px] border transition-colors
+                          {cell.isOverlap
+                          ? 'border-destructive bg-destructive/40 ring-1 ring-destructive/60'
+                          : cell.isDisabled
+                            ? 'border-destructive/40 bg-destructive/20'
+                            : `${color.border} ${color.bg}`}"
+                      ></div>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>
+                      <span class="text-xs">
+                        {cell.seatLabel} — {cell.sectionName}
+                        {#if cell.isOverlap}
+                          <span class="text-destructive">⚠️ chồng lấn với {cell.overlapWith}</span>
+                        {:else if cell.isDisabled}
+                          (hỏng)
+                        {/if}
+                      </span>
+                    </Tooltip.Content>
+                  </Tooltip.Root>
+                {:else}
+                  <div class="h-4 w-4 shrink-0"></div>
+                {/if}
+              {/each}
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-muted-foreground">
+        {#each sections as sec, i (i)}
+          {@const color = SECTION_COLORS[i % SECTION_COLORS.length]}
+          <span class="flex items-center gap-1">
+            <span class="inline-block h-3 w-3 rounded-[2px] {color.label}"></span>
+            {sec.name || `Khu vực ${i + 1}`}
+          </span>
+        {/each}
+        <span class="flex items-center gap-1">
+          <span
+            class="inline-block h-3 w-3 rounded-[2px] border border-destructive/40 bg-destructive/20"
+          ></span>
+          Ghế hỏng
+        </span>
+        {#if gridData.overlapCount > 0}
+          <span class="flex items-center gap-1">
+            <span
+              class="inline-block h-3 w-3 rounded-[2px] border border-destructive bg-destructive/40"
+            ></span>
+            Chồng lấn
+          </span>
+        {/if}
+        <span class="flex items-center gap-1">
+          <span
+            class="inline-block h-3 w-3 rounded-[2px] border border-dashed border-border"
+          ></span>
+          Trống (không thuộc khu vực nào)
+        </span>
+      </div>
+    </div>
+  {/if}
+</div>
