@@ -1,7 +1,8 @@
 import { db } from '$lib/server/db';
 import { events, seatSections, seats } from '$lib/server/db/schema';
-import { AppError, Errors, throwError } from '$lib/server/errors';
+import { Errors, throwError } from '$lib/server/errors';
 import { createEventSchema, type SectionInput } from '$lib/shared/schemas';
+import { validateInput } from '$lib/shared/validation';
 import { getRowLabel } from '$lib/utils/seat-label';
 import { and, eq } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
@@ -51,14 +52,7 @@ async function generateAndInsertSeats(
 
 export const eventService = {
   async createEvent(adminId: number, data: unknown) {
-    const parsed = createEventSchema.safeParse(data);
-    if (!parsed.success) {
-      const details: Record<string, string> = {};
-      parsed.error.issues.forEach((e: any) => (details[e.path.join('.')] = e.message));
-      throw Errors.VALIDATION(details);
-    }
-
-    const { sections, ...eventData } = parsed.data;
+    const { sections, ...eventData } = validateInput(createEventSchema, data);
     validateEventRequirements(sections);
 
     return await db.transaction(async (tx) => {
@@ -114,16 +108,14 @@ export const eventService = {
   },
 
   async updateEventSections(adminId: number, eventId: number, data: unknown) {
-    const parsed = createEventSchema.shape.sections.safeParse((data as any).sections);
-    if (!parsed.success) throw Errors.VALIDATION({ sections: 'Dữ liệu sections không hợp lệ' });
+    const { sections } = validateInput(createEventSchema.pick({ sections: true }), data);
 
-    validateEventRequirements(parsed.data);
+    validateEventRequirements(sections);
 
     return await db.transaction(async (tx) => {
       const [event] = await tx.select().from(events).where(eq(events.id, eventId)).limit(1);
-      if (!event) throw Errors.NOT_FOUND;
-      if (event.status !== 'draft')
-        throwError(new AppError('CONFLICT', 409, 'Chỉ được sửa khi ở trạng thái Draft'));
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
 
       await tx.delete(seats).where(eq(seats.eventId, eventId));
       await tx.delete(seatSections).where(eq(seatSections.eventId, eventId));
@@ -131,7 +123,7 @@ export const eventService = {
       let total_seats = 0;
       const sectionsInfo = [];
 
-      for (const sec of parsed.data) {
+      for (const sec of sections) {
         const [newSection] = await tx
           .insert(seatSections)
           .values({
@@ -171,16 +163,15 @@ export const eventService = {
 
   async publishEvent(adminId: number, eventId: number) {
     const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
-    if (!event) throw Errors.NOT_FOUND;
-    if (event.status === 'published')
-      throwError(new AppError('ALREADY_PUBLISHED', 400, 'Sự kiện đã xuất bản'));
+    if (!event) throwError(Errors.NOT_FOUND);
+    if (event.status === 'published') throwError(Errors.ALREADY_PUBLISHED);
 
     const [hasSeats] = await db
       .select()
       .from(seats)
       .where(and(eq(seats.eventId, eventId), eq(seats.status, 'available')))
       .limit(1);
-    if (!hasSeats) throwError(new AppError('NO_SEATS', 400, 'Không có ghế trống để xuất bản'));
+    if (!hasSeats) throwError(Errors.NO_SEATS);
 
     const [updated] = await db
       .update(events)

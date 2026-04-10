@@ -46,6 +46,11 @@ export const Errors = {
   EMAIL_EXISTS: new AppError('EMAIL_EXISTS', 409, 'Email đã được sử dụng'),
   INVALID_CREDENTIALS: new AppError('INVALID_CREDENTIALS', 401, 'Email hoặc mật khẩu không đúng'),
 
+  // Events
+  ALREADY_PUBLISHED: new AppError('ALREADY_PUBLISHED', 400, 'Sự kiện đã xuất bản'),
+  NO_SEATS: new AppError('NO_SEATS', 400, 'Không có ghế trống để xuất bản'),
+  EVENT_NOT_DRAFT: new AppError('EVENT_NOT_DRAFT', 409, 'Chỉ được sửa khi ở trạng thái Draft'),
+
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
 
