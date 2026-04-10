@@ -138,8 +138,14 @@ export const eventService = {
     validateEventRequirements(sections);
 
     return await db.transaction(async (tx) => {
-      const [event] = await tx.select().from(events).where(eq(events.id, eventId)).limit(1);
+      const [event] = await tx
+        .select()
+        .from(events)
+        .where(eq(events.id, eventId))
+        .limit(1)
+        .for('update');
       if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
       if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
 
       // Must delete seats first due to FK constraint on seatSections
@@ -165,8 +171,14 @@ export const eventService = {
 
   async publishEvent(adminId: number, eventId: number) {
     return await db.transaction(async (tx) => {
-      const [event] = await tx.select().from(events).where(eq(events.id, eventId)).limit(1);
+      const [event] = await tx
+        .select()
+        .from(events)
+        .where(eq(events.id, eventId))
+        .limit(1)
+        .for('update');
       if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
       if (event.status === 'published') throwError(Errors.ALREADY_PUBLISHED);
       const [hasSeats] = await tx
         .select()
