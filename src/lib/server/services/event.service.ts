@@ -22,6 +22,7 @@ async function generateAndInsertSeats(
   sectionId: number,
   section: SectionInput,
 ) {
+  const prefix = section.prefix;
   const startRow = section.start_row_index ?? 0;
   const startCol = section.start_col_index ?? 1;
   const disabledSet = new Set(section.disabled_seats ?? []);
@@ -33,7 +34,7 @@ async function generateAndInsertSeats(
     const rowLabel = getRowLabel(startRow + r);
     for (let c = 0; c < section.cols; c++) {
       const colNumber = startCol + c;
-      const seatKey = `${rowLabel}${colNumber}`;
+      const seatKey = `${prefix}-${rowLabel}${colNumber}`;
       const status: InferInsertModel<typeof seats>['status'] = disabledSet.has(seatKey)
         ? 'disabled'
         : 'available';
@@ -43,6 +44,7 @@ async function generateAndInsertSeats(
       seatsToInsert.push({
         eventId,
         sectionId,
+        prefix,
         rowLabel,
         colNumber,
         status,
@@ -75,6 +77,7 @@ async function insertSectionsWithSeats(
       .values({
         eventId,
         name: sec.name,
+        prefix: sec.prefix,
         rows: sec.rows,
         cols: sec.cols,
         price: String(sec.price),
@@ -245,6 +248,7 @@ export const eventService = {
         return {
           id: s.id,
           name: s.name,
+          prefix: s.prefix,
           price: Number(s.price),
           rows: s.rows,
           cols: s.cols,
