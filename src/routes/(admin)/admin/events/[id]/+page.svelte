@@ -385,7 +385,7 @@
               class="flex h-7 items-center justify-center text-xs font-semibold text-muted-foreground"
               style="grid-row: {rh.gridRow + 1}; grid-column: 1;"
             >
-              {rh.label}
+              {rh.coordY}
             </div>
           {/each}
 

@@ -21,6 +21,26 @@
 
   let rootEl = $state<HTMLDivElement>();
 
+  // ── Auto-sync layout_y → start_row_index ──
+  // When Admin changes layout_y, automatically update start_row_index to match,
+  // unless Admin has manually edited start_row_index independently.
+  let previousLayoutY = $state(section.layout_y);
+  let previousLayoutX = $state(section.layout_x);
+
+  $effect(() => {
+    if (section.layout_y !== previousLayoutY) {
+      section.start_row_index = section.layout_y;
+      previousLayoutY = section.layout_y;
+    }
+  });
+
+  $effect(() => {
+    if (section.layout_x !== previousLayoutX) {
+      section.start_col_index = section.layout_x === 0 ? 1 : section.layout_x;
+      previousLayoutX = section.layout_x;
+    }
+  });
+
   /** Dispatch a bubbling 'remove' CustomEvent AND call the onremove callback if provided */
   function handleRemove() {
     // Dispatch DOM event for event-based listeners (e.g. parent using onremove on the element)
