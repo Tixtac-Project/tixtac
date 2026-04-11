@@ -34,7 +34,7 @@ const config = {
     csp: {
       directives: {
         'default-src': ['self'],
-        'script-src': ['self'],
+        'script-src': ['self', 'unsafe-eval'],
         'style-src': ['self', 'unsafe-inline'],
         'img-src': ['self', 'https:', 'data:'],
         'font-src': ['self'],

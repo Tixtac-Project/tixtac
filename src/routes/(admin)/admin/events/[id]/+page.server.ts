@@ -6,7 +6,12 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const eventId = Number(params.id);
-  if (Number.isNaN(eventId) || !Number.isFinite(eventId) || !Number.isInteger(eventId) || eventId <= 0) {
+  if (
+    Number.isNaN(eventId) ||
+    !Number.isFinite(eventId) ||
+    !Number.isInteger(eventId) ||
+    eventId <= 0
+  ) {
     error(404, 'Không tìm thấy sự kiện');
   }
 

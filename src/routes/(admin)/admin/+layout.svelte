@@ -10,10 +10,10 @@
 <div class="min-h-screen bg-background">
   <AdminSidebar bind:open={sidebarOpen} />
 
-  <div class="md:pl-60">
+  <div class="md:pl-64">
     <AdminHeader ontogglesidebar={() => (sidebarOpen = !sidebarOpen)} />
 
-    <main class="p-4 md:p-6">
+    <main class="mx-auto p-5 md:p-8">
       {@render children()}
     </main>
   </div>
