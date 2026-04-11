@@ -36,10 +36,6 @@
 
     publishingId = null;
   }
-
-  function navigateToEvent(eventId: number) {
-    goto(resolve(`/admin/events/${eventId}`));
-  }
 </script>
 
 <div class="space-y-4 md:space-y-6">
@@ -74,11 +70,15 @@
         </Table.Header>
         <Table.Body>
           {#each data.events as event (event.id)}
-            <Table.Row
-              class="cursor-pointer transition-colors hover:bg-muted/50"
-              onclick={() => navigateToEvent(event.id)}
-            >
-              <Table.Cell class="font-medium">{event.title}</Table.Cell>
+            <Table.Row class="transition-colors hover:bg-muted/50">
+              <Table.Cell class="font-medium">
+                <a
+                  href={resolve(`/admin/events/${event.id}`)}
+                  class="block hover:underline focus:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {event.title}
+                </a>
+              </Table.Cell>
               <Table.Cell>{event.venue}</Table.Cell>
               <Table.Cell>{formatDate(event.event_date)}</Table.Cell>
               <Table.Cell>
@@ -129,7 +129,11 @@
             variant="outline"
             size="sm"
             disabled={data.pagination.page <= 1}
-            onclick={() => goto(resolve(`?page=${data.pagination.page - 1}`))}
+            onclick={() => {
+              const params = new URLSearchParams(window.location.search);
+              params.set('page', String(data.pagination.page - 1));
+              goto(resolve(`?${params.toString()}`));
+            }}
           >
             Trước
           </Button>
@@ -137,7 +141,11 @@
             variant="outline"
             size="sm"
             disabled={data.pagination.page >= data.pagination.total_pages}
-            onclick={() => goto(resolve(`?page=${data.pagination.page + 1}`))}
+            onclick={() => {
+              const params = new URLSearchParams(window.location.search);
+              params.set('page', String(data.pagination.page + 1));
+              goto(resolve(`?${params.toString()}`));
+            }}
           >
             Sau
           </Button>

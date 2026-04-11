@@ -21,7 +21,7 @@ export class RenderComponentConfig<TComponent extends Component> {
   props: ComponentProps<TComponent> | Record<string, never>;
   constructor(
     component: TComponent,
-    props: ComponentProps<TComponent> | Record<string, never> = {},
+    props: ComponentProps<TComponent> | Record<string, never>,
   ) {
     this.component = component;
     this.props = props;
@@ -74,12 +74,28 @@ export class RenderSnippetConfig<TProps> {
  * ```
  * @see {@link https://tanstack.com/table/latest/docs/guide/column-defs}
  */
+// Overload for components with no required props
+export function renderComponent<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  T extends Component<any>,
+>(
+  component: T,
+): ComponentProps<T> extends Record<string, never> ? RenderComponentConfig<T> : never;
+
+// Overload for components with props
 export function renderComponent<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   T extends Component<any>,
   Props extends ComponentProps<T>,
->(component: T, props: Props = {} as Props) {
-  return new RenderComponentConfig(component, props);
+>(component: T, props: Props): RenderComponentConfig<T>;
+
+// Implementation
+export function renderComponent<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  T extends Component<any>,
+  Props extends ComponentProps<T>,
+>(component: T, props?: Props) {
+  return new RenderComponentConfig(component, props ?? ({} as Props));
 }
 
 /**
@@ -106,6 +122,18 @@ export function renderComponent<
  * ```
  * @see {@link https://tanstack.com/table/latest/docs/guide/column-defs}
  */
-export function renderSnippet<TProps>(snippet: Snippet<[TProps]>, params: TProps = {} as TProps) {
-  return new RenderSnippetConfig(snippet, params);
+// Overload for snippets with no required params
+export function renderSnippet<TProps>(
+  snippet: Snippet<[TProps]>,
+): TProps extends Record<string, never> ? RenderSnippetConfig<TProps> : never;
+
+// Overload for snippets with params
+export function renderSnippet<TProps>(
+  snippet: Snippet<[TProps]>,
+  params: TProps,
+): RenderSnippetConfig<TProps>;
+
+// Implementation
+export function renderSnippet<TProps>(snippet: Snippet<[TProps]>, params?: TProps) {
+  return new RenderSnippetConfig(snippet, params ?? ({} as TProps));
 }

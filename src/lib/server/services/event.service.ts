@@ -125,11 +125,9 @@ export const eventService = {
     // Build WHERE conditions
     const conditions = [];
 
-    // Admin sees published + own drafts; others see only published
-    if (role === 'admin' && userId) {
-      conditions.push(
-        sql`(${events.status} = 'published' OR (${events.status} = 'draft' AND ${events.createdBy} = ${userId}))`,
-      );
+    // Admin sees all events (published + all drafts); others see only published
+    if (role === 'admin') {
+      // No status filter for admins - they see everything
     } else {
       conditions.push(eq(events.status, 'published'));
     }

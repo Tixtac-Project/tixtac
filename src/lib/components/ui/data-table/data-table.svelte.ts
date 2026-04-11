@@ -9,12 +9,12 @@ import {
 
 /**
  * Creates a reactive TanStack table object for Svelte.
- * @param options Table options to create the table with.
+ * @param options Table options to create the table with (or a function that returns options).
  * @returns A reactive table object.
  * @example
  * ```svelte
  * <script>
- *   const table = createSvelteTable({ ... })
+ *   const table = createSvelteTable(() => ({ ... }))
  * </script>
  *
  * <table>
@@ -33,7 +33,12 @@ import {
  * </table>
  * ```
  */
-export function createSvelteTable<TData extends RowData>(options: TableOptions<TData>) {
+export function createSvelteTable<TData extends RowData>(
+  options: TableOptions<TData> | (() => TableOptions<TData>),
+) {
+  const getOptions = typeof options === 'function' ? options : () => options;
+
+  const initialOptions = getOptions();
   const resolvedOptions: TableOptionsResolved<TData> = mergeObjects(
     {
       state: {},
@@ -46,22 +51,23 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
         return mergeObjects(defaultOptions, options);
       },
     },
-    options,
+    initialOptions,
   );
 
   const table = createTable(resolvedOptions);
   let state = $state<TableState>(table.initialState);
 
   function updateOptions() {
+    const currentOptions = getOptions();
     table.setOptions(() => {
-      return mergeObjects(resolvedOptions, options, {
-        state: mergeObjects(state, options.state || {}),
+      return mergeObjects(resolvedOptions, currentOptions, {
+        state: mergeObjects(state, currentOptions.state || {}),
 
         onStateChange: (updater: Updater<TableState>) => {
           if (updater instanceof Function) state = updater(state);
-          else state = mergeObjects(state, updater);
+          else state = updater as TableState;
 
-          options.onStateChange?.(updater);
+          currentOptions.onStateChange?.(updater);
         },
       });
     });

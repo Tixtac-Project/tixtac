@@ -6,16 +6,13 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const eventId = Number(params.id);
-  if (Number.isNaN(eventId)) error(404, 'Không tìm thấy sự kiện');
+  if (Number.isNaN(eventId) || !Number.isFinite(eventId) || !Number.isInteger(eventId) || eventId <= 0) {
+    error(404, 'Không tìm thấy sự kiện');
+  }
 
   // 1. Get event
   const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
   if (!event) error(404, 'Không tìm thấy sự kiện');
-
-  // Draft events: only the creator admin can see
-  if (event.status === 'draft' && event.createdBy !== locals.user?.id) {
-    error(404, 'Không tìm thấy sự kiện');
-  }
 
   // 2. Get sections ordered by sort_order
   const sections = await db

@@ -26,16 +26,18 @@
   // unless Admin has manually edited start_row_index independently.
   let previousLayoutY = $state(section.layout_y);
   let previousLayoutX = $state(section.layout_x);
+  let startRowEdited = $state(false);
+  let startColEdited = $state(false);
 
   $effect(() => {
-    if (section.layout_y !== previousLayoutY) {
+    if (section.layout_y !== previousLayoutY && !startRowEdited) {
       section.start_row_index = section.layout_y;
       previousLayoutY = section.layout_y;
     }
   });
 
   $effect(() => {
-    if (section.layout_x !== previousLayoutX) {
+    if (section.layout_x !== previousLayoutX && !startColEdited) {
       section.start_col_index = section.layout_x === 0 ? 1 : section.layout_x;
       previousLayoutX = section.layout_x;
     }
@@ -233,6 +235,7 @@
               type="number"
               min="0"
               bind:value={section.start_row_index}
+              oninput={() => (startRowEdited = true)}
             />
             {#if fieldError('start_row_index')}
               <span class="text-xs text-destructive">{fieldError('start_row_index')}</span>
@@ -248,6 +251,7 @@
               type="number"
               min="1"
               bind:value={section.start_col_index}
+              oninput={() => (startColEdited = true)}
             />
             {#if fieldError('start_col_index')}
               <span class="text-xs text-destructive">{fieldError('start_col_index')}</span>

@@ -61,7 +61,7 @@
       locked += s.stats.locked;
       sold += s.stats.sold;
       disabled += s.stats.disabled;
-      total += s.stats.total;
+      total += s.stats.total + s.stats.disabled;
     }
     return { available, locked, sold, disabled, total };
   });
@@ -475,7 +475,7 @@
             {@const [r, c] = key.split(',').map(Number)}
             <div style="grid-row: {r + 1}; grid-column: {c + 1};">
               <Tooltip.Root>
-                <Tooltip.Trigger>
+                <Tooltip.Trigger aria-label="{cell.label} — {statusLabelVi(cell.status)}">
                   {#if cell.status === 'disabled'}
                     <div
                       class="flex h-7 w-7 cursor-default items-center justify-center rounded border border-dashed border-gray-300 text-[9px] dark:border-gray-700 {seatColor(
@@ -557,7 +557,7 @@
                   {@const seatInfo = section.seatGrid[rowLabel]?.[col]}
                   {#if seatInfo}
                     <Tooltip.Root>
-                      <Tooltip.Trigger>
+                      <Tooltip.Trigger aria-label="{seatInfo.label} — {statusLabelVi(seatInfo.status)}">
                         {#if seatInfo.status === 'disabled'}
                           <div
                             class="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded border border-dashed border-gray-300 dark:border-gray-700 {seatColor(
