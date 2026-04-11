@@ -296,14 +296,19 @@
   });
 </script>
 
-<div class="space-y-4">
+<div class="space-y-5">
   <div class="flex items-center justify-between">
-    <h3 class="text-base font-semibold text-foreground">📦 Khu vực ghế ngồi</h3>
     <div class="flex items-center gap-3">
-      <span class="text-sm text-muted-foreground">
-        Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
-        ghế
-      </span>
+      <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10">
+        <span class="text-lg">📦</span>
+      </div>
+      <div>
+        <h3 class="text-base font-semibold text-foreground">Khu vực ghế ngồi</h3>
+        <p class="text-xs text-muted-foreground">
+          Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
+           ghế
+        </p>
+      </div>
     </div>
   </div>
 
@@ -312,7 +317,7 @@
   {/if}
 
   {#if computedDuplicatePrefixes.length > 0}
-    <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
+    <div class="rounded-2xl border border-destructive/50 bg-destructive/10 px-4 py-3">
       <p class="text-sm font-medium text-destructive">
         ⚠️ Mã tiền tố trùng lặp: <strong>{computedDuplicatePrefixes.join(', ')}</strong>
       </p>
@@ -326,14 +331,19 @@
     <SectionItem bind:section={sections[i]} index={i} onremove={() => removeSection(i)} {errors} />
   {/each}
 
-  <Button type="button" variant="outline" class="w-full border-dashed" onclick={addSection}>
+  <Button
+    type="button"
+    variant="outline"
+    class="w-full rounded-2xl border-dashed py-5"
+    onclick={addSection}
+  >
     <Plus class="mr-2 h-4 w-4" />
     Thêm khu vực ghế
   </Button>
 
   <!-- Total seat map preview -->
   {#if gridData}
-    <div class="rounded-lg border bg-card p-4 shadow-sm">
+    <div class="bento-card">
       <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h3 class="text-sm font-semibold text-foreground">🗺️ Sơ đồ ghế tổng thể</h3>
         <div class="flex flex-wrap gap-2">

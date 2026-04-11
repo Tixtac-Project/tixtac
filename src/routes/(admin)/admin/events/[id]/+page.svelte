@@ -230,7 +230,7 @@
           {#if event.status === 'published'}
             <Badge variant="default" class="bg-green-600 hover:bg-green-700">Đã xuất bản</Badge>
           {:else}
-            <Badge variant="secondary">Bản nháp</Badge>
+            <Badge variant="secondary" class="bg-warning text-warning-foreground">Bản nháp</Badge>
           {/if}
         </div>
         <p class="text-sm text-muted-foreground">📍 {event.venue}</p>
@@ -515,7 +515,7 @@
             <h2 class="text-base font-semibold">
               {section.name}
               <span class="ml-2 text-sm font-normal text-muted-foreground">
-                ({section.stats.total + section.stats.disabled} ghế — {section.stats.total} active)
+                ({section.stats.total + section.stats.disabled} ghế — {section.stats.total} ghế bán được)
               </span>
             </h2>
             <p class="text-xs text-muted-foreground">
@@ -557,7 +557,9 @@
                   {@const seatInfo = section.seatGrid[rowLabel]?.[col]}
                   {#if seatInfo}
                     <Tooltip.Root>
-                      <Tooltip.Trigger aria-label="{seatInfo.label} — {statusLabelVi(seatInfo.status)}">
+                      <Tooltip.Trigger
+                        aria-label="{seatInfo.label} — {statusLabelVi(seatInfo.status)}"
+                      >
                         {#if seatInfo.status === 'disabled'}
                           <div
                             class="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded border border-dashed border-gray-300 dark:border-gray-700 {seatColor(
