@@ -638,11 +638,13 @@
         {#if !isFormValid && validationIssues.length > 0}
           <Tooltip.Provider>
             <Tooltip.Root>
-              <Tooltip.Trigger class="w-full md:w-auto">
-                <Button type="submit" class="w-full gap-2 rounded-xl md:w-auto" disabled>
-                  <Save class="h-4 w-4" />
-                  Tạo sự kiện
-                </Button>
+              <Tooltip.Trigger>
+                {#snippet child({ props })}
+                  <Button {...props} type="submit" class="w-full gap-2 rounded-xl md:w-auto" disabled>
+                    <Save class="h-4 w-4" />
+                    Tạo sự kiện
+                  </Button>
+                {/snippet}
               </Tooltip.Trigger>
               <Tooltip.Content side="top" class="max-w-xs rounded-xl">
                 <p class="mb-1 text-xs font-semibold">Chưa thể tạo sự kiện:</p>
