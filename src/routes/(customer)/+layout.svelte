@@ -205,10 +205,13 @@
         max-width: 1280px;
         margin: 0 auto;
         padding: 0 24px;
-        height: 68px;
+        min-height: 68px;
         display: flex;
         align-items: center;
         gap: 20px;
+        flex-wrap: wrap;
+        padding-top: 8px;
+        padding-bottom: 8px;
     }
 
     /* Logo */
@@ -435,7 +438,15 @@
         .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
     }
     @media (max-width: 768px) {
-        .navbar-search { display: none; }
+        .navbar-inner { gap: 12px; }
+        .navbar-search { 
+            order: 3; 
+            max-width: none; 
+            width: 100%; 
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        .navbar-auth { margin-left: auto; }
         .footer-grid { grid-template-columns: 1fr; gap: 24px; }
         .footer-bottom { flex-direction: column; gap: 8px; text-align: center; }
     }

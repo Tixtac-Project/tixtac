@@ -33,6 +33,16 @@
         });
     }
 
+    function formatPrice(price: number | string): string {
+        const val = typeof price === 'string' ? Number(price) : price;
+        if (!val || val === 0) return 'Đang cập nhật';
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND',
+            maximumFractionDigits: 0
+        }).format(val);
+    }
+
     // Gradient màu nhẹ cho placeholder không có banner (Light mode friendly)
     const placeholderGradients = [
         'linear-gradient(135deg, #EEF2FF, #C7D2FE)',
@@ -195,7 +205,7 @@
 
                         <!-- Footer -->
                         <div class="card-footer">
-                            <span class="card-price">Mua vé ngay</span>
+                            <span class="card-price">Giá từ: {formatPrice(event.min_price)}</span>
                             <span class="card-arrow">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
