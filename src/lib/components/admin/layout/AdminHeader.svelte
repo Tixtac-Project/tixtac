@@ -45,6 +45,8 @@
       variant="ghost"
       size="icon"
       class="h-9 w-9 rounded-xl md:hidden"
+      type="button"
+      aria-label="Toggle sidebar"
       onclick={ontogglesidebar}
     >
       <Menu class="h-5 w-5" />

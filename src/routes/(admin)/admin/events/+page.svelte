@@ -139,9 +139,13 @@
           tabindex="0"
           class="bento-card-interactive group col-span-full text-left"
           onclick={() => navigateToEvent(heroEvent.id)}
-          onkeydown={(e) =>
-            (e.key === 'Enter' || e.key === ' ') &&
-            (e.preventDefault(), navigateToEvent(heroEvent.id))}
+          onkeydown={(e) => {
+            if (e.currentTarget !== e.target) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigateToEvent(heroEvent.id);
+            }
+          }}
         >
           <div class="flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
             <!-- Left: info -->
@@ -257,8 +261,13 @@
           tabindex="0"
           class="bento-card-interactive group flex flex-col text-left"
           onclick={() => navigateToEvent(event.id)}
-          onkeydown={(e) =>
-            (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), navigateToEvent(event.id))}
+          onkeydown={(e) => {
+            if (e.currentTarget !== e.target) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigateToEvent(event.id);
+            }
+          }}
         >
           <div class="flex flex-1 flex-col">
             <!-- Status -->
