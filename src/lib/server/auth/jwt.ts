@@ -1,6 +1,6 @@
 // src/lib/server/auth/jwt.ts
-import { SignJWT, jwtVerify } from 'jose';
 import { config } from '$lib/server/config';
+import { SignJWT, jwtVerify } from 'jose';
 
 const secret = new TextEncoder().encode(config.jwtSecret);
 
@@ -32,7 +32,7 @@ export async function verifyAuthToken(token: string) {
       ...payload,
       sub,
     };
-  } catch (err) {
+  } catch {
     throw new Error('Invalid or expired token');
   }
 }

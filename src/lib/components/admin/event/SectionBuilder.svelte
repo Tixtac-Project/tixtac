@@ -271,14 +271,13 @@
 
     const overlapCount = labelOverlapCount + visualOverlapCount;
 
-    // Row labels for display — use numeric grid Y coordinates (not letters)
-    // because different sections at the same layoutY can have different startRowIndex
-    const rowLabels: number[] = [];
+    // Row labels for display
+    const rowLabels: string[] = [];
     for (let r = 0; r < displayRows; r++) {
-      rowLabels.push(minRow + r);
+      rowLabels.push(getRowLabel(minRow + r));
     }
 
-    // Col labels for display — use numeric grid X coordinates
+    // Col labels for display
     const colLabels: number[] = [];
     for (let c = 0; c < displayCols; c++) {
       colLabels.push(minCol + c);
@@ -296,19 +295,14 @@
   });
 </script>
 
-<div class="space-y-5">
+<div class="space-y-4">
   <div class="flex items-center justify-between">
+    <h3 class="text-base font-semibold text-foreground">📦 Khu vực ghế ngồi</h3>
     <div class="flex items-center gap-3">
-      <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10">
-        <span class="text-lg">📦</span>
-      </div>
-      <div>
-        <h3 class="text-base font-semibold text-foreground">Khu vực ghế ngồi</h3>
-        <p class="text-xs text-muted-foreground">
-          Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
-           ghế
-        </p>
-      </div>
+      <span class="text-sm text-muted-foreground">
+        Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
+        ghế
+      </span>
     </div>
   </div>
 
@@ -317,7 +311,7 @@
   {/if}
 
   {#if computedDuplicatePrefixes.length > 0}
-    <div class="rounded-2xl border border-destructive/50 bg-destructive/10 px-4 py-3">
+    <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
       <p class="text-sm font-medium text-destructive">
         ⚠️ Mã tiền tố trùng lặp: <strong>{computedDuplicatePrefixes.join(', ')}</strong>
       </p>
@@ -331,19 +325,14 @@
     <SectionItem bind:section={sections[i]} index={i} onremove={() => removeSection(i)} {errors} />
   {/each}
 
-  <Button
-    type="button"
-    variant="outline"
-    class="w-full rounded-2xl border-dashed py-5"
-    onclick={addSection}
-  >
+  <Button type="button" variant="outline" class="w-full border-dashed" onclick={addSection}>
     <Plus class="mr-2 h-4 w-4" />
     Thêm khu vực ghế
   </Button>
 
   <!-- Total seat map preview -->
   {#if gridData}
-    <div class="bento-card">
+    <div class="rounded-lg border bg-card p-4 shadow-sm">
       <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h3 class="text-sm font-semibold text-foreground">🗺️ Sơ đồ ghế tổng thể</h3>
         <div class="flex flex-wrap gap-2">
@@ -377,7 +366,7 @@
           </div>
 
           <!-- Rows -->
-          {#each gridData.grid as row, r (`row-${r}`)}
+          {#each gridData.grid as row, r (gridData.rowLabels[r])}
             <div class="flex items-center gap-px">
               <span class="w-7 shrink-0 pr-1 text-right font-mono text-[9px] text-muted-foreground">
                 {gridData.rowLabels[r]}
@@ -388,7 +377,7 @@
                   <Tooltip.Root>
                     <Tooltip.Trigger>
                       <div
-                        class="h-4 w-4 shrink-0 rounded-[2px] border transition-colors
+                        class="h-4 w-4 shrink-0 rounded-xs border transition-colors
                           {cell.isOverlap
                           ? 'border-destructive bg-destructive/40 ring-1 ring-destructive/60'
                           : cell.isDisabled
@@ -421,28 +410,26 @@
         {#each sections as sec, i (i)}
           {@const color = SECTION_COLORS[i % SECTION_COLORS.length]}
           <span class="flex items-center gap-1">
-            <span class="inline-block h-3 w-3 rounded-[2px] {color.label}"></span>
+            <span class="inline-block h-3 w-3 rounded-xs {color.label}"></span>
             {sec.name || `Khu vực ${i + 1}`}
           </span>
         {/each}
         <span class="flex items-center gap-1">
           <span
-            class="inline-block h-3 w-3 rounded-[2px] border border-destructive/40 bg-destructive/20"
+            class="inline-block h-3 w-3 rounded-xs border border-destructive/40 bg-destructive/20"
           ></span>
           Ghế hỏng
         </span>
         {#if gridData.overlapCount > 0}
           <span class="flex items-center gap-1">
             <span
-              class="inline-block h-3 w-3 rounded-[2px] border border-destructive bg-destructive/40"
+              class="inline-block h-3 w-3 rounded-xs border border-destructive bg-destructive/40"
             ></span>
             Chồng lấn
           </span>
         {/if}
         <span class="flex items-center gap-1">
-          <span
-            class="inline-block h-3 w-3 rounded-[2px] border border-dashed border-border"
-          ></span>
+          <span class="inline-block h-3 w-3 rounded-xs border border-dashed border-border"></span>
           Trống (không thuộc khu vực nào)
         </span>
       </div>

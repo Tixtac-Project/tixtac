@@ -21,28 +21,11 @@
 
   let rootEl = $state<HTMLDivElement>();
 
-  // ── Auto-sync layout_y → start_row_index ──
-  let previousLayoutY = $state(section.layout_y);
-  let previousLayoutX = $state(section.layout_x);
-  let startRowEdited = $state(false);
-  let startColEdited = $state(false);
-
-  $effect(() => {
-    if (section.layout_y !== previousLayoutY && !startRowEdited) {
-      section.start_row_index = section.layout_y;
-      previousLayoutY = section.layout_y;
-    }
-  });
-
-  $effect(() => {
-    if (section.layout_x !== previousLayoutX && !startColEdited) {
-      section.start_col_index = section.layout_x === 0 ? 1 : section.layout_x;
-      previousLayoutX = section.layout_x;
-    }
-  });
-
+  /** Dispatch a bubbling 'remove' CustomEvent AND call the onremove callback if provided */
   function handleRemove() {
+    // Dispatch DOM event for event-based listeners (e.g. parent using onremove on the element)
     rootEl?.dispatchEvent(new CustomEvent('remove', { bubbles: true, detail: { index } }));
+    // Also invoke callback prop for direct prop-based usage
     onremove?.();
   }
 
@@ -60,34 +43,23 @@
   let endColNumber = $derived(section.start_col_index + Math.max(section.cols, 1) - 1);
 </script>
 
-<div bind:this={rootEl} class="bento-card">
+<div bind:this={rootEl} class="rounded-lg border bg-card p-4 shadow-sm">
   <!-- Header row -->
   <div class="mb-4 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div
-        class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary"
-      >
-        {index + 1}
-      </div>
-      <div>
-        <h4 class="text-sm font-semibold text-foreground">
-          {#if section.name}
-            {section.name}
-          {:else}
-            Khu vực #{index + 1}
-          {/if}
-        </h4>
-        <span class="text-xs text-muted-foreground">{seatCount} ghế</span>
-      </div>
+    <h4 class="text-sm font-semibold text-foreground">
+      🧩 Khu vực #{index + 1}
+      {#if section.name}
+        — {section.name}
+      {/if}
+    </h4>
+    <div class="flex items-center gap-2">
+      <span class="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        {seatCount} ghế
+      </span>
+      <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive" onclick={handleRemove}>
+        <Trash2 class="h-4 w-4" />
+      </Button>
     </div>
-    <Button
-      variant="ghost"
-      size="icon"
-      class="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10"
-      onclick={handleRemove}
-    >
-      <Trash2 class="h-4 w-4" />
-    </Button>
   </div>
 
   <!-- Basic fields -->
@@ -160,8 +132,7 @@
   <!-- Advanced toggle -->
   <button
     type="button"
-    class="mt-4 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-    style="transition: all 0.2s var(--ease-bento);"
+    class="mt-4 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
     onclick={() => (showAdvanced = !showAdvanced)}
   >
     {#if showAdvanced}
@@ -175,7 +146,7 @@
 
   <!-- Advanced fields -->
   {#if showAdvanced}
-    <div class="mt-3 space-y-4 rounded-2xl border border-border/50 bg-muted/20 p-4">
+    <div class="mt-3 space-y-4 rounded-md border bg-muted/30 p-3">
       <!-- Position on venue layout -->
       <div>
         <div class="mb-2 flex items-center gap-1.5">
@@ -242,7 +213,6 @@
               type="number"
               min="0"
               bind:value={section.start_row_index}
-              oninput={() => (startRowEdited = true)}
             />
             {#if fieldError('start_row_index')}
               <span class="text-xs text-destructive">{fieldError('start_row_index')}</span>
@@ -258,7 +228,6 @@
               type="number"
               min="1"
               bind:value={section.start_col_index}
-              oninput={() => (startColEdited = true)}
             />
             {#if fieldError('start_col_index')}
               <span class="text-xs text-destructive">{fieldError('start_col_index')}</span>
