@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { Button } from '$lib/components/ui/button';
 </script>
 
 <section class="hero">
@@ -17,7 +18,7 @@
       chỉ trong vài giây — bảo mật, nhanh chóng, tiện lợi.
     </p>
     <div class="hero-ctas">
-      <a href={resolve('#events')} class="cta-primary" id="hero-cta-explore">
+      <Button href={resolve('/') + '#events'} size="lg" class="rounded-full" id="hero-cta-explore">
         Khám phá sự kiện
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -27,8 +28,16 @@
             d="M13 7l5 5m0 0l-5 5m5-5H6"
           />
         </svg>
-      </a>
-      <a href={resolve('/events')} class="cta-ghost" id="hero-cta-today">Xem sự kiện hôm nay →</a>
+      </Button>
+      <Button
+        href={resolve('/events')}
+        variant="outline"
+        size="lg"
+        class="rounded-full"
+        id="hero-cta-today"
+      >
+        Xem sự kiện hôm nay →
+      </Button>
     </div>
     <div class="hero-stats">
       <div class="stat-pill">
@@ -105,45 +114,6 @@
     gap: 16px;
     flex-wrap: wrap;
     margin-bottom: 40px;
-  }
-  .cta-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 13px 28px;
-    border-radius: 999px;
-    background: var(--color-primary);
-    color: white;
-    font-weight: 700;
-    font-size: 0.95rem;
-    transition:
-      transform 0.2s,
-      background 0.2s;
-    text-decoration: none;
-  }
-  .cta-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 32px rgba(108, 58, 255, 0.55);
-    opacity: 0.92;
-  }
-  .cta-ghost {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 12px 24px;
-    border-radius: 999px;
-    border: 1px solid rgba(108, 58, 255, 0.4);
-    color: var(--color-primary);
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition:
-      border-color 0.2s,
-      background 0.2s;
-    text-decoration: none;
-  }
-  .cta-ghost:hover {
-    border-color: var(--color-primary);
-    background: rgba(108, 58, 255, 0.08);
   }
   .hero-stats {
     display: inline-flex;

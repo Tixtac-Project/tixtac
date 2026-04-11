@@ -1,5 +1,7 @@
 <script lang="ts">
-  let { currentPage, totalPages, searchQuery, buildPageUrl } = $props<{
+  import { Button } from '$lib/components/ui/button';
+
+  let { currentPage, totalPages, buildPageUrl } = $props<{
     currentPage: number;
     totalPages: number;
     searchQuery: string;
@@ -11,41 +13,44 @@
 
 <nav class="pagination" aria-label="Phân trang">
   <!-- Prev -->
-  <a
+  <Button
     href={buildPageUrl(currentPage - 1)}
-    class="page-btn {currentPage === 1 ? 'disabled' : ''}"
+    variant="outline"
+    size="sm"
+    disabled={currentPage === 1}
     id="pagination-prev"
-    aria-disabled={currentPage === 1}
   >
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
     </svg>
     Trước
-  </a>
+  </Button>
 
   <!-- Page numbers -->
   {#each pageNumbers as num (num)}
-    <a
+    <Button
       href={buildPageUrl(num)}
-      class="page-btn {num === currentPage ? 'active' : ''}"
+      variant={num === currentPage ? 'default' : 'outline'}
+      size="sm"
       id="pagination-page-{num}"
     >
       {num}
-    </a>
+    </Button>
   {/each}
 
   <!-- Next -->
-  <a
+  <Button
     href={buildPageUrl(currentPage + 1)}
-    class="page-btn {currentPage === totalPages ? 'disabled' : ''}"
+    variant="outline"
+    size="sm"
+    disabled={currentPage === totalPages}
     id="pagination-next"
-    aria-disabled={currentPage === totalPages}
   >
     Tiếp
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
     </svg>
-  </a>
+  </Button>
 </nav>
 
 <style>
@@ -56,33 +61,5 @@
     gap: 6px;
     margin-top: 48px;
     padding-bottom: 16px;
-  }
-  .page-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-    background: var(--color-card);
-    color: var(--color-muted-strong);
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 0.2s;
-    text-decoration: none;
-  }
-  .page-btn:hover:not(.disabled) {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-  }
-  .page-btn.active {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-  }
-  .page-btn.disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    pointer-events: none;
   }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { Badge } from '$lib/components/ui/badge';
 
   interface Event {
     id: number;
@@ -35,9 +36,9 @@
 
     <!-- HOT badge -->
     {#if i % 3 === 0}
-      <span class="badge-hot">🔥 HOT</span>
+      <Badge variant="default" class="absolute top-3 left-3 z-[2]">🔥 HOT</Badge>
     {:else if i % 3 === 1}
-      <span class="badge-live">🔴 LIVE</span>
+      <Badge variant="secondary" class="absolute top-3 left-3 z-[2]">🔴 LIVE</Badge>
     {/if}
 
     <!-- Date badge -->
@@ -154,25 +155,6 @@
     inset: 0;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.3) 0%, transparent 60%);
   }
-  .badge-hot,
-  .badge-live {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    z-index: 2;
-  }
-  .badge-hot {
-    background: var(--color-accent);
-    color: white;
-  }
-  .badge-live {
-    background: var(--color-secondary);
-    color: #001f24;
-  }
   .card-date-badge {
     position: absolute;
     top: 12px;
@@ -211,6 +193,7 @@
     color: var(--color-text);
     line-height: 1.4;
     display: -webkit-box;
+    line-clamp: 2;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;

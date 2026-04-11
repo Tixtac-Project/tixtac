@@ -5,6 +5,7 @@
   import EventCard from '$lib/components/customer/event/EventCard.svelte';
   import Hero from '$lib/components/customer/event/Hero.svelte';
   import Pagination from '$lib/components/customer/event/Pagination.svelte';
+  import { SvelteURLSearchParams } from 'svelte/reactivity';
 
   interface Event {
     id: number;
@@ -24,7 +25,7 @@
   let { data } = $props<{
     data: {
       events: Event[];
-      pagination: Pagination;
+      pagination: PaginationInfo;
     };
   }>();
 
@@ -79,10 +80,10 @@
 
   // Build URL for pagination (dùng chung)
   function buildPageUrl(page: number): string {
-    const params = new URLSearchParams();
+    const params = new SvelteURLSearchParams();
     params.set('page', String(page));
     if (pagination.searchQuery) params.set('q', pagination.searchQuery);
-    return resolve(`/?${params.toString()}`);
+    return `/?${params.toString()}`;
   }
 </script>
 
@@ -117,7 +118,7 @@
   </div>
 
   {#if events.length === 0}
-    <EmptyState clearSearchUrl={resolve('/')} />
+    <EmptyState clearSearchUrl="/" />
   {:else}
     <div class="events-grid">
       {#each events as event, i (event.id)}

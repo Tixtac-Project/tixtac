@@ -1,15 +1,9 @@
 <script lang="ts">
-  import type { User } from '$lib/types';
-
   import AuthNav from './AuthNav.svelte';
   import CustomerSearchBar from './CustomerSearchBar.svelte';
   import Logo from './Logo.svelte';
 
-  interface Props {
-    user: User | null;
-  }
-
-  let { user }: Props = $props();
+  let { user } = $props();
 </script>
 
 <header class="navbar">

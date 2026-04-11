@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button } from '$lib/components/ui/button';
+
   interface Category {
     label: string;
     icon: string;
@@ -13,14 +15,16 @@
 
 <div class="category-bar">
   {#each categories as cat (cat.value || 'all')}
-    <button
+    <Button
       id="cat-{cat.value || 'all'}"
-      class="cat-chip {activeCategory === cat.value ? 'active' : ''}"
+      variant={activeCategory === cat.value ? 'default' : 'outline'}
+      size="sm"
       onclick={() => (activeCategory = cat.value)}
+      class="rounded-full whitespace-nowrap"
     >
       <span>{cat.icon}</span>
       {cat.label}
-    </button>
+    </Button>
   {/each}
 </div>
 
@@ -35,31 +39,5 @@
   }
   .category-bar::-webkit-scrollbar {
     display: none;
-  }
-  .cat-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    border-radius: 999px;
-    border: 1px solid var(--color-border);
-    background: var(--color-card);
-    color: var(--color-muted-strong);
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: var(--font-main);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-  .cat-chip:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-  }
-  .cat-chip.active {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
   }
 </style>

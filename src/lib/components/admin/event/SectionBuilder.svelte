@@ -377,7 +377,7 @@
                   <Tooltip.Root>
                     <Tooltip.Trigger>
                       <div
-                        class="h-4 w-4 shrink-0 rounded-[2px] border transition-colors
+                        class="h-4 w-4 shrink-0 rounded-xs border transition-colors
                           {cell.isOverlap
                           ? 'border-destructive bg-destructive/40 ring-1 ring-destructive/60'
                           : cell.isDisabled
@@ -410,28 +410,26 @@
         {#each sections as sec, i (i)}
           {@const color = SECTION_COLORS[i % SECTION_COLORS.length]}
           <span class="flex items-center gap-1">
-            <span class="inline-block h-3 w-3 rounded-[2px] {color.label}"></span>
+            <span class="inline-block h-3 w-3 rounded-xs {color.label}"></span>
             {sec.name || `Khu vực ${i + 1}`}
           </span>
         {/each}
         <span class="flex items-center gap-1">
           <span
-            class="inline-block h-3 w-3 rounded-[2px] border border-destructive/40 bg-destructive/20"
+            class="inline-block h-3 w-3 rounded-xs border border-destructive/40 bg-destructive/20"
           ></span>
           Ghế hỏng
         </span>
         {#if gridData.overlapCount > 0}
           <span class="flex items-center gap-1">
             <span
-              class="inline-block h-3 w-3 rounded-[2px] border border-destructive bg-destructive/40"
+              class="inline-block h-3 w-3 rounded-xs border border-destructive bg-destructive/40"
             ></span>
             Chồng lấn
           </span>
         {/if}
         <span class="flex items-center gap-1">
-          <span
-            class="inline-block h-3 w-3 rounded-[2px] border border-dashed border-border"
-          ></span>
+          <span class="inline-block h-3 w-3 rounded-xs border border-dashed border-border"></span>
           Trống (không thuộc khu vực nào)
         </span>
       </div>
