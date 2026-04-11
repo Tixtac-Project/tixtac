@@ -14,6 +14,20 @@ const config = {
     alias: {
       '@/*': './path/to/lib/*',
     },
+    csp: {
+      directives: {
+        'default-src': ['self'],
+        'script-src': ['self'],
+        'style-src': ['self', 'unsafe-inline'],
+        'img-src': ['self', 'https:', 'data:'],
+        'font-src': ['self'],
+        'connect-src': ['self'],
+        'frame-src': ['none'],
+        'object-src': ['none'],
+        'base-uri': ['self'],
+        'form-action': ['self'],
+      },
+    },
   },
 };
 

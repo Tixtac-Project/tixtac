@@ -1,7 +1,25 @@
 import { verifyAuthToken } from '$lib/server/auth/jwt';
 import type { Handle } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
 
-export const handle: Handle = async ({ event, resolve }) => {
+// ── Security headers (CSP + common hardening) ──
+const securityHeaders: Handle = async ({ event, resolve }) => {
+  const response = await resolve(event);
+
+  // Prevent MIME-type sniffing (stops browser from treating image respone as HTMsL)
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+
+  // Prevent clickjacking
+  response.headers.set('X-Frame-Options', 'DENY');
+
+  // Control referrer leakage to external image hosts
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  return response;
+};
+
+// ── Auth handler ──
+const auth: Handle = async ({ event, resolve }) => {
   const token = event.cookies.get('auth_token');
 
   if (!token) {
@@ -39,3 +57,5 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return resolve(event);
 };
+
+export const handle = sequence(securityHeaders, auth);
