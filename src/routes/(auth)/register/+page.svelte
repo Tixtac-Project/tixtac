@@ -80,7 +80,7 @@
 </script>
 
 <div class="flex h-screen w-screen flex-col items-center justify-center">
-  <Card.Root class="w-full max-w-100" style="view-transition-name: auth-card;">
+  <Card.Root class="w-6/7 max-w-90 md:w-full" style="view-transition-name: auth-card;">
     <Card.Header class="space-y-1 text-center">
       <Card.Title class="text-2xl font-bold">Đăng ký tài khoản</Card.Title>
       <Card.Description>Nhập thông tin của bạn để tạo tài khoản mới</Card.Description>
@@ -143,9 +143,9 @@
                 aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               >
                 {#if showPassword}
-                  <EyeOff class="h-4 w-4" />
+                  <EyeOff class="size-5" />
                 {:else}
-                  <Eye class="h-4 w-4" />
+                  <Eye class="size-5" />
                 {/if}
               </button>
             </div>
@@ -154,7 +154,7 @@
             {/if}
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-rows-2 gap-4 md:grid-cols-2">
             <div class="grid gap-2">
               <Label for="dob">Ngày sinh</Label>
               <Input

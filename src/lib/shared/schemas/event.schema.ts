@@ -16,9 +16,14 @@ const baseSectionSchema = z.object({
 
   prefix: z
     .string(req('Mã tiền tố là bắt buộc'))
-    .min(1, 'Mã tiền tố không được trống')
-    .max(10, 'Mã tiền tố tối đa 10 ký tự')
-    .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
+    .transform((v) => v.trim().toUpperCase())
+    .pipe(
+      z
+        .string()
+        .min(1, 'Mã tiền tố không được trống')
+        .max(10, 'Mã tiền tố tối đa 10 ký tự')
+        .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
+    ),
 
   rows: z
     .number(req('Số hàng là bắt buộc'))
@@ -41,7 +46,12 @@ const baseSectionSchema = z.object({
   start_col_index: z.number().int().min(1, 'start_col_index phải >= 1').default(1),
 
   disabled_seats: z
-    .array(z.string().regex(seatLabelRegex, 'Seat label phải có dạng VIP-A1, STD-B12...'))
+    .array(
+      z
+        .string()
+        .transform((v) => v.trim().toUpperCase())
+        .pipe(z.string().regex(seatLabelRegex, 'Seat label phải có dạng VIP-A1, STD-B12...')),
+    )
     .default([]),
 
   sort_order: z.number().int().min(0).default(0),
@@ -129,7 +139,11 @@ export const createEventSchema = z
       .pipe(z.iso.datetime({ offset: true }))
       .check(z.refine((val) => new Date(val) > new Date(), 'Ngày sự kiện phải trong tương lai')),
 
-    banner_image_url: z.url('URL ảnh không hợp lệ').optional().or(z.literal('')),
+    banner_image_url: z
+      .url('URL ảnh không hợp lệ')
+      .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
+      .optional()
+      .or(z.literal('')),
 
     sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
   })
@@ -149,6 +163,44 @@ export const updateSectionsSchema = z.object({
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateSectionsInput = z.infer<typeof updateSectionsSchema>;
 export type SectionInput = z.infer<typeof sectionSchema>;
+
+/** Form-side section type: disabled_seats is a comma-separated string instead of string[] */
+export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & { disabled_seats: string };
+
+// ── Draft persistence schema (validates shape/types only, not business rules) ──
+const sectionFormDraftSchema = z.object({
+  name: z.string(),
+  prefix: z.string(),
+  price: z.number(),
+  rows: z.number().int(),
+  cols: z.number().int(),
+  layout_x: z.number(),
+  layout_y: z.number(),
+  start_row_index: z.number(),
+  start_col_index: z.number(),
+  disabled_seats: z.string(),
+  sort_order: z.number(),
+});
+
+export const formDraftSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  venue: z.string(),
+  date: z
+    .object({
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+      day: z.number().int().min(1).max(31),
+    })
+    .optional(),
+  selectedHour: z.string(),
+  selectedMinute: z.string(),
+  selectedPeriod: z.enum(['AM', 'PM']),
+  bannerImageUrl: z.string(),
+  sections: z.array(sectionFormDraftSchema).min(1),
+});
+
+export type FormDraft = z.infer<typeof formDraftSchema>;
 
 // ── Event Query Schema (Public List API) ───────
 export const eventQuerySchema = z.object({

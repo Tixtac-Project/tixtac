@@ -1,5 +1,21 @@
 import adapter from 'svelte-adapter-bun';
 
+// ── Derive allowed connect-src origins from VITE_API_URL ──
+// If VITE_API_URL is set to an external origin (e.g. https://api.example.com),
+// we must include it in connect-src so the browser CSP doesn't block fetch requests.
+const apiUrl = process.env.VITE_API_URL || '';
+const connectSrc = /** @type {Array<import('@sveltejs/kit').CspDirectives['connect-src']>[number]>} */ (['self']);
+if (apiUrl) {
+  try {
+    const origin = new URL(apiUrl).origin; // e.g. "https://api.example.com"
+    if (origin && origin !== 'null') {
+      connectSrc.push(origin);
+    }
+  } catch {
+    // Not a valid absolute URL (e.g. "/api") — 'self' is sufficient
+  }
+}
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   compilerOptions: {
@@ -13,6 +29,20 @@ const config = {
     adapter: adapter(),
     alias: {
       '@/*': './path/to/lib/*',
+    },
+    csp: {
+      directives: {
+        'default-src': ['self'],
+        'script-src': ['self'],
+        'style-src': ['self', 'unsafe-inline'],
+        'img-src': ['self', 'https:', 'data:'],
+        'font-src': ['self'],
+        'connect-src': connectSrc,
+        'frame-src': ['none'],
+        'object-src': ['none'],
+        'base-uri': ['self'],
+        'form-action': ['self'],
+      },
     },
   },
 };
