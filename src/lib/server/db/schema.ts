@@ -2,6 +2,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   date,
   decimal,
   index,
@@ -48,31 +49,38 @@ export const users = pgTable('users', {
 });
 
 // ── Events ─────────────────────────────────────
-export const events = pgTable('events', {
-  id: serial('id').primaryKey(),
-  title: varchar('title', { length: 200 }).notNull(),
-  description: text('description').notNull(),
-  venue: varchar('venue', { length: 200 }).notNull(),
-  eventDate: timestamp('event_date', { withTimezone: true }).notNull(),
-  bannerImageUrl: varchar('banner_image_url', { length: 500 }),
-  minAge: integer('min_age').notNull().default(0), // 0 là mọi lứa tuổi
-  maxTicketsPerUser: integer('max_tickets_per_user').notNull().default(0), // 0 là không giới hạn
-  stageLayout: jsonb('stage_layout').default([]),
-  /* Ví dụ data bên trong:
-     [
-       { "id": "main", "label": "Sân khấu chính", "type": "rect", "x": 10, "y": 0, "w": 20, "h": 5 },
-       { "id": "catwalk", "label": "Đường băng", "type": "rect", "x": 18, "y": 5, "w": 4, "h": 10 },
-       { "id": "center", "label": "Center Stage", "type": "circle", "x": 20, "y": 20, "radius": 8 }
-     ]
-  */
+export const events = pgTable(
+  'events',
+  {
+    id: serial('id').primaryKey(),
+    title: varchar('title', { length: 200 }).notNull(),
+    description: text('description').notNull(),
+    venue: varchar('venue', { length: 200 }).notNull(),
+    eventDate: timestamp('event_date', { withTimezone: true }).notNull(),
+    bannerImageUrl: varchar('banner_image_url', { length: 500 }),
+    minAge: integer('min_age').notNull().default(0), // 0 là mọi lứa tuổi
+    maxTicketsPerUser: integer('max_tickets_per_user').notNull().default(0), // 0 là không giới hạn
+    stageLayout: jsonb('stage_layout').default([]),
+    /* Ví dụ data bên trong:
+       [
+         { "id": "main", "label": "Sân khấu chính", "type": "rect", "x": 10, "y": 0, "w": 20, "h": 5 },
+         { "id": "catwalk", "label": "Đường băng", "type": "rect", "x": 18, "y": 5, "w": 4, "h": 10 },
+         { "id": "center", "label": "Center Stage", "type": "circle", "x": 20, "y": 20, "radius": 8 }
+       ]
+    */
 
-  status: eventStatusEnum('status').notNull().default('draft'),
-  createdBy: integer('created_by')
-    .notNull()
-    .references(() => users.id),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+    status: eventStatusEnum('status').notNull().default('draft'),
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check('chk_min_age_non_negative', sql`${table.minAge} >= 0`),
+    check('chk_max_tickets_per_user_non_negative', sql`${table.maxTicketsPerUser} >= 0`),
+  ],
+);
 
 // ── Seat Sections ──────────────────────────────
 export const seatSections = pgTable(
@@ -156,18 +164,27 @@ export const orders = pgTable(
 );
 
 // ── Order Items ────────────────────────────────
-export const orderItems = pgTable('order_items', {
-  id: serial('id').primaryKey(),
-  orderId: integer('order_id')
-    .notNull()
-    .references(() => orders.id),
-  seatId: integer('seat_id')
-    .notNull()
-    .references(() => seats.id),
-  priceSnapshot: decimal('price_snapshot', { precision: 12, scale: 2 }).notNull(),
-  qrCode: text('qr_code'),
-  isCheckedIn: boolean('is_checked_in').notNull().default(false),
-  checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+export const orderItems = pgTable(
+  'order_items',
+  {
+    id: serial('id').primaryKey(),
+    orderId: integer('order_id')
+      .notNull()
+      .references(() => orders.id),
+    seatId: integer('seat_id')
+      .notNull()
+      .references(() => seats.id),
+    priceSnapshot: decimal('price_snapshot', { precision: 12, scale: 2 }).notNull(),
+    qrCode: text('qr_code'),
+    isCheckedIn: boolean('is_checked_in').notNull().default(false),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
 
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      'chk_checked_in_consistency',
+      sql`${table.isCheckedIn} = (${table.checkedInAt} IS NOT NULL)`,
+    ),
+  ],
+);

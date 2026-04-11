@@ -14,6 +14,8 @@ const prefixRegex = /^[A-Z0-9]+$/; // Only uppercase letters and digits, no hyph
 const baseSectionSchema = z.object({
   name: z.string(req('Tên khu vực là bắt buộc')).min(1, 'Tên khu vực không được trống'),
 
+  type: z.enum(['assigned', 'general']).default('assigned'),
+
   prefix: z
     .string(req('Mã tiền tố là bắt buộc'))
     .transform((v) => v.trim().toUpperCase())
@@ -24,6 +26,8 @@ const baseSectionSchema = z.object({
         .max(10, 'Mã tiền tố tối đa 10 ký tự')
         .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
     ),
+
+  is_seat_pickable: z.boolean().default(true),
 
   rows: z
     .number(req('Số hàng là bắt buộc'))
@@ -170,7 +174,9 @@ export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & { disabled_
 // ── Draft persistence schema (validates shape/types only, not business rules) ──
 const sectionFormDraftSchema = z.object({
   name: z.string(),
+  type: z.enum(['assigned', 'general']),
   prefix: z.string(),
+  is_seat_pickable: z.boolean(),
   price: z.number(),
   rows: z.number().int(),
   cols: z.number().int(),
