@@ -127,6 +127,20 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
 });
 
 // ── Event Schema ───────────────────────────────
+// ── Stage layout item schema ───────────────────
+// ── Stage layout item schema (discriminated union) ──
+const baseStageItem = { id: z.string(), label: z.string(), x: z.number(), y: z.number() };
+
+const stageLayoutItemSchema = z.discriminatedUnion('type', [
+  z.object({ ...baseStageItem, type: z.literal('rect'), w: z.number(), h: z.number() }),
+  z.object({ ...baseStageItem, type: z.literal('circle'), radius: z.number() }),
+  z.object({
+    ...baseStageItem,
+    type: z.literal('polygon'),
+    points: z.array(z.object({ x: z.number(), y: z.number() })),
+  }),
+]);
+
 export const createEventSchema = z
   .object({
     title: z
@@ -148,6 +162,16 @@ export const createEventSchema = z
       .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
       .optional()
       .or(z.literal('')),
+
+    min_age: z.number().int().min(0, 'Tuổi tối thiểu không được âm').default(0),
+
+    max_tickets_per_user: z
+      .number()
+      .int()
+      .min(0, 'Giới hạn vé không được âm (0 = không giới hạn)')
+      .default(0),
+
+    stage_layout: z.array(stageLayoutItemSchema).default([]),
 
     sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
   })
