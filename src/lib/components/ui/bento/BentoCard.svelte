@@ -36,9 +36,9 @@
 </script>
 
 <div
-  class="bento-card bento-fade-in {interactive
-    ? 'bento-card-hover cursor-pointer'
-    : ''} {spanClasses} {className}"
+  class="bento-fade-in {interactive
+    ? 'bento-card-interactive'
+    : 'bento-card'} {spanClasses} {className}"
   {...restProps}
 >
   {@render children()}

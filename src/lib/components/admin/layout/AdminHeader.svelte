@@ -65,6 +65,7 @@
             {...props}
             class="flex items-center gap-2.5 rounded-xl border border-border/50 bg-card px-3 py-1.5 hover:bg-accent/60"
             style="transition: all 0.2s var(--ease-bento);"
+            aria-label="Tài khoản Admin"
           >
             <Avatar.Root class="h-7 w-7">
               <Avatar.Fallback class="bg-primary/10 text-xs font-semibold text-primary">

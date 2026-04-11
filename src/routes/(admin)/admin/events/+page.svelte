@@ -57,12 +57,12 @@
     goto(resolve(`/admin/events/${eventId}`));
   }
 
-  // Derived stats
+  // Derived stats (page-scoped — only reflects the current page of results)
   const totalEvents = $derived(data.pagination.total);
   const publishedCount = $derived(data.events.filter((e) => e.status === 'published').length);
   const draftCount = $derived(data.events.filter((e) => e.status === 'draft').length);
-  const totalSeats = $derived(data.events.reduce((sum, e) => sum + e.total_seats, 0));
-  const totalAvailable = $derived(data.events.reduce((sum, e) => sum + e.available_seats, 0));
+  const pageSeats = $derived(data.events.reduce((sum, e) => sum + e.total_seats, 0));
+  const pageAvailable = $derived(data.events.reduce((sum, e) => sum + e.available_seats, 0));
 
   // Split: hero (first) + rest
   const heroEvent = $derived(data.events.length > 0 ? data.events[0] : null);
@@ -116,12 +116,12 @@
     <!-- ══════ Bento Stats Row ══════ -->
     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
       <BentoStat label="Tổng" value={totalEvents} subtitle="sự kiện" hue={265} />
-      <BentoStat label="Xuất bản" value={publishedCount} subtitle="đã xuất bản" hue={155} />
-      <BentoStat label="Nháp" value={draftCount} subtitle="bản nháp" hue={85} />
+      <BentoStat label="Xuất bản" value={publishedCount} subtitle="trang này" hue={155} />
+      <BentoStat label="Nháp" value={draftCount} subtitle="trang này" hue={85} />
       <BentoStat
         label="Ghế trống"
-        value="{totalAvailable}/{totalSeats}"
-        subtitle="ghế còn trống"
+        value="{pageAvailable}/{pageSeats}"
+        subtitle="trang này"
         hue={280}
       />
     </div>
@@ -139,7 +139,9 @@
           tabindex="0"
           class="bento-card-interactive group col-span-full text-left"
           onclick={() => navigateToEvent(heroEvent.id)}
-          onkeydown={(e) => e.key === 'Enter' && navigateToEvent(heroEvent.id)}
+          onkeydown={(e) =>
+            (e.key === 'Enter' || e.key === ' ') &&
+            (e.preventDefault(), navigateToEvent(heroEvent.id))}
         >
           <div class="flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
             <!-- Left: info -->
@@ -194,10 +196,7 @@
                 <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     class="h-full rounded-full {seatBarColor(hp)}"
-                    style="width: {Math.max(
-                      100 - hp,
-                      2,
-                    )}%; transition: width 0.5s var(--ease-bento);"
+                    style="width: {Math.max(hp, 2)}%; transition: width 0.5s var(--ease-bento);"
                   ></div>
                 </div>
                 <p class="mt-2 text-center text-sm font-semibold text-foreground">
@@ -258,7 +257,8 @@
           tabindex="0"
           class="bento-card-interactive group flex flex-col text-left"
           onclick={() => navigateToEvent(event.id)}
-          onkeydown={(e) => e.key === 'Enter' && navigateToEvent(event.id)}
+          onkeydown={(e) =>
+            (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), navigateToEvent(event.id))}
         >
           <div class="flex flex-1 flex-col">
             <!-- Status -->
@@ -303,7 +303,7 @@
               <div class="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   class="h-full rounded-full {seatBarColor(ap)}"
-                  style="width: {Math.max(100 - ap, 2)}%; transition: width 0.5s var(--ease-bento);"
+                  style="width: {Math.max(ap, 2)}%; transition: width 0.5s var(--ease-bento);"
                 ></div>
               </div>
               <div class="flex items-center justify-between text-xs">
