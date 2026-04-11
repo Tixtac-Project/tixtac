@@ -77,7 +77,9 @@ async function insertSectionsWithSeats(
       .values({
         eventId,
         name: sec.name,
+        type: sec.type,
         prefix: sec.prefix,
+        isSeatPickable: sec.is_seat_pickable,
         rows: sec.rows,
         cols: sec.cols,
         price: String(sec.price),
@@ -125,11 +127,12 @@ export const eventService = {
     // Build WHERE conditions
     const conditions = [];
 
-    // Admin sees all events (published + all drafts); others see only published
+    // Admin sees all events; non-admins see all public statuses (published, sold_out, completed, cancelled)
     if (role === 'admin') {
       // No status filter for admins - they see everything
     } else {
-      conditions.push(eq(events.status, 'published'));
+      // Exclude only draft status - all other statuses are public
+      conditions.push(sql`${events.status} != 'draft'`);
     }
 
     if (q) {
@@ -192,7 +195,8 @@ export const eventService = {
     if (!event) throwError(Errors.NOT_FOUND);
 
     // Draft events are only visible to the admin who created them
-    if (event.status !== 'published') {
+    // Other statuses (published, sold_out, completed, cancelled) are public
+    if (event.status === 'draft') {
       if (role !== 'admin' || event.createdBy !== userId) {
         throwError(Errors.NOT_FOUND);
       }
@@ -246,7 +250,9 @@ export const eventService = {
         return {
           id: s.id,
           name: s.name,
+          type: s.type,
           prefix: s.prefix,
+          is_seat_pickable: s.isSeatPickable,
           price: Number(s.price),
           rows: s.rows,
           cols: s.cols,

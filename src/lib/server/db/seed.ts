@@ -31,7 +31,9 @@ function getRowLabel(index: number): string {
 
 interface SectionSeed {
   name: string;
+  type?: 'assigned' | 'general';
   prefix: string;
+  isSeatPickable?: boolean;
   rows: number;
   cols: number;
   price: string;
@@ -270,7 +272,9 @@ async function createSections(eventId: number, sections: SectionSeed[]) {
       .values({
         eventId,
         name: s.name,
+        type: s.type ?? 'assigned',
         prefix: s.prefix,
+        isSeatPickable: s.isSeatPickable ?? true,
         rows: s.rows,
         cols: s.cols,
         price: s.price,
