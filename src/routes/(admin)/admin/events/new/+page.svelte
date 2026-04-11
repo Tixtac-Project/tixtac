@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import SectionBuilder from '$lib/components/admin/event/SectionBuilder.svelte';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { Button } from '$lib/components/ui/button';
   import Calendar from '$lib/components/ui/calendar/calendar.svelte';
   import { Input } from '$lib/components/ui/input';
@@ -9,18 +11,19 @@
   import * as Popover from '$lib/components/ui/popover';
   import * as Select from '$lib/components/ui/select';
   import { Textarea } from '$lib/components/ui/textarea';
+  import * as Tooltip from '$lib/components/ui/tooltip';
   import { formatZodErrors } from '$lib/shared/format-errors';
   import { createEventSchema, type SectionFormData } from '$lib/shared/schemas/event.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import {
+    CalendarDate,
     CalendarDateTime,
     getLocalTimeZone,
     toZoned,
     today,
-    type CalendarDate,
   } from '@internationalized/date';
-  import { ChevronDown, Loader, Save } from 'lucide-svelte';
+  import { ChevronDown, Loader, RotateCcw, Save } from 'lucide-svelte';
 
   // ── Hour options for Select (1–12) ──
   const hourOptions = Array.from({ length: 12 }, (_, i) => {
@@ -34,66 +37,163 @@
     return { value: String(m), label: String(m).padStart(2, '0') };
   });
 
-  // ── Form state ──
-  let title = $state('');
-  let description = $state('');
-  let venue = $state('');
-  let dateValue = $state<CalendarDate | undefined>();
-  let selectedHour = $state('7');
-  let selectedMinute = $state('0');
-  let selectedPeriod = $state<'AM' | 'PM'>('PM');
+  // ── Form persistence ─────────────────────────────────────
+  const STORAGE_KEY = 'tixtac-new-event-draft';
+
+  interface FormDraft {
+    title: string;
+    description: string;
+    venue: string;
+    date?: { year: number; month: number; day: number };
+    selectedHour: string;
+    selectedMinute: string;
+    selectedPeriod: 'AM' | 'PM';
+    bannerImageUrl: string;
+    sections: SectionFormData[];
+  }
+
+  const defaultSection: SectionFormData = {
+    name: '',
+    prefix: '',
+    price: 0,
+    rows: 1,
+    cols: 1,
+    layout_x: 0,
+    layout_y: 0,
+    start_row_index: 0,
+    start_col_index: 1,
+    disabled_seats: '',
+    sort_order: 0,
+  };
+
+  /** Read saved draft synchronously (runs at script init, before first render) */
+  function readDraft(): FormDraft | null {
+    if (!browser) return null;
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as FormDraft;
+    } catch {
+      return null;
+    }
+  }
+
+  const draft = readDraft();
+  const hasDraft = draft !== null;
+
+  // ── Form state (initialised from draft if available) ──
+  let title = $state(draft?.title ?? '');
+  let description = $state(draft?.description ?? '');
+  let venue = $state(draft?.venue ?? '');
+  let dateValue = $state<CalendarDate | undefined>(
+    draft?.date ? new CalendarDate(draft.date.year, draft.date.month, draft.date.day) : undefined,
+  );
+  let selectedHour = $state(draft?.selectedHour ?? '7');
+  let selectedMinute = $state(draft?.selectedMinute ?? '0');
+  let selectedPeriod = $state<'AM' | 'PM'>(draft?.selectedPeriod ?? 'PM');
   let datePickerOpen = $state(false);
-  let bannerImageUrl = $state('');
-  let sections = $state<SectionFormData[]>([
-    {
-      name: '',
-      prefix: '',
-      price: 0,
-      rows: 1,
-      cols: 1,
-      layout_x: 0,
-      layout_y: 0,
-      start_row_index: 0,
-      start_col_index: 1,
-      disabled_seats: '',
-      sort_order: 0,
-    },
-  ]);
+  let bannerImageUrl = $state(draft?.bannerImageUrl ?? '');
+  let sections = $state<SectionFormData[]>(
+    draft?.sections?.length ? draft.sections : [{ ...defaultSection }],
+  );
 
   let loading = $state(false);
   let errors = $state<Record<string, string>>({});
   let sectionHasOverlap = $state(false);
   let sectionDuplicatePrefixes = $state<string[]>([]);
 
+  // Show toast once (after first render) if draft was restored
+  let draftToastShown = false;
+  $effect(() => {
+    if (hasDraft && !draftToastShown) {
+      draftToastShown = true;
+      toast.info('Đã khôi phục bản nháp từ phiên trước.');
+    }
+  });
+
+  function clearFormDraft() {
+    if (browser) sessionStorage.removeItem(STORAGE_KEY);
+  }
+
+  function resetForm() {
+    title = '';
+    description = '';
+    venue = '';
+    dateValue = undefined;
+    selectedHour = '7';
+    selectedMinute = '0';
+    selectedPeriod = 'PM';
+    bannerImageUrl = '';
+    sections = [{ ...defaultSection }];
+    errors = {};
+    clearFormDraft();
+    toast.info('Đã đặt lại biểu mẫu.');
+  }
+
+  // Auto-save to sessionStorage on any form change (debounced)
+  $effect(() => {
+    if (!browser) return;
+    const snapshot: FormDraft = {
+      title,
+      description,
+      venue,
+      date: dateValue
+        ? { year: dateValue.year, month: dateValue.month, day: dateValue.day }
+        : undefined,
+      selectedHour,
+      selectedMinute,
+      selectedPeriod,
+      bannerImageUrl,
+      sections: $state.snapshot(sections) as SectionFormData[],
+    };
+    const timer = setTimeout(() => {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    }, 300);
+    return () => clearTimeout(timer);
+  });
+
   function handleSectionValidation(state: { hasOverlap: boolean; duplicatePrefixes: string[] }) {
     sectionHasOverlap = state.hasOverlap;
     sectionDuplicatePrefixes = state.duplicatePrefixes;
   }
 
-  // ── Live validation: derive whether the form is valid ──
-  let isFormValid = $derived.by(() => {
-    // Quick checks before running Zod
-    if (!title.trim()) return false;
-    if (!description.trim()) return false;
-    if (!venue.trim()) return false;
-    if (!dateValue) return false;
-    if (sections.length === 0) return false;
-    if (sectionHasOverlap) return false;
-    if (sectionDuplicatePrefixes.length > 0) return false;
+  // ── Live validation: derive issues list + validity ──
+  let validationIssues = $derived.by(() => {
+    const issues: string[] = [];
 
-    // Check every section has required fields filled
-    for (const s of sections) {
-      if (!s.name.trim()) return false;
-      if (!s.prefix.trim()) return false;
-      if (s.rows < 1 || s.cols < 1) return false;
-      if (s.price <= 0) return false;
+    if (!title.trim()) issues.push('Tên sự kiện không được trống');
+    if (!description.trim()) issues.push('Mô tả không được trống');
+    if (!venue.trim()) issues.push('Địa điểm không được trống');
+    if (!dateValue) issues.push('Chưa chọn ngày sự kiện');
+    if (sections.length === 0) issues.push('Phải có ít nhất 1 khu vực ghế');
+    if (sectionHasOverlap) issues.push('Các khu vực ghế bị chồng chéo');
+    if (sectionDuplicatePrefixes.length > 0)
+      issues.push(`Prefix trùng lặp: ${sectionDuplicatePrefixes.join(', ')}`);
+
+    for (let i = 0; i < sections.length; i++) {
+      const s = sections[i];
+      const label = s.name.trim() || `Khu vực ${i + 1}`;
+      if (!s.name.trim()) issues.push(`${label}: Thiếu tên`);
+      if (!s.prefix.trim()) issues.push(`${label}: Thiếu mã tiền tố`);
+      if (s.rows < 1 || s.cols < 1) issues.push(`${label}: Số hàng/cột phải ≥ 1`);
+      if (s.price <= 0) issues.push(`${label}: Giá phải > 0`);
     }
 
-    // Run full Zod validation
-    const payload = buildPayload();
-    const result = createEventSchema.safeParse(payload);
-    return result.success;
+    // If basic checks pass, run full Zod for deeper issues
+    if (issues.length === 0) {
+      const payload = buildPayload();
+      const result = createEventSchema.safeParse(payload);
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          issues.push(issue.message);
+        }
+      }
+    }
+
+    return issues;
   });
+
+  let isFormValid = $derived(validationIssues.length === 0);
 
   const minDate = today(getLocalTimeZone());
 
@@ -131,7 +231,9 @@
       0,
     );
     const zdt = toZoned(dt, tz);
-    return zdt.toString(); // e.g. "2025-06-15T19:00:00+07:00[Asia/Saigon]"
+    // zdt.toString() returns "2025-06-15T19:00:00+07:00[Asia/Saigon]"
+    // Strip the [IANA] suffix — Zod's z.iso.datetime({ offset: true }) only accepts pure ISO 8601
+    return zdt.toString().replace(/\[.+\]$/, '');
   }
 
   /** Preview text shown when both date & time are filled */
@@ -220,6 +322,7 @@
     }
 
     if (data) {
+      clearFormDraft();
       toast.success('Tạo sự kiện (Draft) thành công!');
       goto(resolve('/admin/events'));
     }
@@ -411,7 +514,7 @@
     <!-- Sections -->
     <SectionBuilder bind:sections {errors} onvalidationchange={handleSectionValidation} />
 
-    <!-- Submit -->
+    <!-- Actions -->
     <div
       class="flex flex-col-reverse gap-3 border-t pt-4 md:flex-row md:items-center md:justify-end md:pt-6"
     >
@@ -423,14 +526,61 @@
       >
         Hủy
       </Button>
-      <Button type="submit" class="w-full md:w-auto" disabled={loading}>
-        {#if loading}
-          <Loader class="mr-2 h-4 w-4 animate-spin" />
-        {:else}
-          <Save class="mr-2 h-4 w-4" />
-        {/if}
-        Tạo sự kiện (Lưu Draft)
-      </Button>
+
+      <AlertDialog.Root>
+        <AlertDialog.Trigger>
+          {#snippet child({ props })}
+            <Button {...props} type="button" variant="destructive" class="w-full md:w-auto">
+              <RotateCcw class="mr-2 h-4 w-4" />
+              Đặt lại
+            </Button>
+          {/snippet}
+        </AlertDialog.Trigger>
+        <AlertDialog.Content>
+          <AlertDialog.Header>
+            <AlertDialog.Title>Đặt lại biểu mẫu?</AlertDialog.Title>
+            <AlertDialog.Description>
+              Tất cả các ô bạn đã nhập sẽ bị xoá. Bạn có chắc chắn muốn đặt lại?
+            </AlertDialog.Description>
+          </AlertDialog.Header>
+          <AlertDialog.Footer>
+            <AlertDialog.Cancel>Huỷ bỏ</AlertDialog.Cancel>
+            <AlertDialog.Action onclick={resetForm}>Đặt lại</AlertDialog.Action>
+          </AlertDialog.Footer>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
+      {#if !isFormValid && validationIssues.length > 0}
+        <Tooltip.Provider>
+          <Tooltip.Root>
+            <Tooltip.Trigger class="w-full md:w-auto">
+              <Button type="submit" class="w-full md:w-auto" disabled>
+                <Save class="mr-2 h-4 w-4" />
+                Tạo sự kiện (Lưu Draft)
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content side="top" class="max-w-xs">
+              <p class="mb-1 text-xs font-semibold">Chưa thể tạo sự kiện:</p>
+              <ul class="list-inside list-disc space-y-0.5 text-xs">
+                {#each validationIssues.slice(0, 5) as issue, i (`${issue}-${i}`)}
+                  <li>{issue}</li>
+                {/each}
+                {#if validationIssues.length > 5}
+                  <li>… và {validationIssues.length - 5} lỗi khác</li>
+                {/if}
+              </ul>
+            </Tooltip.Content>
+          </Tooltip.Root>
+        </Tooltip.Provider>
+      {:else}
+        <Button type="submit" class="w-full hover:bg-primary/80 md:w-auto" disabled={loading}>
+          {#if loading}
+            <Loader class="mr-2 h-4 w-4 animate-spin" />
+          {:else}
+            <Save class="mr-2 h-4 w-4" />
+          {/if}
+          Tạo sự kiện (Lưu Draft)
+        </Button>
+      {/if}
     </div>
   </form>
 </div>
