@@ -28,7 +28,17 @@
     toZoned,
     today,
   } from '@internationalized/date';
-  import { ChevronDown, Loader, RotateCcw, Save } from 'lucide-svelte';
+  import {
+    ArrowLeft,
+    CalendarDays,
+    ChevronDown,
+    FileText,
+    ImageIcon,
+    Loader,
+    MapPin,
+    RotateCcw,
+    Save,
+  } from 'lucide-svelte';
 
   // ── Hour options for Select (1–12) ──
   const hourOptions = Array.from({ length: 12 }, (_, i) => {
@@ -329,11 +339,21 @@
 </script>
 
 <div class="mx-auto max-w-4xl space-y-6 md:space-y-8">
+  <!-- Back button -->
+  <Button variant="ghost" size="sm" href={resolve('/admin/events')} class="gap-2 rounded-xl">
+    <ArrowLeft class="h-4 w-4" />
+    Quay lại danh sách
+  </Button>
+
   <!-- Page header -->
   <div>
-    <h1 class="text-2xl font-bold tracking-tight">Tạo sự kiện mới</h1>
-    <p class="text-sm text-muted-foreground">
-      Điền thông tin và cấu hình khu vực ghế cho sự kiện. Sự kiện sẽ được lưu dưới dạng Draft.
+    <h1 class="font-heading text-2xl font-bold tracking-tight md:text-3xl">Tạo sự kiện mới</h1>
+    <p class="mt-1 text-sm text-muted-foreground">
+      Điền thông tin và cấu hình khu vực ghế cho sự kiện. Sự kiện sẽ được lưu dưới dạng
+      <span class="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+        Draft
+      </span>
+      .
     </p>
   </div>
 
@@ -342,11 +362,19 @@
       e.preventDefault();
       handleSubmit();
     }}
-    class="space-y-8"
+    class="space-y-6"
   >
-    <!-- General info -->
-    <div class="rounded-lg border bg-card p-4 shadow-sm md:p-6">
-      <h2 class="mb-4 text-base font-semibold text-foreground">📝 Thông tin chung</h2>
+    <!-- ══════ General Info Card ══════ -->
+    <div class="bento-card">
+      <div class="mb-5 flex items-center gap-3">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+          <FileText class="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h2 class="text-base font-semibold text-foreground">Thông tin chung</h2>
+          <p class="text-xs text-muted-foreground">Tên, mô tả và địa điểm sự kiện</p>
+        </div>
+      </div>
 
       <div class="grid gap-5">
         <!-- Title -->
@@ -380,7 +408,10 @@
 
         <!-- Venue -->
         <div class="grid gap-1.5">
-          <Label for="venue">Địa điểm</Label>
+          <Label for="venue" class="flex items-center gap-1.5">
+            <MapPin class="h-3.5 w-3.5 text-muted-foreground" />
+            Địa điểm
+          </Label>
           <Input
             id="venue"
             placeholder="VD: Nhà hát lớn Hà Nội"
@@ -391,195 +422,256 @@
             <span class="text-xs text-destructive">{errors.venue}</span>
           {/if}
         </div>
+      </div>
+    </div>
 
-        <!-- Event date & time -->
-        <div class="grid gap-1.5">
-          <Label>Ngày & giờ sự kiện</Label>
-          <div class="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-            <!-- Date picker -->
-            <Popover.Root bind:open={datePickerOpen}>
-              <Popover.Trigger
-                onclick={() => clearError('event_date')}
-                class="inline-flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm font-normal shadow-xs  md:w-44"
-              >
-                {dateValue
-                  ? dateValue.toDate(getLocalTimeZone()).toLocaleDateString('vi-VN')
-                  : 'Chọn ngày'}
-                <ChevronDown class="h-4 w-4 opacity-50" />
-              </Popover.Trigger>
-              <Popover.Content class="w-auto overflow-hidden p-0" align="start">
-                <Calendar
-                  type="single"
-                  bind:value={dateValue}
-                  onValueChange={() => {
-                    datePickerOpen = false;
-                    clearError('event_date');
-                  }}
-                  captionLayout="dropdown"
-                  minValue={minDate}
-                />
-              </Popover.Content>
-            </Popover.Root>
+    <!-- ══════ Date & Time Card ══════ -->
+    <div class="bento-card">
+      <div class="mb-5 flex items-center gap-3">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-info/10">
+          <CalendarDays class="h-5 w-5 text-info" />
+        </div>
+        <div>
+          <h2 class="text-base font-semibold text-foreground">Ngày & giờ</h2>
+          <p class="text-xs text-muted-foreground">Chọn thời gian tổ chức sự kiện</p>
+        </div>
+      </div>
 
-            <!-- Time selects: Hour / Minute / AM|PM -->
-            <div class="flex w-full items-center gap-2 md:w-auto">
-              <div class="flex flex-1 items-center gap-2 md:flex-initial">
-                <Select.Root
-                  type="single"
-                  bind:value={selectedHour}
-                  onValueChange={() => clearError('event_date')}
-                >
-                  <Select.Trigger class="w-full md:w-18">
-                    {String(selectedHour).padStart(2, '0')}
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Group>
-                      <Select.Label>Giờ</Select.Label>
-                      {#each hourOptions as opt (opt.value)}
-                        <Select.Item value={opt.value}>{opt.label}</Select.Item>
-                      {/each}
-                    </Select.Group>
-                  </Select.Content>
-                </Select.Root>
+      <div class="grid gap-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+          <!-- Date picker -->
+          <Popover.Root bind:open={datePickerOpen}>
+            <Popover.Trigger
+              onclick={() => clearError('event_date')}
+              class="inline-flex h-9 w-full items-center justify-between rounded-xl border border-input bg-background px-3 text-sm font-normal shadow-xs md:w-48"
+            >
+              {dateValue
+                ? dateValue.toDate(getLocalTimeZone()).toLocaleDateString('vi-VN')
+                : 'Chọn ngày'}
+              <ChevronDown class="h-4 w-4 opacity-50" />
+            </Popover.Trigger>
+            <Popover.Content class="w-auto overflow-hidden rounded-2xl p-0" align="start">
+              <Calendar
+                type="single"
+                bind:value={dateValue}
+                onValueChange={() => {
+                  datePickerOpen = false;
+                  clearError('event_date');
+                }}
+                captionLayout="dropdown"
+                minValue={minDate}
+              />
+            </Popover.Content>
+          </Popover.Root>
 
-                <span class="text-sm font-medium text-muted-foreground">:</span>
-
-                <Select.Root
-                  type="single"
-                  bind:value={selectedMinute}
-                  onValueChange={() => clearError('event_date')}
-                >
-                  <Select.Trigger class="w-full md:w-18">
-                    {String(selectedMinute).padStart(2, '0')}
-                  </Select.Trigger>
-                  <Select.Content>
-                    <Select.Group>
-                      <Select.Label>Phút</Select.Label>
-                      {#each minuteOptions as opt (opt.value)}
-                        <Select.Item value={opt.value}>{opt.label}</Select.Item>
-                      {/each}
-                    </Select.Group>
-                  </Select.Content>
-                </Select.Root>
-              </div>
-
+          <!-- Time selects: Hour / Minute / AM|PM -->
+          <div class="flex w-full items-center gap-2 md:w-auto">
+            <div class="flex flex-1 items-center gap-2 md:flex-initial">
               <Select.Root
                 type="single"
-                bind:value={selectedPeriod}
+                bind:value={selectedHour}
                 onValueChange={() => clearError('event_date')}
               >
-                <Select.Trigger class="flex-1 md:w-18 md:flex-initial">
-                  {selectedPeriod}
+                <Select.Trigger class="w-full rounded-xl md:w-18">
+                  {String(selectedHour).padStart(2, '0')}
                 </Select.Trigger>
                 <Select.Content>
                   <Select.Group>
-                    <Select.Label>Buổi</Select.Label>
-                    <Select.Item value="AM">AM (00:00 - 11:59)</Select.Item>
-                    <Select.Item value="PM">PM (12:00 - 23:59)</Select.Item>
+                    <Select.Label>Giờ</Select.Label>
+                    {#each hourOptions as opt (opt.value)}
+                      <Select.Item value={opt.value}>{opt.label}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+              </Select.Root>
+
+              <span class="text-sm font-bold text-muted-foreground">:</span>
+
+              <Select.Root
+                type="single"
+                bind:value={selectedMinute}
+                onValueChange={() => clearError('event_date')}
+              >
+                <Select.Trigger class="w-full rounded-xl md:w-18">
+                  {String(selectedMinute).padStart(2, '0')}
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    <Select.Label>Phút</Select.Label>
+                    {#each minuteOptions as opt (opt.value)}
+                      <Select.Item value={opt.value}>{opt.label}</Select.Item>
+                    {/each}
                   </Select.Group>
                 </Select.Content>
               </Select.Root>
             </div>
-          </div>
 
-          {#if previewText}
-            <p class="text-sm text-muted-foreground">
+            <Select.Root
+              type="single"
+              bind:value={selectedPeriod}
+              onValueChange={() => clearError('event_date')}
+            >
+              <Select.Trigger class="flex-1 rounded-xl md:w-18 md:flex-initial">
+                {selectedPeriod}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  <Select.Label>Buổi</Select.Label>
+                  <Select.Item value="AM">AM (00:00 - 11:59)</Select.Item>
+                  <Select.Item value="PM">PM (12:00 - 23:59)</Select.Item>
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+          </div>
+        </div>
+
+        {#if previewText}
+          <div class="rounded-xl border border-info-border/50 bg-info-muted/50 px-4 py-2.5">
+            <p class="text-sm text-info-muted-foreground">
               📅 {previewText}
             </p>
-          {/if}
+          </div>
+        {/if}
 
-          {#if errors.event_date}
-            <span class="text-xs text-destructive">{errors.event_date}</span>
-          {/if}
-        </div>
-
-        <!-- Banner URL -->
-        <div class="grid gap-1.5">
-          <Label for="banner_image_url">URL ảnh banner (tùy chọn)</Label>
-          <Input
-            id="banner_image_url"
-            type="url"
-            placeholder="https://example.com/banner.jpg"
-            bind:value={bannerImageUrl}
-            onfocus={() => clearError('banner_image_url')}
-          />
-          {#if errors.banner_image_url}
-            <span class="text-xs text-destructive">{errors.banner_image_url}</span>
-          {/if}
-        </div>
+        {#if errors.event_date}
+          <span class="text-xs text-destructive">{errors.event_date}</span>
+        {/if}
       </div>
     </div>
 
-    <!-- Sections -->
+    <!-- ══════ Banner Card ══════ -->
+    <div class="bento-card">
+      <div class="mb-5 flex items-center gap-3">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-purple/10">
+          <ImageIcon class="h-5 w-5 text-purple" />
+        </div>
+        <div>
+          <h2 class="text-base font-semibold text-foreground">Ảnh banner</h2>
+          <p class="text-xs text-muted-foreground">Tùy chọn — URL ảnh đại diện cho sự kiện</p>
+        </div>
+      </div>
+
+      <div class="grid gap-1.5">
+        <Input
+          id="banner_image_url"
+          type="url"
+          placeholder="https://example.com/banner.jpg"
+          bind:value={bannerImageUrl}
+          onfocus={() => clearError('banner_image_url')}
+        />
+        {#if errors.banner_image_url}
+          <span class="text-xs text-destructive">{errors.banner_image_url}</span>
+        {/if}
+        {#if bannerImageUrl.trim()}
+          <div class="mt-2 overflow-hidden rounded-2xl border border-border/50">
+            <img
+              src={bannerImageUrl}
+              alt="Banner preview"
+              class="h-40 w-full object-cover"
+              onerror={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    <!-- ══════ Sections ══════ -->
     <SectionBuilder bind:sections {errors} onvalidationchange={handleSectionValidation} />
 
-    <!-- Actions -->
+    <!-- ══════ Actions ══════ -->
     <div
-      class="flex flex-col-reverse gap-3 border-t pt-4 md:flex-row md:items-center md:justify-end md:pt-6"
+      class="bento-card flex flex-col-reverse gap-3 md:flex-row md:items-center md:justify-between"
     >
-      <Button
-        type="button"
-        variant="outline"
-        class="w-full md:w-auto"
-        onclick={() => goto(resolve('/admin/events'))}
-      >
-        Hủy
-      </Button>
+      <!-- Left: validation summary -->
+      <div class="hidden md:block">
+        {#if !isFormValid && validationIssues.length > 0}
+          <p class="text-xs text-muted-foreground">
+            ⚠️ {validationIssues.length} vấn đề cần khắc phục
+          </p>
+        {:else if isFormValid}
+          <p class="text-xs text-success">✓ Sẵn sàng tạo sự kiện</p>
+        {/if}
+      </div>
 
-      <AlertDialog.Root>
-        <AlertDialog.Trigger>
-          {#snippet child({ props })}
-            <Button {...props} type="button" variant="destructive" class="w-full md:w-auto">
-              <RotateCcw class="mr-2 h-4 w-4" />
-              Đặt lại
-            </Button>
-          {/snippet}
-        </AlertDialog.Trigger>
-        <AlertDialog.Content>
-          <AlertDialog.Header>
-            <AlertDialog.Title>Đặt lại biểu mẫu?</AlertDialog.Title>
-            <AlertDialog.Description>
-              Tất cả các ô bạn đã nhập sẽ bị xoá. Bạn có chắc chắn muốn đặt lại?
-            </AlertDialog.Description>
-          </AlertDialog.Header>
-          <AlertDialog.Footer>
-            <AlertDialog.Cancel>Huỷ bỏ</AlertDialog.Cancel>
-            <AlertDialog.Action onclick={resetForm}>Đặt lại</AlertDialog.Action>
-          </AlertDialog.Footer>
-        </AlertDialog.Content>
-      </AlertDialog.Root>
-      {#if !isFormValid && validationIssues.length > 0}
-        <Tooltip.Provider>
-          <Tooltip.Root>
-            <Tooltip.Trigger class="w-full md:w-auto">
-              <Button type="submit" class="w-full md:w-auto" disabled>
-                <Save class="mr-2 h-4 w-4" />
-                Tạo sự kiện (Lưu Draft)
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content side="top" class="max-w-xs">
-              <p class="mb-1 text-xs font-semibold">Chưa thể tạo sự kiện:</p>
-              <ul class="list-inside list-disc space-y-0.5 text-xs">
-                {#each validationIssues.slice(0, 5) as issue, i (`${issue}-${i}`)}
-                  <li>{issue}</li>
-                {/each}
-                {#if validationIssues.length > 5}
-                  <li>… và {validationIssues.length - 5} lỗi khác</li>
-                {/if}
-              </ul>
-            </Tooltip.Content>
-          </Tooltip.Root>
-        </Tooltip.Provider>
-      {:else}
-        <Button type="submit" class="w-full hover:bg-primary/80 md:w-auto" disabled={loading}>
-          {#if loading}
-            <Loader class="mr-2 h-4 w-4 animate-spin" />
-          {:else}
-            <Save class="mr-2 h-4 w-4" />
-          {/if}
-          Tạo sự kiện (Lưu Draft)
+      <!-- Right: buttons -->
+      <div class="flex flex-col-reverse gap-2 md:flex-row md:items-center">
+        <Button
+          type="button"
+          variant="ghost"
+          class="w-full rounded-xl md:w-auto"
+          onclick={() => goto(resolve('/admin/events'))}
+        >
+          Hủy
         </Button>
-      {/if}
+
+        <AlertDialog.Root>
+          <AlertDialog.Trigger>
+            {#snippet child({ props })}
+              <Button
+                {...props}
+                type="button"
+                variant="outline"
+                class="w-full gap-2 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5 md:w-auto"
+              >
+                <RotateCcw class="h-4 w-4" />
+                Đặt lại
+              </Button>
+            {/snippet}
+          </AlertDialog.Trigger>
+          <AlertDialog.Content>
+            <AlertDialog.Header>
+              <AlertDialog.Title>Đặt lại biểu mẫu?</AlertDialog.Title>
+              <AlertDialog.Description>
+                Tất cả các ô bạn đã nhập sẽ bị xoá. Bạn có chắc chắn muốn đặt lại?
+              </AlertDialog.Description>
+            </AlertDialog.Header>
+            <AlertDialog.Footer>
+              <AlertDialog.Cancel>Huỷ bỏ</AlertDialog.Cancel>
+              <AlertDialog.Action onclick={resetForm}>Đặt lại</AlertDialog.Action>
+            </AlertDialog.Footer>
+          </AlertDialog.Content>
+        </AlertDialog.Root>
+
+        {#if !isFormValid && validationIssues.length > 0}
+          <Tooltip.Provider>
+            <Tooltip.Root>
+              <Tooltip.Trigger class="w-full md:w-auto">
+                <Button type="submit" class="w-full gap-2 rounded-xl md:w-auto" disabled>
+                  <Save class="h-4 w-4" />
+                  Tạo sự kiện
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content side="top" class="max-w-xs rounded-xl">
+                <p class="mb-1 text-xs font-semibold">Chưa thể tạo sự kiện:</p>
+                <ul class="list-inside list-disc space-y-0.5 text-xs">
+                  {#each validationIssues.slice(0, 5) as issue, i (`${issue}-${i}`)}
+                    <li>{issue}</li>
+                  {/each}
+                  {#if validationIssues.length > 5}
+                    <li>… và {validationIssues.length - 5} lỗi khác</li>
+                  {/if}
+                </ul>
+              </Tooltip.Content>
+            </Tooltip.Root>
+          </Tooltip.Provider>
+        {:else}
+          <Button
+            type="submit"
+            class="w-full gap-2 rounded-xl hover:bg-primary/90 md:w-auto"
+            disabled={loading}
+          >
+            {#if loading}
+              <Loader class="h-4 w-4 animate-spin" />
+            {:else}
+              <Save class="h-4 w-4" />
+            {/if}
+            Tạo sự kiện (Lưu Draft)
+          </Button>
+        {/if}
+      </div>
     </div>
   </form>
 </div>

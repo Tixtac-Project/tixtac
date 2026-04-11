@@ -3,7 +3,7 @@
   import { resolve } from '$app/paths';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { Badge } from '$lib/components/ui/badge';
-  import { BentoCard, BentoGrid, BentoStat } from '$lib/components/ui/bento';
+  import { BentoCard, BentoStat } from '$lib/components/ui/bento';
   import { Button } from '$lib/components/ui/button';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
