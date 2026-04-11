@@ -24,9 +24,7 @@
   /** Dispatch a bubbling 'remove' CustomEvent AND call the onremove callback if provided */
   function handleRemove() {
     // Dispatch DOM event for event-based listeners (e.g. parent using onremove on the element)
-    rootEl?.dispatchEvent(
-      new CustomEvent('remove', { bubbles: true, detail: { index } }),
-    );
+    rootEl?.dispatchEvent(new CustomEvent('remove', { bubbles: true, detail: { index } }));
     // Also invoke callback prop for direct prop-based usage
     onremove?.();
   }
