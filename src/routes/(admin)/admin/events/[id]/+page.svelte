@@ -1,12 +1,32 @@
 <script lang="ts">
+  import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import * as Tooltip from '$lib/components/ui/tooltip';
+  import { toast } from '$lib/stores/toast';
+  import { api } from '$lib/utils/api';
   import { getRowLabel } from '$lib/utils/seat-label';
-  import { ArrowLeft } from 'lucide-svelte';
+  import { ArrowLeft, Globe, Loader } from 'lucide-svelte';
   import { SvelteMap } from 'svelte/reactivity';
   let { data } = $props();
+
+  let publishing = $state(false);
+
+  async function handlePublish() {
+    publishing = true;
+    const { error } = await api.patch(`/events/${event.id}/publish`, {});
+    publishing = false;
+
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    toast.success('Sự kiện đã được xuất bản thành công!');
+    await invalidateAll();
+  }
 
   const event = $derived(data.event);
   const sections = $derived(data.sections);
@@ -219,64 +239,125 @@
           <p class="mt-2 max-w-2xl text-sm text-muted-foreground">{event.description}</p>
         {/if}
       </div>
+
+      {#if event.status !== 'published'}
+        <div class="shrink-0">
+          <AlertDialog.Root>
+            <AlertDialog.Trigger>
+              {#snippet child({ props })}
+                <Button {...props} class="gap-2 " disabled={publishing}>
+                  {#if publishing}
+                    <Loader class="h-4 w-4 animate-spin" />
+                  {:else}
+                    <Globe class="h-4 w-4" />
+                  {/if}
+                  Xuất bản sự kiện
+                </Button>
+              {/snippet}
+            </AlertDialog.Trigger>
+            <AlertDialog.Content>
+              <AlertDialog.Header>
+                <AlertDialog.Title>Xuất bản sự kiện?</AlertDialog.Title>
+                <AlertDialog.Description>
+                  Sau khi xuất bản, sự kiện sẽ hiển thị công khai và khách hàng có thể đặt vé. Bạn
+                  sẽ không thể thay đổi sơ đồ ghế nữa.
+                </AlertDialog.Description>
+              </AlertDialog.Header>
+              <AlertDialog.Footer>
+                <AlertDialog.Cancel>Huỷ bỏ</AlertDialog.Cancel>
+                <AlertDialog.Action onclick={handlePublish}>Xuất bản</AlertDialog.Action>
+              </AlertDialog.Footer>
+            </AlertDialog.Content>
+          </AlertDialog.Root>
+        </div>
+      {/if}
     </div>
   </div>
 
   <!-- Overall stats — Bento grid -->
-  <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
-    <!-- Total -->
-    <div class="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-sm">
-      <div class="absolute -top-3 -right-3 h-16 w-16 rounded-full bg-blue-500/10"></div>
-      <div class="relative">
-        <div class="mb-2 h-1.5 w-6 rounded-full bg-blue-500"></div>
-        <p class="text-2xl font-bold tracking-tight text-blue-600">{totalStats.total}</p>
-        <p class="text-xs font-medium text-muted-foreground">Tổng ghế</p>
+  <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <!-- Hero tile: Tổng ghế — spans 2 cols on all, + 2 rows on md -->
+    <div
+      class="relative col-span-2 overflow-hidden rounded-3xl border bg-card p-6 shadow-sm transition-shadow hover:shadow-md md:row-span-2 md:p-8"
+    >
+      <!-- Decorative blobs -->
+      <div class="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-blue-500/8 blur-md"></div>
+      <div class="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-blue-400/6 blur-lg"></div>
+
+      <div class="relative flex h-full flex-col justify-between">
+        <div>
+          <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1">
+            <div class="h-2 w-2 rounded-full bg-blue-500"></div>
+            <span
+              class="text-xs font-semibold tracking-wide text-blue-600 uppercase dark:text-blue-400"
+            >
+              Tổng ghế
+            </span>
+          </div>
+          <p
+            class="text-5xl font-extrabold tracking-tighter text-blue-600 md:text-6xl dark:text-blue-400"
+          >
+            {totalStats.total.toLocaleString('vi-VN')}
+          </p>
+        </div>
+        <p class="mt-4 text-sm text-muted-foreground">
+          {totalStats.available} trống · {totalStats.locked} giữ · {totalStats.sold} bán · {totalStats.disabled}
+          vô hiệu
+        </p>
       </div>
     </div>
 
     <!-- Available -->
-    <div class="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-sm">
-      <div class="absolute -top-3 -right-3 h-16 w-16 rounded-full bg-green-500/10"></div>
+    <div
+      class="relative overflow-hidden rounded-3xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+    >
+      <div class="absolute -top-4 -right-4 h-16 w-16 rounded-full bg-green-500/10 blur-sm"></div>
       <div class="relative">
         <div class="mb-2 h-1.5 w-6 rounded-full bg-green-500"></div>
         <p class="text-2xl font-bold tracking-tight text-green-600">{totalStats.available}</p>
-        <p class="text-xs font-medium text-muted-foreground">Còn trống</p>
+        <p class="mt-0.5 text-xs font-medium text-muted-foreground">Còn trống</p>
       </div>
     </div>
 
     <!-- Locked -->
-    <div class="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-sm">
-      <div class="absolute -top-3 -right-3 h-16 w-16 rounded-full bg-red-500/10"></div>
+    <div
+      class="relative overflow-hidden rounded-3xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+    >
+      <div class="absolute -top-4 -right-4 h-16 w-16 rounded-full bg-red-500/10 blur-sm"></div>
       <div class="relative">
         <div class="mb-2 h-1.5 w-6 rounded-full bg-red-500"></div>
         <p class="text-2xl font-bold tracking-tight text-red-600">{totalStats.locked}</p>
-        <p class="text-xs font-medium text-muted-foreground">Đang giữ</p>
+        <p class="mt-0.5 text-xs font-medium text-muted-foreground">Đang giữ</p>
       </div>
     </div>
 
     <!-- Sold -->
-    <div class="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-sm">
-      <div class="absolute -top-3 -right-3 h-16 w-16 rounded-full bg-gray-500/10"></div>
+    <div
+      class="relative overflow-hidden rounded-3xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+    >
+      <div class="absolute -top-4 -right-4 h-16 w-16 rounded-full bg-gray-500/10 blur-sm"></div>
       <div class="relative">
-        <div class="mb-2 h-1.5 w-6 rounded-full bg-gray-800 dark:bg-gray-500"></div>
+        <div class="mb-2 h-1.5 w-6 rounded-full bg-gray-800/80 dark:bg-gray-500"></div>
         <p class="text-2xl font-bold tracking-tight text-gray-700 dark:text-gray-400">
           {totalStats.sold}
         </p>
-        <p class="text-xs font-medium text-muted-foreground">Đã bán</p>
+        <p class="mt-0.5 text-xs font-medium text-muted-foreground">Đã bán</p>
       </div>
     </div>
 
     <!-- Disabled -->
-    <div class="relative overflow-hidden rounded-2xl border border-dashed bg-card p-5 shadow-sm">
+    <div
+      class="relative overflow-hidden rounded-3xl border border-dashed bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+    >
       <div
-        class="absolute -top-3 -right-3 h-16 w-16 rounded-full bg-gray-300/10 dark:bg-gray-700/10"
+        class="absolute -top-4 -right-4 h-16 w-16 rounded-full bg-gray-300/10 blur-sm dark:bg-gray-700/10"
       ></div>
       <div class="relative">
         <div class="mb-2 h-1.5 w-6 rounded-full bg-gray-300 dark:bg-gray-700"></div>
         <p class="text-2xl font-bold tracking-tight text-gray-400 dark:text-gray-600">
           {totalStats.disabled}
         </p>
-        <p class="text-xs font-medium text-muted-foreground">Vô hiệu</p>
+        <p class="mt-0.5 text-xs font-medium text-muted-foreground">Vô hiệu</p>
       </div>
     </div>
   </div>
