@@ -13,7 +13,12 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import * as Tooltip from '$lib/components/ui/tooltip';
   import { formatZodErrors } from '$lib/shared/format-errors';
-  import { createEventSchema, type SectionFormData } from '$lib/shared/schemas/event.schema';
+  import {
+    createEventSchema,
+    formDraftSchema,
+    type FormDraft,
+    type SectionFormData,
+  } from '$lib/shared/schemas/event.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import {
@@ -40,18 +45,6 @@
   // ── Form persistence ─────────────────────────────────────
   const STORAGE_KEY = 'tixtac-new-event-draft';
 
-  interface FormDraft {
-    title: string;
-    description: string;
-    venue: string;
-    date?: { year: number; month: number; day: number };
-    selectedHour: string;
-    selectedMinute: string;
-    selectedPeriod: 'AM' | 'PM';
-    bannerImageUrl: string;
-    sections: SectionFormData[];
-  }
-
   const defaultSection: SectionFormData = {
     name: '',
     prefix: '',
@@ -66,14 +59,20 @@
     sort_order: 0,
   };
 
-  /** Read saved draft synchronously (runs at script init, before first render) */
+  /** Read and validate saved draft synchronously (runs at script init, before first render) */
   function readDraft(): FormDraft | null {
     if (!browser) return null;
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
-      return JSON.parse(raw) as FormDraft;
+      const result = formDraftSchema.safeParse(JSON.parse(raw));
+      if (!result.success) {
+        sessionStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+      return result.data;
     } catch {
+      sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
   }
@@ -273,7 +272,7 @@
       banner_image_url: bannerImageUrl.trim() || undefined,
       sections: sections.map((s, i) => ({
         name: s.name.trim(),
-        prefix: s.prefix.trim(),
+        prefix: s.prefix.trim().toUpperCase(),
         price: Number(s.price),
         rows: Number(s.rows),
         cols: Number(s.cols),
