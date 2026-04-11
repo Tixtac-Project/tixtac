@@ -15,9 +15,21 @@
   }: {
     section: SectionFormData;
     index: number;
-    onremove: () => void;
+    onremove?: () => void;
     errors?: Record<string, string>;
   } = $props();
+
+  let rootEl = $state<HTMLDivElement>();
+
+  /** Dispatch a bubbling 'remove' CustomEvent AND call the onremove callback if provided */
+  function handleRemove() {
+    // Dispatch DOM event for event-based listeners (e.g. parent using onremove on the element)
+    rootEl?.dispatchEvent(
+      new CustomEvent('remove', { bubbles: true, detail: { index } }),
+    );
+    // Also invoke callback prop for direct prop-based usage
+    onremove?.();
+  }
 
   let showAdvanced = $state(false);
 
@@ -33,7 +45,7 @@
   let endColNumber = $derived(section.start_col_index + Math.max(section.cols, 1) - 1);
 </script>
 
-<div class="rounded-lg border bg-card p-4 shadow-sm">
+<div bind:this={rootEl} class="rounded-lg border bg-card p-4 shadow-sm">
   <!-- Header row -->
   <div class="mb-4 flex items-center justify-between">
     <h4 class="text-sm font-semibold text-foreground">
@@ -46,7 +58,7 @@
       <span class="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
         {seatCount} ghế
       </span>
-      <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive" onclick={onremove}>
+      <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive" onclick={handleRemove}>
         <Trash2 class="h-4 w-4" />
       </Button>
     </div>
