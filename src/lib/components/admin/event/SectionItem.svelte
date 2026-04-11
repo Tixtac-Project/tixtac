@@ -21,12 +21,32 @@
 
   let rootEl = $state<HTMLDivElement>();
 
+  // ── Auto-sync layout_y → start_row_index ──
+  // When Admin changes layout_y, automatically update start_row_index to match,
+  // unless Admin has manually edited start_row_index independently.
+  let previousLayoutY = $state(section.layout_y);
+  let previousLayoutX = $state(section.layout_x);
+  let startRowEdited = $state(false);
+  let startColEdited = $state(false);
+
+  $effect(() => {
+    if (section.layout_y !== previousLayoutY && !startRowEdited) {
+      section.start_row_index = section.layout_y;
+      previousLayoutY = section.layout_y;
+    }
+  });
+
+  $effect(() => {
+    if (section.layout_x !== previousLayoutX && !startColEdited) {
+      section.start_col_index = section.layout_x === 0 ? 1 : section.layout_x;
+      previousLayoutX = section.layout_x;
+    }
+  });
+
   /** Dispatch a bubbling 'remove' CustomEvent AND call the onremove callback if provided */
   function handleRemove() {
     // Dispatch DOM event for event-based listeners (e.g. parent using onremove on the element)
-    rootEl?.dispatchEvent(
-      new CustomEvent('remove', { bubbles: true, detail: { index } }),
-    );
+    rootEl?.dispatchEvent(new CustomEvent('remove', { bubbles: true, detail: { index } }));
     // Also invoke callback prop for direct prop-based usage
     onremove?.();
   }
@@ -215,6 +235,7 @@
               type="number"
               min="0"
               bind:value={section.start_row_index}
+              oninput={() => (startRowEdited = true)}
             />
             {#if fieldError('start_row_index')}
               <span class="text-xs text-destructive">{fieldError('start_row_index')}</span>
@@ -230,6 +251,7 @@
               type="number"
               min="1"
               bind:value={section.start_col_index}
+              oninput={() => (startColEdited = true)}
             />
             {#if fieldError('start_col_index')}
               <span class="text-xs text-destructive">{fieldError('start_col_index')}</span>

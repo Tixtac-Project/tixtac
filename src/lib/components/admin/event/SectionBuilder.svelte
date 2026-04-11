@@ -271,13 +271,14 @@
 
     const overlapCount = labelOverlapCount + visualOverlapCount;
 
-    // Row labels for display
-    const rowLabels: string[] = [];
+    // Row labels for display — use numeric grid Y coordinates (not letters)
+    // because different sections at the same layoutY can have different startRowIndex
+    const rowLabels: number[] = [];
     for (let r = 0; r < displayRows; r++) {
-      rowLabels.push(getRowLabel(minRow + r));
+      rowLabels.push(minRow + r);
     }
 
-    // Col labels for display
+    // Col labels for display — use numeric grid X coordinates
     const colLabels: number[] = [];
     for (let c = 0; c < displayCols; c++) {
       colLabels.push(minCol + c);
@@ -366,7 +367,7 @@
           </div>
 
           <!-- Rows -->
-          {#each gridData.grid as row, r (gridData.rowLabels[r])}
+          {#each gridData.grid as row, r (`row-${r}`)}
             <div class="flex items-center gap-px">
               <span class="w-7 shrink-0 pr-1 text-right font-mono text-[9px] text-muted-foreground">
                 {gridData.rowLabels[r]}
