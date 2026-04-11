@@ -1,16 +1,22 @@
 <script lang="ts">
     import { page } from '$app/stores';
     import { enhance } from '$app/forms';
+    import { goto, invalidateAll } from '$app/navigation';
     import type { Snippet } from 'svelte';
 
     interface Props { children: Snippet; }
     let { children }: Props = $props();
 
-    // Lấy thông tin user đã đăng nhập (do hooks.server.ts cấp)
     let user = $derived($page.data.user);
-
-    // Active search value từ URL
     let searchQuery = $derived($page.url.searchParams.get('q') ?? '');
+
+    // Xử lý đăng xuất: xóa cookie rồi về homepage, cập nhật UI ngay
+    function handleLogout() {
+        return async ({ result }: { result: { type: string } }) => {
+            await invalidateAll();
+            await goto('/');
+        };
+    }
 </script>
 
 <div class="tixtac-root">
@@ -42,7 +48,7 @@
             <nav class="navbar-auth">
                 {#if user}
                     <a href="/me" class="nav-link" id="nav-tickets-link">🎟️ Vé của tôi</a>
-                    <form action="/api/auth/logout" method="POST" use:enhance>
+                    <form action="/api/auth/logout" method="POST" use:enhance={handleLogout}>
                         <button type="submit" class="btn-ghost-danger" id="nav-logout-btn">Đăng xuất</button>
                     </form>
                 {:else}
@@ -148,21 +154,21 @@
 </div>
 
 <style>
-    /* ── Design Tokens ── */
+    /* ── Design Tokens: Light Minimalist ── */
     :global(:root) {
-        --color-bg: #0D0D14;
-        --color-surface: #13131a;
-        --color-surface-low: #1b1b22;
-        --color-card: #1f1f26;
-        --color-card-high: #2a2931;
-        --color-border: #2A2A3A;
-        --color-primary: #6C3AFF;
-        --color-primary-dim: #cbbeff;
-        --color-secondary: #00E5FF;
-        --color-accent: #FF3A8C;
-        --color-text: #e4e1ec;
-        --color-muted: #8888A0;
-        --color-muted-strong: #cac3d9;
+        --color-bg: #FFFFFF;
+        --color-surface: #F8FAFC;
+        --color-surface-low: #F1F5F9;
+        --color-card: #FFFFFF;
+        --color-card-high: #F8FAFC;
+        --color-border: #E2E8F0;
+        --color-primary: #4F46E5;
+        --color-primary-dim: #4F46E5;
+        --color-secondary: #0EA5E9;
+        --color-accent: #F43F5E;
+        --color-text: #0F172A;
+        --color-muted: #94A3B8;
+        --color-muted-strong: #475569;
         --font-main: 'Inter', system-ui, sans-serif;
         --radius-card: 12px;
         --radius-pill: 999px;
@@ -190,11 +196,9 @@
         top: 0;
         z-index: 100;
         width: 100%;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        background: rgba(13, 13, 20, 0.75);
-        border-bottom: 1px solid rgba(108, 58, 255, 0.2);
-        box-shadow: 0 4px 32px rgba(108, 58, 255, 0.08);
+        background: #FFFFFF;
+        border-bottom: 1px solid var(--color-border);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
 
     .navbar-inner {
@@ -219,11 +223,8 @@
     .logo-text {
         font-size: 1.5rem;
         font-weight: 800;
-        background: linear-gradient(135deg, #a78bfa, #6C3AFF, #FF3A8C);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: -0.02em;
+        color: var(--color-text);
+        letter-spacing: -0.03em;
     }
     .footer-logo .logo-text { font-size: 1.3rem; }
 
@@ -258,7 +259,7 @@
     .search-input::placeholder { color: var(--color-muted); }
     .search-input:focus {
         border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px rgba(108, 58, 255, 0.15);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
     }
 
     /* Nav auth */
@@ -276,35 +277,33 @@
         transition: color 0.2s;
         padding: 6px 2px;
     }
-    .nav-link:hover { color: var(--color-primary-dim); }
+    .nav-link:hover { color: var(--color-primary); }
 
     .btn-ghost-danger {
         background: none;
         border: none;
         font-size: 0.9rem;
         font-weight: 500;
-        color: var(--color-accent);
+        color: #DC2626;
         cursor: pointer;
         font-family: var(--font-main);
-        transition: opacity 0.2s;
+        transition: color 0.2s;
         padding: 6px 2px;
     }
-    .btn-ghost-danger:hover { opacity: 0.75; }
+    .btn-ghost-danger:hover { color: #B91C1C; }
 
     .btn-primary {
-        background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+        background: var(--color-primary);
         color: white;
         font-size: 0.875rem;
         font-weight: 600;
         padding: 9px 20px;
         border-radius: var(--radius-pill);
-        transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-        box-shadow: 0 0 16px rgba(108, 58, 255, 0.3);
+        transition: background 0.2s, transform 0.15s;
     }
     .btn-primary:hover {
-        opacity: 0.9;
+        background: #4338CA;
         transform: translateY(-1px);
-        box-shadow: 0 4px 20px rgba(108, 58, 255, 0.5);
     }
 
     /* ── Main ── */
@@ -380,7 +379,7 @@
         color: var(--color-muted-strong);
         transition: color 0.2s;
     }
-    .footer-links a:hover { color: var(--color-primary-dim); }
+    .footer-links a:hover { color: var(--color-primary); }
 
     /* App badges */
     .app-badges {
