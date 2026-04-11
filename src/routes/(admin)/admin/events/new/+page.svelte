@@ -10,7 +10,7 @@
   import * as Select from '$lib/components/ui/select';
   import { Textarea } from '$lib/components/ui/textarea';
   import { formatZodErrors } from '$lib/shared/format-errors';
-  import { createEventSchema } from '$lib/shared/schemas/event.schema';
+  import { createEventSchema, type SectionFormData } from '$lib/shared/schemas/event.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import {
@@ -21,19 +21,6 @@
     type CalendarDate,
   } from '@internationalized/date';
   import { ChevronDown, Loader, Save } from 'lucide-svelte';
-
-  type SectionForm = {
-    name: string;
-    price: number;
-    rows: number;
-    cols: number;
-    layout_x: number;
-    layout_y: number;
-    start_row_index: number;
-    start_col_index: number;
-    disabled_seats: string;
-    sort_order: number;
-  };
 
   // ── Hour options for Select (1–12) ──
   const hourOptions = Array.from({ length: 12 }, (_, i) => {
@@ -57,9 +44,10 @@
   let selectedPeriod = $state<'AM' | 'PM'>('PM');
   let datePickerOpen = $state(false);
   let bannerImageUrl = $state('');
-  let sections = $state<SectionForm[]>([
+  let sections = $state<SectionFormData[]>([
     {
       name: '',
+      prefix: '',
       price: 0,
       rows: 1,
       cols: 1,
@@ -74,6 +62,38 @@
 
   let loading = $state(false);
   let errors = $state<Record<string, string>>({});
+  let sectionHasOverlap = $state(false);
+  let sectionDuplicatePrefixes = $state<string[]>([]);
+
+  function handleSectionValidation(state: { hasOverlap: boolean; duplicatePrefixes: string[] }) {
+    sectionHasOverlap = state.hasOverlap;
+    sectionDuplicatePrefixes = state.duplicatePrefixes;
+  }
+
+  // ── Live validation: derive whether the form is valid ──
+  let isFormValid = $derived.by(() => {
+    // Quick checks before running Zod
+    if (!title.trim()) return false;
+    if (!description.trim()) return false;
+    if (!venue.trim()) return false;
+    if (!dateValue) return false;
+    if (sections.length === 0) return false;
+    if (sectionHasOverlap) return false;
+    if (sectionDuplicatePrefixes.length > 0) return false;
+
+    // Check every section has required fields filled
+    for (const s of sections) {
+      if (!s.name.trim()) return false;
+      if (!s.prefix.trim()) return false;
+      if (s.rows < 1 || s.cols < 1) return false;
+      if (s.price <= 0) return false;
+    }
+
+    // Run full Zod validation
+    const payload = buildPayload();
+    const result = createEventSchema.safeParse(payload);
+    return result.success;
+  });
 
   const minDate = today(getLocalTimeZone());
 
@@ -151,6 +171,7 @@
       banner_image_url: bannerImageUrl.trim() || undefined,
       sections: sections.map((s, i) => ({
         name: s.name.trim(),
+        prefix: s.prefix.trim(),
         price: Number(s.price),
         rows: Number(s.rows),
         cols: Number(s.cols),
@@ -161,7 +182,7 @@
         disabled_seats: s.disabled_seats
           ? s.disabled_seats
               .split(',')
-              .map((seat) => seat.trim())
+              .map((seat) => seat.trim().toUpperCase())
               .filter(Boolean)
           : [],
         sort_order: Number(s.sort_order ?? i),
@@ -277,7 +298,7 @@
             <Popover.Root bind:open={datePickerOpen}>
               <Popover.Trigger
                 onclick={() => clearError('event_date')}
-                class="inline-flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm font-normal shadow-xs hover:bg-accent hover:text-accent-foreground md:w-44"
+                class="inline-flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm font-normal shadow-xs  md:w-44"
               >
                 {dateValue
                   ? dateValue.toDate(getLocalTimeZone()).toLocaleDateString('vi-VN')
@@ -299,51 +320,53 @@
             </Popover.Root>
 
             <!-- Time selects: Hour / Minute / AM|PM -->
-            <div class="flex items-center gap-2">
-              <Select.Root
-                type="single"
-                bind:value={selectedHour}
-                onValueChange={() => clearError('event_date')}
-              >
-                <Select.Trigger class="w-18">
-                  {String(selectedHour).padStart(2, '0')}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Group>
-                    <Select.Label>Giờ</Select.Label>
-                    {#each hourOptions as opt (opt.value)}
-                      <Select.Item value={opt.value}>{opt.label}</Select.Item>
-                    {/each}
-                  </Select.Group>
-                </Select.Content>
-              </Select.Root>
+            <div class="flex w-full items-center gap-2 md:w-auto">
+              <div class="flex flex-1 items-center gap-2 md:flex-initial">
+                <Select.Root
+                  type="single"
+                  bind:value={selectedHour}
+                  onValueChange={() => clearError('event_date')}
+                >
+                  <Select.Trigger class="w-full md:w-18">
+                    {String(selectedHour).padStart(2, '0')}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Group>
+                      <Select.Label>Giờ</Select.Label>
+                      {#each hourOptions as opt (opt.value)}
+                        <Select.Item value={opt.value}>{opt.label}</Select.Item>
+                      {/each}
+                    </Select.Group>
+                  </Select.Content>
+                </Select.Root>
 
-              <span class="text-sm font-medium text-muted-foreground">:</span>
+                <span class="text-sm font-medium text-muted-foreground">:</span>
 
-              <Select.Root
-                type="single"
-                bind:value={selectedMinute}
-                onValueChange={() => clearError('event_date')}
-              >
-                <Select.Trigger class="w-18">
-                  {String(selectedMinute).padStart(2, '0')}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Group>
-                    <Select.Label>Phút</Select.Label>
-                    {#each minuteOptions as opt (opt.value)}
-                      <Select.Item value={opt.value}>{opt.label}</Select.Item>
-                    {/each}
-                  </Select.Group>
-                </Select.Content>
-              </Select.Root>
+                <Select.Root
+                  type="single"
+                  bind:value={selectedMinute}
+                  onValueChange={() => clearError('event_date')}
+                >
+                  <Select.Trigger class="w-full md:w-18">
+                    {String(selectedMinute).padStart(2, '0')}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Group>
+                      <Select.Label>Phút</Select.Label>
+                      {#each minuteOptions as opt (opt.value)}
+                        <Select.Item value={opt.value}>{opt.label}</Select.Item>
+                      {/each}
+                    </Select.Group>
+                  </Select.Content>
+                </Select.Root>
+              </div>
 
               <Select.Root
                 type="single"
                 bind:value={selectedPeriod}
                 onValueChange={() => clearError('event_date')}
               >
-                <Select.Trigger class="w-18">
+                <Select.Trigger class="flex-1 md:w-18 md:flex-initial">
                   {selectedPeriod}
                 </Select.Trigger>
                 <Select.Content>
@@ -386,7 +409,7 @@
     </div>
 
     <!-- Sections -->
-    <SectionBuilder bind:sections {errors} />
+    <SectionBuilder bind:sections {errors} onvalidationchange={handleSectionValidation} />
 
     <!-- Submit -->
     <div

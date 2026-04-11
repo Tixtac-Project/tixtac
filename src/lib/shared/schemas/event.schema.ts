@@ -129,7 +129,11 @@ export const createEventSchema = z
       .pipe(z.iso.datetime({ offset: true }))
       .check(z.refine((val) => new Date(val) > new Date(), 'Ngày sự kiện phải trong tương lai')),
 
-    banner_image_url: z.url('URL ảnh không hợp lệ').optional().or(z.literal('')),
+    banner_image_url: z
+      .url('URL ảnh không hợp lệ')
+      .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
+      .optional()
+      .or(z.literal('')),
 
     sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
   })
@@ -149,6 +153,9 @@ export const updateSectionsSchema = z.object({
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateSectionsInput = z.infer<typeof updateSectionsSchema>;
 export type SectionInput = z.infer<typeof sectionSchema>;
+
+/** Form-side section type: disabled_seats is a comma-separated string instead of string[] */
+export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & { disabled_seats: string };
 
 // ── Event Query Schema (Public List API) ───────
 export const eventQuerySchema = z.object({

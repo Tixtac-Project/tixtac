@@ -3,21 +3,9 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import * as Tooltip from '$lib/components/ui/tooltip';
+  import type { SectionFormData } from '$lib/shared/schemas/event.schema';
   import { getRowLabel } from '$lib/utils/seat-label';
-  import { ChevronDown, ChevronUp, CircleHelp, Trash2 } from 'lucide-svelte';
-
-  type Section = {
-    name: string;
-    price: number;
-    rows: number;
-    cols: number;
-    layout_x: number;
-    layout_y: number;
-    start_row_index: number;
-    start_col_index: number;
-    disabled_seats: string;
-    sort_order: number;
-  };
+  import { ChevronDown, ChevronUp, CircleQuestionMark, Trash2 } from 'lucide-svelte';
 
   let {
     section = $bindable(),
@@ -25,7 +13,7 @@
     onremove,
     errors = {},
   }: {
-    section: Section;
+    section: SectionFormData;
     index: number;
     onremove: () => void;
     errors?: Record<string, string>;
@@ -65,12 +53,39 @@
   </div>
 
   <!-- Basic fields -->
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+  <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-5">
     <div class="grid gap-1.5">
       <Label for="section-name-{index}">Tên khu vực</Label>
       <Input id="section-name-{index}" placeholder="VD: VIP Trái" bind:value={section.name} />
       {#if fieldError('name')}
         <span class="text-xs text-destructive">{fieldError('name')}</span>
+      {/if}
+    </div>
+
+    <div class="grid gap-1.5">
+      <div class="flex items-center gap-1.5">
+        <Label for="section-prefix-{index}">Mã tiền tố</Label>
+        <Tooltip.Root>
+          <Tooltip.Trigger>
+            <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground" />
+          </Tooltip.Trigger>
+          <Tooltip.Content class="max-w-60">
+            <p class="text-xs">
+              Mã ngắn gọn (tối đa 10 ký tự, chữ in hoa và số) dùng làm tiền tố cho mã ghế. VD: VIP,
+              STD, V1. Mã ghế sẽ có dạng VIP-A1, STD-B12.
+            </p>
+          </Tooltip.Content>
+        </Tooltip.Root>
+      </div>
+      <Input
+        id="section-prefix-{index}"
+        placeholder="VD: VIP"
+        maxlength={10}
+        bind:value={section.prefix}
+        oninput={() => (section.prefix = section.prefix.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+      />
+      {#if fieldError('prefix')}
+        <span class="text-xs text-destructive">{fieldError('prefix')}</span>
       {/if}
     </div>
 
@@ -128,14 +143,17 @@
           <span class="text-xs font-semibold text-foreground">📍 Vị trí trên sơ đồ tổng</span>
           <Tooltip.Root>
             <Tooltip.Trigger>
-              <CircleHelp class="h-3.5 w-3.5 text-muted-foreground" />
+              <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground" />
             </Tooltip.Trigger>
             <Tooltip.Content class="max-w-60">
-              <p class="text-xs">Tọa độ (X, Y) xác định vị trí khu vực ghế trên bản đồ tổng thể của sự kiện. X = cột, Y = hàng (tính từ góc trên-trái, đơn vị pixel/grid).</p>
+              <p class="text-xs">
+                Tọa độ (X, Y) xác định vị trí khu vực ghế trên bản đồ tổng thể của sự kiện. X = cột,
+                Y = hàng (tính từ góc trên-trái, đơn vị pixel/grid).
+              </p>
             </Tooltip.Content>
           </Tooltip.Root>
         </div>
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div class="grid grid-cols-2 items-start gap-4 md:grid-cols-4">
           <div class="grid gap-1.5">
             <Label for="section-lx-{index}">Tọa độ X</Label>
             <Input id="section-lx-{index}" type="number" min="0" bind:value={section.layout_x} />
@@ -159,18 +177,22 @@
           <span class="text-xs font-semibold text-foreground">🏷️ Đánh số ghế bắt đầu từ</span>
           <Tooltip.Root>
             <Tooltip.Trigger>
-              <CircleHelp class="h-3.5 w-3.5 text-muted-foreground" />
+              <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground" />
             </Tooltip.Trigger>
             <Tooltip.Content class="max-w-72">
               <p class="text-xs">
-                <strong>Hàng bắt đầu (0-based):</strong> 0 = A, 1 = B, 2 = C, ... 26 = AA.<br />
-                <strong>Cột bắt đầu (1-based):</strong> Số ghế đầu tiên trong mỗi hàng.<br />
+                <strong>Hàng bắt đầu (0-based):</strong>
+                0 = A, 1 = B, 2 = C, ... 26 = AA.
+                <br />
+                <strong>Cột bắt đầu (1-based):</strong>
+                Số ghế đầu tiên trong mỗi hàng.
+                <br />
                 VD: Hàng=2, Cột=5 → ghế đầu tiên là C5.
               </p>
             </Tooltip.Content>
           </Tooltip.Root>
         </div>
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div class="grid grid-cols-2 items-start gap-4 md:grid-cols-4">
           <div class="grid gap-1.5">
             <Label for="section-sri-{index}">
               Hàng bắt đầu
@@ -205,8 +227,13 @@
         <!-- Quick preview of label range -->
         {#if section.rows > 0 && section.cols > 0}
           <p class="mt-2 text-xs text-muted-foreground">
-            → Ghế: <strong class="text-foreground">{startRowLabel}{section.start_col_index}</strong>
-            đến <strong class="text-foreground">{endRowLabel}{endColNumber}</strong>
+            → Ghế: <strong class="text-foreground">
+              {section.prefix ? `${section.prefix}-` : ''}{startRowLabel}{section.start_col_index}
+            </strong>
+            đến
+            <strong class="text-foreground">
+              {section.prefix ? `${section.prefix}-` : ''}{endRowLabel}{endColNumber}
+            </strong>
           </p>
         {/if}
       </div>
@@ -216,16 +243,18 @@
         <div class="mb-2 flex items-center gap-1.5">
           <span class="text-xs font-semibold text-foreground">⚙️ Khác</span>
         </div>
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
           <div class="grid gap-1.5">
             <div class="flex items-center gap-1.5">
               <Label for="section-so-{index}">Thứ tự hiển thị</Label>
               <Tooltip.Root>
                 <Tooltip.Trigger>
-                  <CircleHelp class="h-3.5 w-3.5 text-muted-foreground" />
+                  <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip.Trigger>
                 <Tooltip.Content class="max-w-52">
-                  <p class="text-xs">Số nhỏ hơn hiển thị trước. Các khu vực cùng thứ tự sẽ sắp theo tên.</p>
+                  <p class="text-xs">
+                    Số nhỏ hơn hiển thị trước. Các khu vực cùng thứ tự sẽ sắp theo tên.
+                  </p>
                 </Tooltip.Content>
               </Tooltip.Root>
             </div>
@@ -237,16 +266,19 @@
               <Label for="section-ds-{index}">Ghế hỏng / không bán</Label>
               <Tooltip.Root>
                 <Tooltip.Trigger>
-                  <CircleHelp class="h-3.5 w-3.5 text-muted-foreground" />
+                  <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip.Trigger>
                 <Tooltip.Content class="max-w-60">
-                  <p class="text-xs">Nhập nhãn ghế cách nhau bằng dấu phẩy. VD: A1, B3, C5. Ghế này sẽ bị vô hiệu hóa không cho đặt.</p>
+                  <p class="text-xs">
+                    Nhập nhãn ghế cách nhau bằng dấu phẩy. VD: {section.prefix || 'VIP'}-A1, {section.prefix ||
+                      'VIP'}-B3. Ghế này sẽ bị vô hiệu hóa không cho đặt.
+                  </p>
                 </Tooltip.Content>
               </Tooltip.Root>
             </div>
             <Input
               id="section-ds-{index}"
-              placeholder="A1, B2, C3"
+              placeholder="{section.prefix || 'VIP'}-A1, {section.prefix || 'VIP'}-B2"
               bind:value={section.disabled_seats}
             />
             {#if fieldError('disabled_seats')}

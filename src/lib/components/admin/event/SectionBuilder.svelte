@@ -1,35 +1,26 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import * as Tooltip from '$lib/components/ui/tooltip';
+  import type { SectionFormData } from '$lib/shared/schemas/event.schema';
   import { getRowLabel } from '$lib/utils/seat-label';
   import { Plus } from 'lucide-svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import SectionItem from './SectionItem.svelte';
 
-  type Section = {
-    name: string;
-    price: number;
-    rows: number;
-    cols: number;
-    layout_x: number;
-    layout_y: number;
-    start_row_index: number;
-    start_col_index: number;
-    disabled_seats: string;
-    sort_order: number;
-  };
-
   let {
     sections = $bindable(),
     errors = {},
+    onvalidationchange,
   }: {
-    sections: Section[];
+    sections: SectionFormData[];
     errors?: Record<string, string>;
+    onvalidationchange?: (state: { hasOverlap: boolean; duplicatePrefixes: string[] }) => void;
   } = $props();
 
-  function createDefaultSection(): Section {
+  function createDefaultSection(): SectionFormData {
     return {
       name: '',
+      prefix: '',
       price: 0,
       rows: 1,
       cols: 1,
@@ -111,6 +102,17 @@
     overlapWith?: string;
   };
 
+  // ── Detect duplicate prefixes across sections ──
+  let computedDuplicatePrefixes = $derived.by(() => {
+    const prefixCount = new SvelteMap<string, number>();
+    for (const s of sections) {
+      const p = s.prefix.trim().toUpperCase();
+      if (!p) continue;
+      prefixCount.set(p, (prefixCount.get(p) || 0) + 1);
+    }
+    return [...prefixCount.entries()].filter(([, count]) => count > 1).map(([prefix]) => prefix);
+  });
+
   let gridData = $derived.by(() => {
     if (sections.length === 0) return null;
 
@@ -121,7 +123,8 @@
       maxCol = -Infinity;
 
     const parsedSections = sections.map((s, idx) => {
-      // Seat labeling (determines seat names like A1, B5, etc.)
+      // Seat labeling (determines seat names like VIP-A1, STD-B5, etc.)
+      const prefix = s.prefix || '';
       const labelStartRow = Math.max(s.start_row_index, 0);
       const labelStartCol = Math.max(s.start_col_index, 1);
       const rows = Math.max(s.rows, 0);
@@ -151,6 +154,7 @@
 
       return {
         idx,
+        prefix,
         labelStartRow,
         labelStartCol,
         rows,
@@ -193,7 +197,9 @@
         for (let c = 0; c < sec.cols; c++) {
           const rowLabel = getRowLabel(sec.labelStartRow + r);
           const colNum = sec.labelStartCol + c;
-          const seatLabel = `${rowLabel}${colNum}`;
+          const seatLabel = sec.prefix
+            ? `${sec.prefix}-${rowLabel}${colNum}`
+            : `${rowLabel}${colNum}`;
           if (seatLabelOwner.has(seatLabel)) {
             duplicateLabels.add(seatLabel);
           } else {
@@ -203,8 +209,12 @@
       }
     }
 
-    // Second pass: fill grid cells
-    let overlapCount = duplicateLabels.size;
+    // Second pass: fill grid cells & detect visual (grid position) overlap
+    let labelOverlapCount = duplicateLabels.size;
+    let visualOverlapCount = 0;
+    // Track which section owns each grid cell for visual overlap detection
+    const gridCellOwner = new SvelteMap<string, { sectionName: string; seatLabel: string }>();
+
     for (const sec of parsedSections) {
       if (sec.rows <= 0 || sec.cols <= 0) continue;
       for (let r = 0; r < sec.rows; r++) {
@@ -215,24 +225,51 @@
           const gridR = gridAbsRow - minRow;
           const gridC = gridAbsCol - minCol;
           if (gridR >= displayRows || gridC >= displayCols) continue;
+
           // Seat label from start_row_index / start_col_index (independent of layout position)
           const rowLabel = getRowLabel(sec.labelStartRow + r);
           const colNum = sec.labelStartCol + c;
-          const seatLabel = `${rowLabel}${colNum}`;
-          const isDuplicate = duplicateLabels.has(seatLabel);
-          const duplicateOwner = isDuplicate ? seatLabelOwner.get(seatLabel) : undefined;
+          const seatLabel = sec.prefix
+            ? `${sec.prefix}-${rowLabel}${colNum}`
+            : `${rowLabel}${colNum}`;
+
+          // Check for visual overlap (different section already placed a seat in this grid cell)
+          const cellKey = `${gridR},${gridC}`;
+          const existingOwner = gridCellOwner.get(cellKey);
+          const isVisualOverlap =
+            existingOwner !== undefined && existingOwner.sectionName !== sec.name;
+          if (isVisualOverlap && !grid[gridR][gridC]?.isOverlap) {
+            visualOverlapCount++;
+          }
+
+          // Check for seat label overlap
+          const isLabelDuplicate = duplicateLabels.has(seatLabel);
+          const duplicateOwner = isLabelDuplicate ? seatLabelOwner.get(seatLabel) : undefined;
+
+          const isOverlap = isLabelDuplicate || isVisualOverlap;
+          const overlapWith = isVisualOverlap
+            ? existingOwner?.sectionName
+            : isLabelDuplicate && duplicateOwner !== sec.name
+              ? duplicateOwner
+              : undefined;
 
           grid[gridR][gridC] = {
             sectionIndex: sec.idx,
             sectionName: sec.name,
-            seatLabel,
+            seatLabel: isVisualOverlap ? `${existingOwner!.seatLabel} / ${seatLabel}` : seatLabel,
             isDisabled: sec.disabledSet.has(seatLabel),
-            isOverlap: isDuplicate,
-            overlapWith: isDuplicate && duplicateOwner !== sec.name ? duplicateOwner : undefined,
+            isOverlap,
+            overlapWith,
           };
+
+          if (!existingOwner) {
+            gridCellOwner.set(cellKey, { sectionName: sec.name, seatLabel });
+          }
         }
       }
     }
+
+    const overlapCount = labelOverlapCount + visualOverlapCount;
 
     // Row labels for display
     const rowLabels: string[] = [];
@@ -247,6 +284,14 @@
     }
 
     return { grid, rowLabels, colLabels, isTruncated, displayRows, displayCols, overlapCount };
+  });
+
+  // Notify parent of validation state changes
+  $effect(() => {
+    onvalidationchange?.({
+      hasOverlap: (gridData?.overlapCount ?? 0) > 0,
+      duplicatePrefixes: computedDuplicatePrefixes,
+    });
   });
 </script>
 
@@ -263,6 +308,17 @@
 
   {#if errors['sections']}
     <p class="text-sm text-destructive">{errors['sections']}</p>
+  {/if}
+
+  {#if computedDuplicatePrefixes.length > 0}
+    <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
+      <p class="text-sm font-medium text-destructive">
+        ⚠️ Mã tiền tố trùng lặp: <strong>{computedDuplicatePrefixes.join(', ')}</strong>
+      </p>
+      <p class="text-xs text-destructive/80">
+        Mỗi khu vực phải có mã tiền tố (prefix) riêng biệt để đảm bảo mã ghế không bị trùng.
+      </p>
+    </div>
   {/if}
 
   {#each sections as section, i (section)}
