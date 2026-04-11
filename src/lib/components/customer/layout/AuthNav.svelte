@@ -20,7 +20,7 @@
 
 <nav class="navbar-auth">
   {#if user}
-    <a href={resolve('/(customer)')} class="nav-link">🎟️ Vé của tôi</a>
+    <a href={resolve('/my-tickets')} class="nav-link">🎟️ Vé của tôi</a>
 
     <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
       <button type="submit" class="btn-ghost-danger">Đăng xuất</button>

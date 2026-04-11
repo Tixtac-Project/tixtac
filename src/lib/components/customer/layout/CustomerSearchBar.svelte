@@ -10,7 +10,14 @@
     <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
   </svg>
 
-  <input type="text" name="q" value={searchQuery} placeholder="Tìm kiếm..." class="search-input" />
+  <input
+    type="text"
+    name="q"
+    value={searchQuery}
+    aria-label="Tìm kiếm sự kiện"
+    placeholder="Tìm kiếm..."
+    class="search-input"
+  />
 </form>
 
 <style>

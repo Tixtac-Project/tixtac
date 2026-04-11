@@ -7,7 +7,8 @@ export const load: PageServerLoad = async ({ url }) => {
   // 1. Nhận từ khóa tìm kiếm và trang hiện tại từ URL (VD: ?q=rock&page=1)
   const searchQuery = url.searchParams.get('q') || '';
   const escapedQuery = searchQuery.replace(/[%_]/g, '\\$&');
-  const page = Number(url.searchParams.get('page')) || 1;
+  const rawPage = Number.parseInt(url.searchParams.get('page') ?? '1', 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
   const limit = 8; // Hiển thị 8 sự kiện 1 trang
   const offset = (page - 1) * limit;
 

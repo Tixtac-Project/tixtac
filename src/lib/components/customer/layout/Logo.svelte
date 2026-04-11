@@ -8,7 +8,7 @@
 </a>
 
 <style>
-  .logo {
+  .navbar-logo {
     font-weight: 800;
     font-size: 1.2rem;
     display: flex;
