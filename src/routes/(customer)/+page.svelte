@@ -1,9 +1,28 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
+
+  // Interface for Event data
+  interface Event {
+    id: number;
+    title: string;
+    eventDate: string | Date;
+    venue: string;
+    bannerImageUrl?: string;
+    min_price: number | string;
+  }
+
+  // Interface for Pagination data
+  interface Pagination {
+    currentPage: number;
+    totalPages: number;
+    searchQuery: string;
+  }
+
   // Dữ liệu từ +page.server.ts
   let { data } = $props<{
     data: {
-      events: any[];
-      pagination: { currentPage: number; totalPages: number; searchQuery: string };
+      events: Event[];
+      pagination: Pagination;
     };
   }>();
 
@@ -71,6 +90,7 @@
 
 <!-- ─── HERO SECTION ─── -->
 <section class="hero">
+  <div class="hero-bg-glow"></div>
   <div class="hero-content">
     <div class="hero-badge">✨ Hơn 500,000 vé đã được đặt</div>
     <h1 class="hero-title">
@@ -84,7 +104,7 @@
       chỉ trong vài giây — bảo mật, nhanh chóng, tiện lợi.
     </p>
     <div class="hero-ctas">
-      <a href="#events" class="cta-primary" id="hero-cta-explore">
+      <a href={resolve('#events')} class="cta-primary" id="hero-cta-explore">
         Khám phá sự kiện
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -95,7 +115,7 @@
           />
         </svg>
       </a>
-      <a href="/events" class="cta-ghost" id="hero-cta-today">Xem sự kiện hôm nay →</a>
+      <a href={resolve('/events')} class="cta-ghost" id="hero-cta-today">Xem sự kiện hôm nay →</a>
     </div>
     <div class="hero-stats">
       <div class="stat-pill">
@@ -120,7 +140,7 @@
 <section class="events-section" id="events">
   <!-- Category Filter Bar -->
   <div class="category-bar">
-    {#each categories as cat}
+    {#each categories as cat (cat.value || 'all')}
       <button
         id="cat-{cat.value || 'all'}"
         class="cat-chip {activeCategory === cat.value ? 'active' : ''}"
@@ -142,7 +162,7 @@
         </p>
       {/if}
     </div>
-    <a href="/events" class="view-all-link" id="events-view-all">
+    <a href={resolve('/events')} class="view-all-link" id="events-view-all">
       Xem tất cả
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -156,14 +176,14 @@
       <div class="empty-icon">🎭</div>
       <h3 class="empty-title">Không tìm thấy sự kiện nào!</h3>
       <p class="empty-sub">Hãy thử tìm kiếm với từ khóa khác hoặc khám phá tất cả sự kiện.</p>
-      <a href="/" class="cta-primary" id="events-clear-search">Xóa tìm kiếm</a>
+      <a href={resolve('/')} class="cta-primary" id="events-clear-search">Xóa tìm kiếm</a>
     </div>
 
     <!-- Events Grid -->
   {:else}
     <div class="events-grid">
-      {#each events as event, i}
-        <a href="/events/{event.id}" class="event-card" id="event-card-{event.id}">
+      {#each events as event, i (event.id)}
+        <a href={resolve(`/events/${event.id}`)} class="event-card" id="event-card-{event.id}">
           <!-- Banner Image -->
           <div class="card-banner">
             {#if event.bannerImageUrl}
@@ -259,9 +279,9 @@
       <nav class="pagination" aria-label="Phân trang">
         <!-- Prev -->
         <a
-          href="?page={pagination.currentPage - 1}{pagination.searchQuery
-            ? `&q=${pagination.searchQuery}`
-            : ''}"
+          href={resolve(
+            `?page=${pagination.currentPage - 1}${pagination.searchQuery ? `&q=${pagination.searchQuery}` : ''}`,
+          )}
           class="page-btn {pagination.currentPage === 1 ? 'disabled' : ''}"
           id="pagination-prev"
           aria-disabled={pagination.currentPage === 1}
@@ -278,9 +298,11 @@
         </a>
 
         <!-- Page numbers -->
-        {#each pageNumbers as num}
+        {#each pageNumbers as num (num)}
           <a
-            href="?page={num}{pagination.searchQuery ? `&q=${pagination.searchQuery}` : ''}"
+            href={resolve(
+              `?page=${num}${pagination.searchQuery ? `&q=${pagination.searchQuery}` : ''}`,
+            )}
             class="page-btn {num === pagination.currentPage ? 'active' : ''}"
             id="pagination-page-{num}"
           >
@@ -290,9 +312,9 @@
 
         <!-- Next -->
         <a
-          href="?page={pagination.currentPage + 1}{pagination.searchQuery
-            ? `&q=${pagination.searchQuery}`
-            : ''}"
+          href={resolve(
+            `?page=${pagination.currentPage + 1}${pagination.searchQuery ? `&q=${pagination.searchQuery}` : ''}`,
+          )}
           class="page-btn {pagination.currentPage === pagination.totalPages ? 'disabled' : ''}"
           id="pagination-next"
           aria-disabled={pagination.currentPage === pagination.totalPages}

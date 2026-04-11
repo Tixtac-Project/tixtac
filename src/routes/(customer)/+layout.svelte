@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { enhance } from '$app/forms';
   import { goto, invalidateAll } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import type { Snippet } from 'svelte';
 
   interface Props {
@@ -14,9 +15,9 @@
 
   // Xử lý đăng xuất: xóa cookie rồi về homepage, cập nhật UI ngay
   function handleLogout() {
-    return async ({ result }: { result: { type: string } }) => {
+    return async () => {
       await invalidateAll();
-      await goto('/');
+      await goto(resolve('/'));
     };
   }
 </script>
@@ -26,13 +27,13 @@
   <header class="navbar">
     <div class="navbar-inner">
       <!-- Logo -->
-      <a href="/" class="navbar-logo" id="nav-logo">
+      <a href={resolve('/')} class="navbar-logo" id="nav-logo">
         <span class="logo-icon">🎫</span>
         <span class="logo-text">TixTac</span>
       </a>
 
       <!-- Search Bar -->
-      <form action="/" method="GET" class="navbar-search" id="nav-search-form">
+      <form action={resolve('/')} method="GET" class="navbar-search" id="nav-search-form">
         <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
@@ -54,13 +55,13 @@
       <!-- Auth Nav -->
       <nav class="navbar-auth">
         {#if user}
-          <a href="/me" class="nav-link" id="nav-tickets-link">🎟️ Vé của tôi</a>
-          <form action="/api/auth/logout" method="POST" use:enhance={handleLogout}>
+          <a href={resolve('/me')} class="nav-link" id="nav-tickets-link">🎟️ Vé của tôi</a>
+          <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
             <button type="submit" class="btn-ghost-danger" id="nav-logout-btn">Đăng xuất</button>
           </form>
         {:else}
-          <a href="/login" class="nav-link" id="nav-login-link">Đăng nhập</a>
-          <a href="/register" class="btn-primary" id="nav-register-btn">Đăng ký</a>
+          <a href={resolve('/login')} class="nav-link" id="nav-login-link">Đăng nhập</a>
+          <a href={resolve('/register')} class="btn-primary" id="nav-register-btn">Đăng ký</a>
         {/if}
       </nav>
     </div>
@@ -139,10 +140,10 @@
         <div class="footer-col">
           <h4 class="footer-heading">Về TixTac</h4>
           <ul class="footer-links">
-            <li><a href="/about" id="footer-about">Giới thiệu</a></li>
-            <li><a href="/careers" id="footer-careers">Tuyển dụng</a></li>
-            <li><a href="/news" id="footer-news">Tin tức</a></li>
-            <li><a href="/contact" id="footer-contact">Liên hệ</a></li>
+            <li><a href={resolve('/about')} id="footer-about">Giới thiệu</a></li>
+            <li><a href={resolve('/careers')} id="footer-careers">Tuyển dụng</a></li>
+            <li><a href={resolve('/news')} id="footer-news">Tin tức</a></li>
+            <li><a href={resolve('/contact')} id="footer-contact">Liên hệ</a></li>
           </ul>
         </div>
 
@@ -150,10 +151,10 @@
         <div class="footer-col">
           <h4 class="footer-heading">Hỗ trợ</h4>
           <ul class="footer-links">
-            <li><a href="/faq" id="footer-faq">FAQ</a></li>
-            <li><a href="/refund-policy" id="footer-refund">Chính sách hoàn vé</a></li>
-            <li><a href="/terms" id="footer-terms">Điều khoản sử dụng</a></li>
-            <li><a href="/privacy" id="footer-privacy">Chính sách bảo mật</a></li>
+            <li><a href={resolve('/faq')} id="footer-faq">FAQ</a></li>
+            <li><a href={resolve('/refund-policy')} id="footer-refund">Chính sách hoàn vé</a></li>
+            <li><a href={resolve('/terms')} id="footer-terms">Điều khoản sử dụng</a></li>
+            <li><a href={resolve('/privacy')} id="footer-privacy">Chính sách bảo mật</a></li>
           </ul>
         </div>
 
@@ -161,7 +162,7 @@
         <div class="footer-col">
           <h4 class="footer-heading">Tải ứng dụng</h4>
           <div class="app-badges">
-            <a href="/" class="app-badge" id="footer-appstore">
+            <a href={resolve('/')} class="app-badge" id="footer-appstore">
               <svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
                 <path
                   d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
@@ -172,7 +173,7 @@
                 <span class="app-badge-main">App Store</span>
               </div>
             </a>
-            <a href="/" class="app-badge" id="footer-googleplay">
+            <a href={resolve('/')} class="app-badge" id="footer-googleplay">
               <svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
                 <path
                   d="M3 20.5v-17c0-.83 1-.98 1.43-.43l14 8.5c.31.18.31.68 0 .87l-14 8.5C3.97 21.47 3 21.33 3 20.5z"
