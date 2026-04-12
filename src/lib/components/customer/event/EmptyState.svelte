@@ -6,7 +6,7 @@
     title: string;
     description: string;
     ctaLabel?: string;
-    ctaHref?: string;
+    ctaHref?: `/${string}`;
     onCtaClick?: () => void;
   }
 
@@ -29,7 +29,7 @@
 
   {#if ctaLabel}
     <a
-      href={resolve((ctaHref || '/') as any)}
+      href={resolve(ctaHref as any)}
       onclick={(e) => {
         if (onCtaClick) {
           e.preventDefault();

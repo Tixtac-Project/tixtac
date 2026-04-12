@@ -32,12 +32,12 @@
 
   function formatDate(dateStr: string | Date): string {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('vi-VN', {
+    return new Intl.DateTimeFormat('vi-VN', {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
       year: 'numeric',
-    });
+    }).format(d);
   }
 
   function formatPrice(price: number | string): string {
@@ -55,7 +55,7 @@
 
 <a
   href={resolve(`/events/${event.id}` as any)}
-  class="flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-purple-600 hover:shadow-lg"
+  class="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-purple-600 hover:shadow-lg"
 >
   <!-- Banner -->
   <div class="relative h-40 overflow-hidden bg-slate-100 sm:h-48">

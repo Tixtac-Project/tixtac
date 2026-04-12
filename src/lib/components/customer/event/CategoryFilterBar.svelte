@@ -14,16 +14,15 @@
   let { categories = [], activeCategory = $bindable(''), onCategoryChange }: Props = $props();
 
   function handleClick(value: string) {
-    if (onCategoryChange) {
-      onCategoryChange(value);
-    }
+    activeCategory = value;
+    onCategoryChange?.(value);
   }
 </script>
 
 <div class="scrollbar-hide mb-8 flex gap-2.5 overflow-x-auto pb-1">
   {#each categories as category (category.value || 'all')}
     <button
-      on:click={() => handleClick(category.value)}
+      onclick={() => handleClick(category.value)}
       class={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border px-4.5 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200
         ${
           activeCategory === category.value

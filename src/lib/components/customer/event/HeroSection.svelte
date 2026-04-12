@@ -33,6 +33,7 @@
       { number: '60s', label: 'Đặt vé xong' },
     ],
   }: Props = $props();
+
 </script>
 
 <section class="relative overflow-hidden px-6 py-20 text-center sm:px-6 sm:py-28 lg:px-8 lg:py-32">
@@ -95,20 +96,22 @@
 
     <!-- Stats -->
     {#if stats && stats.length > 0}
-      <div
-        class="inline-flex items-center gap-5 rounded-2xl border border-slate-200 bg-slate-50 px-8 py-4"
-      >
-        {#each stats as stat, i}
-          <div class="text-center">
-            <div class="block text-xl font-black text-purple-700 sm:text-2xl">{stat.number}</div>
-            <div class="text-xs font-medium text-slate-500 sm:text-sm">{stat.label}</div>
+    <div class="inline-flex items-center gap-5 rounded-2xl border border-slate-200 bg-slate-50 px-8 py-4">
+      {#each stats as stat, i (`${stat.number}-${stat.label}`)}
+        <div class="text-center">
+          <div class="block text-xl font-black text-purple-700 sm:text-2xl">
+            {stat.number}
           </div>
+          <div class="text-xs font-medium text-slate-500 sm:text-sm">
+            {stat.label}
+          </div>
+        </div>
 
-          {#if i < stats.length - 1}
-            <div class="h-9 w-px bg-slate-300"></div>
-          {/if}
-        {/each}
-      </div>
-    {/if}
+        {#if i < stats.length - 1}
+          <div class="h-9 w-px bg-slate-300"></div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
   </div>
 </section>
