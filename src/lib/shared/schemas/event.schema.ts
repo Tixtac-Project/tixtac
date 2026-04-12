@@ -14,6 +14,8 @@ const prefixRegex = /^[A-Z0-9]+$/; // Only uppercase letters and digits, no hyph
 const baseSectionSchema = z.object({
   name: z.string(req('Tên khu vực là bắt buộc')).min(1, 'Tên khu vực không được trống'),
 
+  type: z.enum(['assigned', 'general']).default('assigned'),
+
   prefix: z
     .string(req('Mã tiền tố là bắt buộc'))
     .transform((v) => v.trim().toUpperCase())
@@ -24,6 +26,8 @@ const baseSectionSchema = z.object({
         .max(10, 'Mã tiền tố tối đa 10 ký tự')
         .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
     ),
+
+  is_seat_pickable: z.boolean().default(true),
 
   rows: z
     .number(req('Số hàng là bắt buộc'))
@@ -123,6 +127,20 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
 });
 
 // ── Event Schema ───────────────────────────────
+// ── Stage layout item schema ───────────────────
+// ── Stage layout item schema (discriminated union) ──
+const baseStageItem = { id: z.string(), label: z.string(), x: z.number(), y: z.number() };
+
+const stageLayoutItemSchema = z.discriminatedUnion('type', [
+  z.object({ ...baseStageItem, type: z.literal('rect'), w: z.number(), h: z.number() }),
+  z.object({ ...baseStageItem, type: z.literal('circle'), radius: z.number() }),
+  z.object({
+    ...baseStageItem,
+    type: z.literal('polygon'),
+    points: z.array(z.object({ x: z.number(), y: z.number() })),
+  }),
+]);
+
 export const createEventSchema = z
   .object({
     title: z
@@ -144,6 +162,16 @@ export const createEventSchema = z
       .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
       .optional()
       .or(z.literal('')),
+
+    min_age: z.number().int().min(0, 'Tuổi tối thiểu không được âm').default(0),
+
+    max_tickets_per_user: z
+      .number()
+      .int()
+      .min(0, 'Giới hạn vé không được âm (0 = không giới hạn)')
+      .default(0),
+
+    stage_layout: z.array(stageLayoutItemSchema).default([]),
 
     sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
   })
@@ -170,7 +198,9 @@ export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & { disabled_
 // ── Draft persistence schema (validates shape/types only, not business rules) ──
 const sectionFormDraftSchema = z.object({
   name: z.string(),
+  type: z.enum(['assigned', 'general']),
   prefix: z.string(),
+  is_seat_pickable: z.boolean(),
   price: z.number(),
   rows: z.number().int(),
   cols: z.number().int(),

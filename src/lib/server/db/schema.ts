@@ -2,10 +2,12 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   date,
   decimal,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   serial,
@@ -18,8 +20,16 @@ import {
 // ── Enums ──────────────────────────────────────
 export const roleEnum = pgEnum('role', ['admin', 'customer']);
 export const genderEnum = pgEnum('gender', ['male', 'female', 'other']);
-export const eventStatusEnum = pgEnum('event_status', ['draft', 'published']);
+
+export const eventStatusEnum = pgEnum('event_status', [
+  'draft',
+  'published',
+  'sold_out',
+  'completed',
+  'cancelled',
+]);
 export const seatStatusEnum = pgEnum('seat_status', ['available', 'locked', 'sold', 'disabled']);
+export const seatTypeEnum = pgEnum('seat_type', ['assigned', 'general']);
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'cancelled']);
 
 // ── Users ──────────────────────────────────────
@@ -39,20 +49,38 @@ export const users = pgTable('users', {
 });
 
 // ── Events ─────────────────────────────────────
-export const events = pgTable('events', {
-  id: serial('id').primaryKey(),
-  title: varchar('title', { length: 200 }).notNull(),
-  description: text('description').notNull(),
-  venue: varchar('venue', { length: 200 }).notNull(),
-  eventDate: timestamp('event_date', { withTimezone: true }).notNull(),
-  bannerImageUrl: varchar('banner_image_url', { length: 500 }),
-  status: eventStatusEnum('status').notNull().default('draft'),
-  createdBy: integer('created_by')
-    .notNull()
-    .references(() => users.id),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const events = pgTable(
+  'events',
+  {
+    id: serial('id').primaryKey(),
+    title: varchar('title', { length: 200 }).notNull(),
+    description: text('description').notNull(),
+    venue: varchar('venue', { length: 200 }).notNull(),
+    eventDate: timestamp('event_date', { withTimezone: true }).notNull(),
+    bannerImageUrl: varchar('banner_image_url', { length: 500 }),
+    minAge: integer('min_age').notNull().default(0), // 0 là mọi lứa tuổi
+    maxTicketsPerUser: integer('max_tickets_per_user').notNull().default(0), // 0 là không giới hạn
+    stageLayout: jsonb('stage_layout').default([]),
+    /* Ví dụ data bên trong:
+       [
+         { "id": "main", "label": "Sân khấu chính", "type": "rect", "x": 10, "y": 0, "w": 20, "h": 5 },
+         { "id": "catwalk", "label": "Đường băng", "type": "rect", "x": 18, "y": 5, "w": 4, "h": 10 },
+         { "id": "center", "label": "Center Stage", "type": "circle", "x": 20, "y": 20, "radius": 8 }
+       ]
+    */
+
+    status: eventStatusEnum('status').notNull().default('draft'),
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check('chk_min_age_non_negative', sql`${table.minAge} >= 0`),
+    check('chk_max_tickets_per_user_non_negative', sql`${table.maxTicketsPerUser} >= 0`),
+  ],
+);
 
 // ── Seat Sections ──────────────────────────────
 export const seatSections = pgTable(
@@ -63,7 +91,9 @@ export const seatSections = pgTable(
       .notNull()
       .references(() => events.id),
     name: varchar('name', { length: 50 }).notNull(),
+    type: seatTypeEnum('type').notNull().default('assigned'),
     prefix: varchar('prefix', { length: 10 }).notNull(),
+    isSeatPickable: boolean('is_pickable').notNull().default(true),
     rows: integer('rows').notNull(),
     cols: integer('cols').notNull(),
     price: decimal('price', { precision: 12, scale: 2 }).notNull(),
@@ -134,15 +164,27 @@ export const orders = pgTable(
 );
 
 // ── Order Items ────────────────────────────────
-export const orderItems = pgTable('order_items', {
-  id: serial('id').primaryKey(),
-  orderId: integer('order_id')
-    .notNull()
-    .references(() => orders.id),
-  seatId: integer('seat_id')
-    .notNull()
-    .references(() => seats.id),
-  priceSnapshot: decimal('price_snapshot', { precision: 12, scale: 2 }).notNull(),
-  qrCode: text('qr_code'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const orderItems = pgTable(
+  'order_items',
+  {
+    id: serial('id').primaryKey(),
+    orderId: integer('order_id')
+      .notNull()
+      .references(() => orders.id),
+    seatId: integer('seat_id')
+      .notNull()
+      .references(() => seats.id),
+    priceSnapshot: decimal('price_snapshot', { precision: 12, scale: 2 }).notNull(),
+    qrCode: text('qr_code'),
+    isCheckedIn: boolean('is_checked_in').notNull().default(false),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      'chk_checked_in_consistency',
+      sql`${table.isCheckedIn} = (${table.checkedInAt} IS NOT NULL)`,
+    ),
+  ],
+);

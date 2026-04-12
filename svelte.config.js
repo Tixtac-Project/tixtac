@@ -1,4 +1,5 @@
 import adapter from 'svelte-adapter-bun';
+const isDev = process.env.NODE_ENV === 'development';
 
 // ── Derive allowed connect-src origins from VITE_API_URL ──
 // If VITE_API_URL is set to an external origin (e.g. https://api.example.com),
@@ -34,7 +35,7 @@ const config = {
     csp: {
       directives: {
         'default-src': ['self'],
-        'script-src': ['self'],
+        'script-src': isDev ? ['self', 'unsafe-eval'] : ['self'],
         'style-src': ['self', 'unsafe-inline'],
         'img-src': ['self', 'https:', 'data:'],
         'font-src': ['self'],
