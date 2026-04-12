@@ -186,23 +186,41 @@ const itineraryItemSchema = z.object({
 });
 
 // ── Show Schema ────────────────────────────────
-const showSchema = z.object({
-  title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
+const showSchema = z
+  .object({
+    title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
 
-  show_date: z.iso.date('Ngày diễn không hợp lệ'),
+    show_date: z.iso.date('Ngày diễn không hợp lệ'),
 
-  start_time: z.string(req('Giờ bắt đầu là bắt buộc')).pipe(z.iso.datetime({ offset: true })),
+    start_time: z.string(req('Giờ bắt đầu là bắt buộc')).pipe(z.iso.datetime({ offset: true })),
 
-  end_time: z
-    .string()
-    .pipe(z.iso.datetime({ offset: true }))
-    .optional()
-    .or(z.literal('')),
+    end_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional()
+      .or(z.literal('')),
 
-  itinerary: z.array(itineraryItemSchema).default([]),
+    itinerary: z.array(itineraryItemSchema).default([]),
 
-  sections: z.array(sectionSchema).min(1, 'Mỗi suất diễn phải có ít nhất 1 khu vực ghế'),
-});
+    sections: z.array(sectionSchema).min(1, 'Mỗi suất diễn phải có ít nhất 1 khu vực ghế'),
+  })
+  .superRefine((show, ctx) => {
+    if (show.show_date !== show.start_time.slice(0, 10)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['show_date'],
+        message: 'Ngày diễn phải khớp với ngày bắt đầu của suất diễn',
+      });
+    }
+
+    if (show.end_time && show.end_time !== '' && new Date(show.end_time) <= new Date(show.start_time)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end_time'],
+        message: 'Giờ kết thúc phải sau giờ bắt đầu',
+      });
+    }
+  });
 
 // ── Stage layout item schema (discriminated union) ──
 const baseStageItem = { id: z.string(), label: z.string(), x: z.number(), y: z.number() };
