@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db';
 import { events, seatSections } from '$lib/server/db/schema';
-import { eq, ilike, and, desc, min, count, sql } from 'drizzle-orm';
+import { eq, ilike, and, desc, min, count } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {
