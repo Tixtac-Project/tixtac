@@ -938,7 +938,7 @@ export async function seed() {
   console.log('');
   console.log('✅ Seed completed!');
   console.log('  Events: 6 (5 published, 1 draft)');
-  console.log('  Shows: 9 total (2+1+1+1+2+1 = 8 shows, Events 1 & 5 have 2 days each)');
+  console.log('  Shows: 8 total (2+1+1+1+2+1 = 8 shows, Events 1 & 5 have 2 days each)');
   console.log('  Users: 1 admin + 10 customers');
 }
 
