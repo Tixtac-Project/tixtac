@@ -29,8 +29,8 @@
 
   {#if ctaLabel}
     <a
-      href={resolve(ctaHref || '/')}
-      on:click={(e) => {
+      href={resolve((ctaHref || '/') as any)}
+      onclick={(e) => {
         if (onCtaClick) {
           e.preventDefault();
           onCtaClick();

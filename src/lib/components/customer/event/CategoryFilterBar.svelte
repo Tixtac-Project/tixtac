@@ -11,7 +11,7 @@
     onCategoryChange?: (value: string) => void;
   }
 
-  let { categories = [], activeCategory = '', onCategoryChange }: Props = $props();
+  let { categories = [], activeCategory = $bindable(''), onCategoryChange }: Props = $props();
 
   function handleClick(value: string) {
     if (onCategoryChange) {

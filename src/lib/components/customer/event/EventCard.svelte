@@ -54,7 +54,7 @@
 </script>
 
 <a
-  href={resolve(`/events/${event.id}`)}
+  href={resolve(`/events/${event.id}` as any)}
   class="flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-purple-600 hover:shadow-lg"
 >
   <!-- Banner -->

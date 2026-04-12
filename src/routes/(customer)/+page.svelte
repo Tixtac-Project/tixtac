@@ -57,7 +57,13 @@
 </svelte:head>
 
 <!-- Hero Section -->
-<HeroSection />
+<HeroSection
+  title="Trải nghiệm"
+  titleAccent="sự kiện đỉnh cao"
+  subtitle="Đặt vé concert, festival, thể thao và hơn thế nữa chỉ trong vài giây — bảo mật, nhanh chóng, tiện lợi."
+  primaryCTA={{ label: 'Khám phá sự kiện', href: '/' }}
+  secondaryCTA = {{ label: 'Xem sự kiện hôm nay →', href: '/' }}
+/>
 
 <!-- Events Section -->
 <section class="mx-auto max-w-7xl px-6 py-16 lg:py-24" id="events">

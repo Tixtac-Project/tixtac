@@ -69,7 +69,7 @@
     <!-- CTAs -->
     <div class="mb-10 flex flex-wrap items-center justify-center gap-4">
       <a
-        href={resolve(primaryCTA.href || '#events')}
+        href={resolve((primaryCTA.href || '#events') as any)}
         class="inline-flex items-center gap-2 rounded-full bg-purple-600 px-7 py-3 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-lg hover:shadow-purple-600/50"
       >
         {primaryCTA.label}
@@ -85,7 +85,7 @@
 
       {#if secondaryCTA}
         <a
-          href={resolve(secondaryCTA.href || '/events')}
+          href={resolve((secondaryCTA.href || '/events') as any)}
           class="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 px-6 py-3 text-sm font-semibold text-purple-600 transition-all duration-200 hover:border-purple-600 hover:bg-purple-50/50"
         >
           {secondaryCTA.label}
