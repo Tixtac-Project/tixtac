@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
 
   interface Props {
     currentPage: number;
@@ -17,11 +16,11 @@
     baseUrl = '?page=',
   }: Props = $props();
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pageNumbers = $derived(Array.from({ length: totalPages }, (_, i) => i + 1));
 
   function buildUrl(page: number): string {
     const query = searchQuery ? `&q=${searchQuery}` : '';
-    return resolve(`${baseUrl}${page}${query}`);
+    return `${baseUrl}${page}${query}`;
   }
 
   function handlePageChange(page: number) {
@@ -36,7 +35,7 @@
     <!-- Previous -->
     <a
       href={buildUrl(currentPage - 1)}
-      on:click={(e) => {
+      onclick={(e) => {
         if (currentPage === 1) {
           e.preventDefault();
         } else if (onPageChange) {
@@ -63,7 +62,7 @@
     {#each pageNumbers as num (num)}
       <a
         href={buildUrl(num)}
-        on:click={(e) => {
+        onclick={(e) => {
           if (onPageChange) {
             e.preventDefault();
             handlePageChange(num);
@@ -84,7 +83,7 @@
     <!-- Next -->
     <a
       href={buildUrl(currentPage + 1)}
-      on:click={(e) => {
+      onclick={(e) => {
         if (currentPage === totalPages) {
           e.preventDefault();
         } else if (onPageChange) {

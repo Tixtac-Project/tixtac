@@ -1,44 +1,61 @@
 import { db } from '$lib/server/db';
-import { events } from '$lib/server/db/schema';
-import { eq, ilike, and, desc } from 'drizzle-orm';
+import { events, seatSections } from '$lib/server/db/schema';
+import { eq, ilike, and, desc, min, count, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {
-  // 1. Nhận từ khóa tìm kiếm và trang hiện tại từ URL (VD: ?q=rock&page=1)
-  const searchQuery = url.searchParams.get('q') || '';
-  const page = Number(url.searchParams.get('page')) || 1;
-  const limit = 8; // Hiển thị 8 sự kiện 1 trang
-  const offset = (page - 1) * limit;
+	// 1. Nhận các tham số từ URL
+	const searchQuery = url.searchParams.get('q') || '';
+	const rawPage = parseInt(url.searchParams.get('page') || '1', 10);
+  const page = rawPage > 0 ? rawPage : 1;
 
-  // 2. Viết điều kiện lọc (Chỉ lấy sự kiện 'published')
-  const conditions = [eq(events.status, 'published')];
+	const limit = 8;
+	const offset = (page - 1) * limit;
 
-  // Nếu user có gõ tìm kiếm, thêm điều kiện tìm theo tiêu đề (ilike: không phân biệt hoa thường)
-  if (searchQuery) {
-    conditions.push(ilike(events.title, `%${searchQuery}%`));
-  }
+	// 2. Xây dựng điều kiện lọc
+	const conditions = [eq(events.status, 'published')];
+	if (searchQuery) {
+		conditions.push(ilike(events.title, `%${searchQuery}%`));
+	}
+	const whereClause = and(...conditions);
 
-  // 3. Query Database
-  const eventList = await db
-    .select()
-    .from(events)
-    .where(and(...conditions))
-    .orderBy(desc(events.createdAt)) // Mới nhất lên đầu
-    .limit(limit)
-    .offset(offset);
+	// 3. Đếm tổng số bản ghi (Đúng chuẩn cho phân trang)
+	const [{ total }] = await db
+		.select({ total: count() })
+		.from(events)
+		.where(whereClause);
 
-  // 4. Đếm tổng số sự kiện để làm phân trang (Pagination)
-  // Tạm thời lấy length để làm demo nhanh, dự án thật sẽ dùng hàm COUNT() của DB
-  const totalEvents = eventList.length;
-  const totalPages = Math.ceil(totalEvents / limit) || 1;
+	// 4. Truy vấn danh sách sự kiện kèm theo giá thấp nhất
+	const rawEvents = await db
+		.select({
+			id: events.id,
+			title: events.title,
+			eventDate: events.eventDate,
+			venue: events.venue,
+			bannerImageUrl: events.bannerImageUrl,
+			// Tính giá thấp nhất từ bảng seatSections
+			minPrice: min(seatSections.price)
+		})
+		.from(events)
+		// Nối với bảng seatSections để lấy thông tin giá
+		.leftJoin(seatSections, eq(seatSections.eventId, events.id))
+		.where(whereClause)
+		// Bắt buộc phải Group By khi dùng hàm tổng hợp (min)
+		.groupBy(events.id)
+		.orderBy(desc(events.createdAt))
+		.limit(limit)
+		.offset(offset);
 
-  // 5. Trả dữ liệu về cho Frontend (+page.svelte)
-  return {
-    events: eventList,
-    pagination: {
-      currentPage: page,
-      totalPages,
-      searchQuery,
-    },
-  };
+	return {
+		events: rawEvents.map((e) => ({
+			...e,
+			min_price: e.minPrice ? Number(e.minPrice) : 0
+		})),
+		pagination: {
+			currentPage: page,
+			totalPages: Math.ceil(total / limit) || 1,
+			searchQuery,
+			totalItems: total
+		}
+	};
 };

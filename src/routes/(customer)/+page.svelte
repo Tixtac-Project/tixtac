@@ -61,7 +61,7 @@
   title="Trải nghiệm"
   titleAccent="sự kiện đỉnh cao"
   subtitle="Đặt vé concert, festival, thể thao và hơn thế nữa chỉ trong vài giây — bảo mật, nhanh chóng, tiện lợi."
-  primaryCTA={{ label: 'Khám phá sự kiện', href: '/' }}
+  primaryCTA={{ label: 'Khám phá sự kiện', href: '#events' }}
   secondaryCTA = {{ label: 'Xem sự kiện hôm nay →', href: '/' }}
 />
 

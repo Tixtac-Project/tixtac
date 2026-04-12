@@ -70,7 +70,17 @@
     <!-- CTAs -->
     <div class="mb-10 flex flex-wrap items-center justify-center gap-4">
       <a
-        href={resolve((primaryCTA.href || '#events') as any)}
+        href={primaryCTA.href || '#events'}
+        onclick={(e) => {
+          const targetHref = primaryCTA.href || '#events';
+          if (targetHref.startsWith('#')) {
+            e.preventDefault();
+            const target = document.querySelector(targetHref);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        }}
         class="inline-flex items-center gap-2 rounded-full bg-purple-600 px-7 py-3 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-lg hover:shadow-purple-600/50"
       >
         {primaryCTA.label}

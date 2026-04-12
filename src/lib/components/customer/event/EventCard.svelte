@@ -33,6 +33,7 @@
   function formatDate(dateStr: string | Date): string {
     const d = new Date(dateStr);
     return new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
       weekday: 'short',
       day: 'numeric',
       month: 'short',
