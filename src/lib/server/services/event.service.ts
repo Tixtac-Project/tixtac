@@ -12,72 +12,39 @@ import { validateInput } from '$lib/shared/validation';
 import { getRowLabel } from '$lib/utils/seat-label';
 import { and, count, eq, ilike, min, sql, type InferInsertModel } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
-const BATCH_SIZE = 1000;
+
+/**
+ * Max seats per INSERT statement.
+ * Each seat row has 6 columns → 6 params. PG max params = 65535 → ~10k rows.
+ * We use 5000 as a safe, performant batch size.
+ */
+export const SEAT_INSERT_BATCH_SIZE = 5000;
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function generateAndInsertSeats(
-  tx: DbTransaction,
-  eventId: number,
-  sectionId: number,
-  section: SectionInput,
-) {
-  const prefix = section.prefix;
-  const startRow = section.start_row_index ?? 0;
-  const startCol = section.start_col_index ?? 1;
-  const disabledSet = new Set(section.disabled_seats ?? []);
-
-  const seatsToInsert: InferInsertModel<typeof seats>[] = [];
-  let disabled_count = 0;
-
-  for (let r = 0; r < section.rows; r++) {
-    const rowLabel = getRowLabel(startRow + r);
-    for (let c = 0; c < section.cols; c++) {
-      const colNumber = startCol + c;
-      const seatKey = `${prefix}-${rowLabel}${colNumber}`;
-      const status: InferInsertModel<typeof seats>['status'] = disabledSet.has(seatKey)
-        ? 'disabled'
-        : 'available';
-
-      if (status === 'disabled') disabled_count++;
-
-      seatsToInsert.push({
-        eventId,
-        sectionId,
-        prefix,
-        rowLabel,
-        colNumber,
-        status,
-      });
-    }
-  }
-
-  for (let i = 0; i < seatsToInsert.length; i += BATCH_SIZE) {
-    await tx.insert(seats).values(seatsToInsert.slice(i, i + BATCH_SIZE));
-  }
-
-  const seat_count = section.rows * section.cols;
-  const available_count = seat_count - disabled_count;
-
-  return { seat_count, available_count, disabled_count };
-}
-
+/**
+ * Insert all sections + their seats in bulk.
+ *
+ * Optimised path:
+ * 1. Single INSERT for all sections → 1 round-trip
+ * 2. Collect ALL seat rows across every section in memory
+ * 3. Batch-INSERT all seats in chunks of BATCH_SIZE → minimal round-trips
+ */
 async function insertSectionsWithSeats(
   tx: DbTransaction,
   eventId: number,
   sections: SectionInput[],
 ) {
-  let total_seats = 0;
-  let total_available_seats = 0;
-  const sectionsInfo = [];
-
-  for (const sec of sections) {
-    const [newSection] = await tx
-      .insert(seatSections)
-      .values({
+  // ── 1. Bulk-insert all sections in one statement ──
+  const insertedSections = await tx
+    .insert(seatSections)
+    .values(
+      sections.map((sec) => ({
         eventId,
         name: sec.name,
         prefix: sec.prefix,
+        type: sec.type ?? 'assigned',
+        isSeatPickable: sec.is_seat_pickable ?? true,
         rows: sec.rows,
         cols: sec.cols,
         price: String(sec.price),
@@ -86,21 +53,71 @@ async function insertSectionsWithSeats(
         startRowIndex: sec.start_row_index,
         startColIndex: sec.start_col_index,
         sortOrder: sec.sort_order,
-      })
-      .returning();
+      })),
+    )
+    .returning();
 
-    const counts = await generateAndInsertSeats(tx, eventId, newSection.id, sec);
-    total_seats += counts.seat_count;
-    total_available_seats += counts.available_count;
+  // ── 2. Generate all seat rows in memory ──
+  const allSeats: InferInsertModel<typeof seats>[] = [];
+  let total_seats = 0;
+  let total_available_seats = 0;
+  const sectionsInfo = [];
+
+  for (let idx = 0; idx < sections.length; idx++) {
+    const sec = sections[idx];
+    const dbSection = insertedSections[idx];
+
+    // Sanity check: ensure RETURNING order matches VALUES order
+    if (dbSection.prefix !== sec.prefix) {
+      throw new Error(
+        `Section order mismatch at index ${idx}: expected prefix "${sec.prefix}", got "${dbSection.prefix}"`,
+      );
+    }
+
+    const prefix = sec.prefix;
+    const startRow = sec.start_row_index ?? 0;
+    const startCol = sec.start_col_index ?? 1;
+    const disabledSet = new Set(sec.disabled_seats ?? []);
+    let disabled_count = 0;
+
+    for (let r = 0; r < sec.rows; r++) {
+      const rowLabel = getRowLabel(startRow + r);
+      for (let c = 0; c < sec.cols; c++) {
+        const colNumber = startCol + c;
+        const seatKey = `${prefix}-${rowLabel}${colNumber}`;
+        const isDisabled = disabledSet.has(seatKey);
+        if (isDisabled) disabled_count++;
+
+        allSeats.push({
+          eventId,
+          sectionId: dbSection.id,
+          prefix,
+          rowLabel,
+          colNumber,
+          status: isDisabled ? 'disabled' : 'available',
+        });
+      }
+    }
+
+    const seat_count = sec.rows * sec.cols;
+    const available_count = seat_count - disabled_count;
+    total_seats += seat_count;
+    total_available_seats += available_count;
+
     sectionsInfo.push({
-      id: newSection.id,
-      name: newSection.name,
-      rows: newSection.rows,
-      cols: newSection.cols,
-      seat_count: counts.seat_count,
-      available_count: counts.available_count,
-      disabled_count: counts.disabled_count,
+      id: dbSection.id,
+      name: dbSection.name,
+      rows: dbSection.rows,
+      cols: dbSection.cols,
+      seat_count,
+      available_count,
+      disabled_count,
     });
+  }
+
+  // ── 3. Batch-insert all seats ──
+  for (let i = 0; i < allSeats.length; i += SEAT_INSERT_BATCH_SIZE) {
+    await tx.insert(seats).values(allSeats.slice(i, i + SEAT_INSERT_BATCH_SIZE));
   }
 
   return { total_seats, total_available_seats, sectionsInfo };
@@ -119,19 +136,18 @@ export const eventService = {
       page: params.page,
       limit: params.limit,
     });
-    const { role, userId } = params;
+    const { role } = params;
     const offset = (page - 1) * limit;
 
     // Build WHERE conditions
     const conditions = [];
 
-    // Admin sees published + own drafts; others see only published
-    if (role === 'admin' && userId) {
-      conditions.push(
-        sql`(${events.status} = 'published' OR (${events.status} = 'draft' AND ${events.createdBy} = ${userId}))`,
-      );
+    // Admin sees all events; non-admins see all public statuses (published, sold_out, completed, cancelled)
+    if (role === 'admin') {
+      // No status filter for admins - they see everything
     } else {
-      conditions.push(eq(events.status, 'published'));
+      // Exclude only draft status - all other statuses are public
+      conditions.push(sql`${events.status} != 'draft'`);
     }
 
     if (q) {
@@ -150,6 +166,8 @@ export const eventService = {
         venue: events.venue,
         eventDate: events.eventDate,
         bannerImageUrl: events.bannerImageUrl,
+        minAge: events.minAge,
+        maxTicketsPerUser: events.maxTicketsPerUser,
         status: events.status,
         minPrice: min(seatSections.price),
         totalSeats: count(sql`CASE WHEN ${seats.status} != 'disabled' THEN 1 END`),
@@ -171,6 +189,8 @@ export const eventService = {
         venue: r.venue,
         event_date: r.eventDate,
         banner_image_url: r.bannerImageUrl,
+        min_age: r.minAge,
+        max_tickets_per_user: r.maxTicketsPerUser,
         status: r.status,
         min_price: r.minPrice ? Number(r.minPrice) : 0,
         total_seats: r.totalSeats,
@@ -194,7 +214,8 @@ export const eventService = {
     if (!event) throwError(Errors.NOT_FOUND);
 
     // Draft events are only visible to the admin who created them
-    if (event.status !== 'published') {
+    // Other statuses (published, sold_out, completed, cancelled) are public
+    if (event.status === 'draft') {
       if (role !== 'admin' || event.createdBy !== userId) {
         throwError(Errors.NOT_FOUND);
       }
@@ -248,7 +269,9 @@ export const eventService = {
         return {
           id: s.id,
           name: s.name,
+          type: s.type,
           prefix: s.prefix,
+          is_seat_pickable: s.isSeatPickable,
           price: Number(s.price),
           rows: s.rows,
           cols: s.cols,
@@ -277,6 +300,9 @@ export const eventService = {
           venue: eventData.venue,
           eventDate: new Date(eventData.event_date),
           bannerImageUrl: eventData.banner_image_url || null,
+          minAge: eventData.min_age ?? 0,
+          maxTicketsPerUser: eventData.max_tickets_per_user ?? 0,
+          stageLayout: eventData.stage_layout ?? [],
           createdBy: adminId,
           status: 'draft',
         })

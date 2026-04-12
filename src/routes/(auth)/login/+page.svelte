@@ -2,7 +2,6 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Button } from '$lib/components/ui/button';
-  import * as Card from '$lib/components/ui/card';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { formatZodErrors } from '$lib/shared/format-errors';
@@ -40,7 +39,6 @@
   }
 
   async function handleLogin() {
-    // Client-side validation using shared Zod schema
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       errors = formatZodErrors(result.error);
@@ -53,7 +51,6 @@
     loading = false;
 
     if (details) {
-      // Server returned field-level validation errors — map them to the form
       errors = details;
       return;
     }
@@ -70,79 +67,76 @@
   }
 </script>
 
-<div class="flex h-screen w-screen flex-col items-center justify-center">
-  <Card.Root class="w-5/6 max-w-90 md:w-full" style="view-transition-name: auth-card;">
-    <Card.Header class="space-y-1 text-center">
-      <Card.Title class="text-2xl font-bold">Đăng nhập</Card.Title>
-      <Card.Description>Nhập email và mật khẩu của bạn</Card.Description>
-    </Card.Header>
+<div class="space-y-6">
+  <!-- Header -->
+  <div>
+    <h1 class="font-heading text-2xl font-bold tracking-tight text-foreground">Đăng nhập</h1>
+    <p class="mt-1 text-sm text-muted-foreground">Nhập email và mật khẩu của bạn để tiếp tục</p>
+  </div>
 
-    <form
-      onsubmit={(e) => {
-        e.preventDefault();
-        handleLogin();
-      }}
-      class="grid gap-4"
+  <!-- Form -->
+  <form
+    onsubmit={(e) => {
+      e.preventDefault();
+      handleLogin();
+    }}
+    class="grid gap-5"
+  >
+    <div class="grid gap-2">
+      <Label for="email">Email</Label>
+      <Input
+        id="email"
+        type="email"
+        placeholder="name@example.com"
+        bind:value={email}
+        onfocus={() => clearError('email')}
+        onblur={() => validateField('email')}
+        class="rounded-xl"
+      />
+      {#if errors.email}
+        <span class="text-xs text-destructive">{errors.email}</span>
+      {/if}
+    </div>
+
+    <div class="grid gap-2">
+      <Label for="password">Mật khẩu</Label>
+      <div class="relative">
+        <Input
+          id="password"
+          type={showPassword ? 'text' : 'password'}
+          bind:value={password}
+          class="rounded-xl pr-10"
+          onfocus={() => clearError('password')}
+          onblur={() => validateField('password')}
+        />
+        <button
+          type="button"
+          class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          style="transition: color 0.2s var(--ease-bento);"
+          onclick={() => (showPassword = !showPassword)}
+          tabindex={-1}
+          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+        >
+          {#if showPassword}
+            <EyeOff class="size-5" />
+          {:else}
+            <Eye class="size-5" />
+          {/if}
+        </button>
+      </div>
+      {#if errors.password}
+        <span class="text-xs text-destructive">{errors.password}</span>
+      {/if}
+    </div>
+
+    <Button
+      type="submit"
+      class="mt-1 w-full rounded-xl py-5 text-sm font-semibold"
+      disabled={loading}
     >
-      <Card.Content class="grid gap-4">
-        <div class="grid gap-2">
-          <Label for="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="name@example.com"
-            bind:value={email}
-            onfocus={() => clearError('email')}
-            onblur={() => validateField('email')}
-          />
-          {#if errors.email}
-            <span class="text-xs text-destructive">{errors.email}</span>
-          {/if}
-        </div>
+      {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
+      Đăng nhập
+    </Button>
+  </form>
 
-        <div class="grid gap-2">
-          <Label for="password">Mật khẩu</Label>
-          <div class="relative">
-            <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              bind:value={password}
-              class="pr-10"
-              onfocus={() => clearError('password')}
-              onblur={() => validateField('password')}
-            />
-            <button
-              type="button"
-              class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-              onclick={() => (showPassword = !showPassword)}
-              tabindex={-1}
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-            >
-              {#if showPassword}
-                <EyeOff class="size-5" />
-              {:else}
-                <Eye class="size-5" />
-              {/if}
-            </button>
-          </div>
-          {#if errors.password}
-            <span class="text-xs text-destructive">{errors.password}</span>
-          {/if}
-        </div>
-      </Card.Content>
-
-      <Card.Footer class="flex flex-col gap-4">
-        <Button type="submit" class="w-full" disabled={loading}>
-          {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
-          Đăng nhập
-        </Button>
-        <div class="text-center text-sm text-muted-foreground">
-          Chưa có tài khoản?
-          <a href={resolve('/register')} class="text-primary underline underline-offset-4">
-            Đăng ký
-          </a>
-        </div>
-      </Card.Footer>
-    </form>
-  </Card.Root>
 </div>
