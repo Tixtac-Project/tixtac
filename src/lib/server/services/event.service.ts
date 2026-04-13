@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { events, eventShows, seats, seatSections } from '$lib/server/db/schema';
+import { categories, events, eventShows, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import {
   createEventSchema,
@@ -30,6 +30,8 @@ type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
  * 1. Single INSERT for all sections → 1 round-trip
  * 2. Collect ALL seat rows across every section in memory
  * 3. Batch-INSERT all seats in chunks of BATCH_SIZE → minimal round-trips
+ *
+ * GA (general admission) sections skip seat generation entirely — they use capacity only.
  */
 async function insertSectionsWithSeats(
   tx: DbTransaction,
@@ -43,18 +45,13 @@ async function insertSectionsWithSeats(
       sections.map((sec) => ({
         showId,
         name: sec.name,
-        prefix: sec.prefix,
         type: sec.type ?? 'assigned',
         isSeatPickable: sec.is_seat_pickable ?? true,
-        rows: sec.rows,
-        cols: sec.cols,
         capacity: sec.capacity ?? 0,
         price: String(sec.price),
-        layoutX: sec.layout_x,
-        layoutY: sec.layout_y,
-        startRowIndex: sec.start_row_index,
-        startColIndex: sec.start_col_index,
         sortOrder: sec.sort_order,
+        layoutConfig: sec.layout_config,
+        seatConfig: sec.seat_config,
         salesStartAt: sec.sales_start_at ? new Date(sec.sales_start_at) : null,
         salesEndAt: sec.sales_end_at ? new Date(sec.sales_end_at) : null,
       })),
@@ -70,32 +67,39 @@ async function insertSectionsWithSeats(
   for (let idx = 0; idx < sections.length; idx++) {
     const sec = sections[idx];
     const dbSection = insertedSections[idx];
-
-    // Sanity check: ensure RETURNING order matches VALUES order
-    if (dbSection.prefix !== sec.prefix) {
-      throw new Error(
-        `Section order mismatch at index ${idx}: expected prefix "${sec.prefix}", got "${dbSection.prefix}"`,
-      );
-    }
-
-    const prefix = sec.prefix;
+    const seatCfg = sec.seat_config;
     const sectionType = sec.type ?? 'assigned';
 
-    // For general admission: use capacity or rows*cols
-    const effectiveRows = sectionType === 'general' ? (sec.capacity ?? sec.rows ?? 0) : sec.rows;
-    const effectiveCols = sectionType === 'general' ? 1 : sec.cols;
+    // For GA sections, skip individual seat generation — use capacity only
+    if (sectionType === 'general') {
+      sectionsInfo.push({
+        id: dbSection.id,
+        name: dbSection.name,
+        type: sectionType,
+        capacity: sec.capacity ?? 0,
+        seat_count: 0,
+        available_count: 0,
+        disabled_count: 0,
+      });
+      continue;
+    }
 
-    const startRow = sec.start_row_index ?? 0;
-    const startCol = sec.start_col_index ?? 1;
+    const prefix = seatCfg.prefix || '';
+    const startRow = seatCfg.startRowIndex ?? 1;
+    const startCol = seatCfg.startColIndex ?? 1;
     const disabledSet = new Set(sec.disabled_seats ?? []);
     let disabled_count = 0;
 
-    for (let r = 0; r < effectiveRows; r++) {
-      const rowLabel = sectionType === 'general' ? '' : getRowLabel(startRow + r);
-      for (let c = 0; c < effectiveCols; c++) {
-        const colNumber = startCol + c;
-        const seatKey =
-          sectionType === 'general' ? `${prefix}-${r + 1}` : `${prefix}-${rowLabel}${colNumber}`;
+    for (let r = 0; r < seatCfg.rows; r++) {
+      const rowLabel =
+        seatCfg.rowFormat === 'alphabetic' ? getRowLabel(startRow + r - 1) : String(startRow + r);
+
+      for (let c = 0; c < seatCfg.cols; c++) {
+        const colNumber =
+          seatCfg.colDirection === 'ltr' ? startCol + c : startCol + (seatCfg.cols - 1 - c);
+
+        const prefixStr = prefix ? `${prefix}-` : '';
+        const seatKey = `${prefixStr}${rowLabel}${colNumber}`;
         const isDisabled = disabledSet.has(seatKey);
         if (isDisabled) disabled_count++;
 
@@ -104,13 +108,13 @@ async function insertSectionsWithSeats(
           sectionId: dbSection.id,
           prefix,
           rowLabel,
-          colNumber: sectionType === 'general' ? r + 1 : colNumber,
+          colNumber,
           status: isDisabled ? 'disabled' : 'available',
         });
       }
     }
 
-    const seat_count = effectiveRows * effectiveCols;
+    const seat_count = seatCfg.rows * seatCfg.cols;
     const available_count = seat_count - disabled_count;
     total_seats += seat_count;
     total_available_seats += available_count;
@@ -118,9 +122,8 @@ async function insertSectionsWithSeats(
     sectionsInfo.push({
       id: dbSection.id,
       name: dbSection.name,
-      rows: dbSection.rows,
-      cols: dbSection.cols,
-      capacity: dbSection.capacity,
+      type: sectionType,
+      capacity: 0,
       seat_count,
       available_count,
       disabled_count,
@@ -174,13 +177,15 @@ async function insertShowWithSections(tx: DbTransaction, eventId: number, show: 
 export const eventService = {
   async listEvents(params: {
     q?: string;
+    category?: string;
     page?: string | number;
     limit?: string | number;
     role?: string;
     userId?: number;
   }) {
-    const { q, page, limit } = validateInput(eventQuerySchema, {
+    const { q, category, page, limit } = validateInput(eventQuerySchema, {
       q: params.q,
+      category: params.category,
       page: params.page,
       limit: params.limit,
     });
@@ -198,18 +203,31 @@ export const eventService = {
     if (q) {
       conditions.push(ilike(events.title, `%${q}%`));
     }
+
+    // Filter by category slug
+    if (category) {
+      const [cat] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, category))
+        .limit(1);
+      if (cat) {
+        conditions.push(eq(events.categoryId, cat.id));
+      }
+    }
+
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Count total matching events
     const [{ total }] = await db.select({ total: count() }).from(events).where(whereClause);
 
     // Query events with show/seat aggregation
-    // Join events → eventShows → seatSections → seats
     const rows = await db
       .select({
         id: events.id,
         title: events.title,
         venue: events.venue,
+        categoryId: events.categoryId,
         bannerImageUrl: events.bannerImageUrl,
         minAge: events.minAge,
         maxTicketsPerUser: events.maxTicketsPerUser,
@@ -235,6 +253,7 @@ export const eventService = {
         id: r.id,
         title: r.title,
         venue: r.venue,
+        category_id: r.categoryId,
         earliest_show_date: r.earliestShowDate,
         banner_image_url: r.bannerImageUrl,
         min_age: r.minAge,
@@ -338,6 +357,7 @@ export const eventService = {
 
     return {
       id: event.id,
+      category_id: event.categoryId,
       title: event.title,
       description: event.description,
       terms_and_conditions: event.termsAndConditions,
@@ -346,6 +366,7 @@ export const eventService = {
       static_map_image_url: event.staticMapImageUrl,
       min_age: event.minAge,
       max_tickets_per_user: event.maxTicketsPerUser,
+      map_config: event.mapConfig,
       stage_layout: event.stageLayout,
       amenities: event.amenities,
       organizer_info: event.organizerInfo,
@@ -370,17 +391,11 @@ export const eventService = {
               id: s.id,
               name: s.name,
               type: s.type,
-              prefix: s.prefix,
               is_seat_pickable: s.isSeatPickable,
               price: Number(s.price),
-              rows: s.rows,
-              cols: s.cols,
               capacity: s.capacity,
-              layout_x: s.layoutX,
-              layout_y: s.layoutY,
-              start_row_index: s.startRowIndex,
-              start_col_index: s.startColIndex,
-              visual_layout: s.visualLayout,
+              layout_config: s.layoutConfig,
+              seat_config: s.seatConfig,
               sales_start_at: s.salesStartAt,
               sales_end_at: s.salesEndAt,
               seat_count: counts.seat_count,
@@ -405,6 +420,7 @@ export const eventService = {
       const [newEvent] = await tx
         .insert(events)
         .values({
+          categoryId: eventData.category_id,
           title: eventData.title,
           description: eventData.description,
           termsAndConditions: eventData.terms_and_conditions || null,
@@ -413,6 +429,7 @@ export const eventService = {
           staticMapImageUrl: eventData.static_map_image_url || null,
           minAge: eventData.min_age ?? 0,
           maxTicketsPerUser: eventData.max_tickets_per_user ?? 0,
+          mapConfig: eventData.map_config,
           stageLayout: eventData.stage_layout ?? [],
           amenities: eventData.amenities ?? [],
           organizerInfo: eventData.organizer_info ?? {},
@@ -489,7 +506,7 @@ export const eventService = {
       if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
       if (event.status === 'published') throwError(Errors.ALREADY_PUBLISHED);
 
-      // Check that at least one show has available seats
+      // Check that at least one show has available seats (assigned) or capacity (GA)
       const showList = await tx
         .select({ id: eventShows.id })
         .from(eventShows)
@@ -498,7 +515,9 @@ export const eventService = {
       if (showList.length === 0) throwError(Errors.NO_SEATS);
 
       const showIds = showList.map((s) => s.id);
-      const [hasSeats] = await tx
+
+      // Check for assigned seats availability
+      const [hasAssignedSeats] = await tx
         .select()
         .from(seats)
         .where(
@@ -511,7 +530,24 @@ export const eventService = {
           ),
         )
         .limit(1);
-      if (!hasSeats) throwError(Errors.NO_SEATS);
+
+      // Check for GA sections with capacity > 0
+      const [hasGACapacity] = await tx
+        .select()
+        .from(seatSections)
+        .where(
+          and(
+            sql`${seatSections.showId} IN (${sql.join(
+              showIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})`,
+            eq(seatSections.type, 'general'),
+            sql`${seatSections.capacity} > 0`,
+          ),
+        )
+        .limit(1);
+
+      if (!hasAssignedSeats && !hasGACapacity) throwError(Errors.NO_SEATS);
 
       // Publish the event and all its draft shows
       const [updated] = await tx

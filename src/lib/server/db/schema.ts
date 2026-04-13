@@ -17,19 +17,20 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-// ── Enums ──────────────────────────────────────
+// ══════════════════════════════════════════════════
+// ENUMS & TYPES
+// ══════════════════════════════════════════════════
+
 export const roleEnum = pgEnum('role', ['admin', 'customer']);
 export const genderEnum = pgEnum('gender', ['male', 'female', 'other']);
 
 // NOTE: "sold_out" is intentionally excluded — it is a derived/computed state
-// calculated at the application layer (when available_seats === 0).
 export const eventStatusEnum = pgEnum('event_status', [
   'draft',
   'published',
   'completed',
   'cancelled',
 ]);
-
 export const showStatusEnum = pgEnum('show_status', [
   'draft',
   'published',
@@ -37,9 +38,39 @@ export const showStatusEnum = pgEnum('show_status', [
   'cancelled',
 ]);
 
+// 'disabled' is used when an Organizer deletes seats from a block to make irregular shapes (cutouts)
 export const seatStatusEnum = pgEnum('seat_status', ['available', 'locked', 'sold', 'disabled']);
-export const seatTypeEnum = pgEnum('seat_type', ['assigned', 'general']);
+export const seatTypeEnum = pgEnum('seat_type', ['assigned', 'general']); // assigned = Ngồi, general = Đứng
 export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'cancelled']);
+
+// ── Types for JSONB Casting ──
+
+export type MapConfigType = {
+  width: number;
+  height: number;
+  gridSize: number;
+  snapToGrid: boolean;
+};
+
+export type SectionLayoutConfig = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  color: string;
+  zIndex?: number;
+};
+
+export type SectionSeatConfig = {
+  rows: number;
+  cols: number;
+  prefix: string | null;
+  rowFormat: 'alphabetic' | 'numeric'; // Hàng đánh theo A, B, C hay 1, 2, 3
+  colDirection: 'ltr' | 'rtl'; // Số ghế đánh từ trái qua phải hay phải qua trái
+  startRowIndex: number;
+  startColIndex: number;
+};
 
 // ══════════════════════════════════════════════════
 // TABLES
@@ -64,42 +95,48 @@ export const users = pgTable('users', {
     .$onUpdate(() => new Date()),
 });
 
-// ── Events (General Info — dates live on event_shows) ──────
+// ── Categories ──────────────────────────────────
+export const categories = pgTable('categories', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(), // Để làm URL: /c/nhac-song
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+// ── Events ─────────────────────────────────────
 export const events = pgTable(
   'events',
   {
     id: serial('id').primaryKey(),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'restrict' }),
     title: varchar('title', { length: 200 }).notNull(),
-    description: text('description').notNull(), // Markdown supported
-    termsAndConditions: text('terms_and_conditions'), // Markdown supported
+    description: text('description').notNull(),
+    termsAndConditions: text('terms_and_conditions'),
     venue: varchar('venue', { length: 200 }).notNull(),
     bannerImageUrl: varchar('banner_image_url', { length: 500 }),
     staticMapImageUrl: varchar('static_map_image_url', { length: 500 }),
-    minAge: integer('min_age').notNull().default(0), // 0 = all ages
-    maxTicketsPerUser: integer('max_tickets_per_user').notNull().default(0), // 0 = unlimited
+    minAge: integer('min_age').notNull().default(0),
+    maxTicketsPerUser: integer('max_tickets_per_user').notNull().default(0),
 
+    // Config tổng của Map Builder (Kích thước Canvas)
+    mapConfig: jsonb('map_config').$type<MapConfigType>().default({
+      width: 1200,
+      height: 800,
+      gridSize: 20,
+      snapToGrid: true,
+    }),
+
+    // Chứa các Object định hướng như Sân khấu, Lối vào, FOH
     stageLayout: jsonb('stage_layout').default([]),
-    /* Example stageLayout:
-       [
-         { "id": "main", "label": "Sân khấu chính", "type": "rect", "x": 10, "y": 0, "w": 20, "h": 5 },
-         { "id": "catwalk", "label": "Đường băng", "type": "rect", "x": 18, "y": 5, "w": 4, "h": 10 }
-       ]
-    */
+    /* Example: [{ "id": "stage", "label": "Sân khấu chính", "type": "stage", "x": 400, "y": 50, "w": 400, "h": 100, "rotation": 0 }] */
 
     amenities: text('amenities')
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
-
     organizerInfo: jsonb('organizer_info').default({}),
-    /* Example organizerInfo:
-       {
-         "name": "TixTac Entertainment",
-         "email": "contact@tixtac.io.vn",
-         "phone": "+84 28 1234 5678",
-         "website": "https://tixtac.io.vn"
-       }
-    */
 
     status: eventStatusEnum('status').notNull().default('draft'),
     createdBy: integer('created_by')
@@ -125,21 +162,11 @@ export const eventShows = pgTable(
     eventId: integer('event_id')
       .notNull()
       .references(() => events.id, { onDelete: 'cascade' }),
-    title: varchar('title', { length: 200 }), // e.g. "Day 1 — Opening Night"
+    title: varchar('title', { length: 200 }),
     showDate: date('show_date').notNull(),
     startTime: timestamp('start_time', { withTimezone: true }).notNull(),
     endTime: timestamp('end_time', { withTimezone: true }),
-
     itinerary: jsonb('itinerary').default([]),
-    /* Example itinerary:
-       [
-         { "time": "18:00", "activity": "Mở cửa", "description": "Check-in và nhận vòng tay" },
-         { "time": "19:00", "activity": "DJ Warm-up", "description": "" },
-         { "time": "20:00", "activity": "Main Act", "description": "Nghệ sĩ chính biểu diễn" },
-         { "time": "22:30", "activity": "Kết thúc", "description": "" }
-       ]
-    */
-
     status: showStatusEnum('status').notNull().default('draft'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -156,7 +183,7 @@ export const eventShows = pgTable(
   ],
 );
 
-// ── Seat Sections ──────────────────────────────
+// ── Seat Sections ────
 export const seatSections = pgTable(
   'seat_sections',
   {
@@ -165,36 +192,41 @@ export const seatSections = pgTable(
       .notNull()
       .references(() => eventShows.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 50 }).notNull(),
-    type: seatTypeEnum('type').notNull().default('assigned'),
-    prefix: varchar('prefix', { length: 10 }).notNull(),
+    type: seatTypeEnum('type').notNull().default('assigned'), // assigned: vé ngồi, general: vé đứng
     isSeatPickable: boolean('is_pickable').notNull().default(true),
-    rows: integer('rows').notNull().default(0),
-    cols: integer('cols').notNull().default(0),
-    capacity: integer('capacity').notNull().default(0), // For general admission sections
     price: decimal('price', { precision: 12, scale: 2 }).notNull(),
-    layoutX: integer('layout_x').notNull().default(0),
-    layoutY: integer('layout_y').notNull().default(0),
-    startRowIndex: integer('start_row_index').notNull().default(0),
-    startColIndex: integer('start_col_index').notNull().default(1),
+    capacity: integer('capacity').notNull().default(0), // Bắt buộc cho vé đứng (general)
     sortOrder: integer('sort_order').notNull().default(0),
 
-    visualLayout: jsonb('visual_layout').default([]),
-    /* Example visualLayout — coordinates for rendering on interactive map:
-       [
-         { "x": 10, "y": 20, "w": 50, "h": 30, "label": "Khu VIP Trái" },
-         { "x": 70, "y": 20, "w": 50, "h": 30, "label": "Khu VIP Phải" }
-       ]
-    */
+    // UI/Layout Configuration trên Canvas (Tọa độ, kích thước, góc xoay, màu sắc)
+    layoutConfig: jsonb('layout_config').$type<SectionLayoutConfig>().notNull().default({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+      color: '#cccccc',
+    }),
+
+    // Rule sinh tự động các ghế bên trong Block (Chỉ áp dụng cho vé ngồi)
+    seatConfig: jsonb('seat_config').$type<SectionSeatConfig>().default({
+      rows: 0,
+      cols: 0,
+      prefix: null,
+      rowFormat: 'alphabetic',
+      colDirection: 'ltr',
+      startRowIndex: 1,
+      startColIndex: 1,
+    }),
 
     salesStartAt: timestamp('sales_start_at', { withTimezone: true }),
     salesEndAt: timestamp('sales_end_at', { withTimezone: true }),
-
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('idx_seat_sections_show').on(table.showId)],
 );
 
-// ── Seats ──────────────────────────────────────
+// ── Seats (Từng ghế cụ thể) ────────────────────
 export const seats = pgTable(
   'seats',
   {
@@ -208,6 +240,7 @@ export const seats = pgTable(
     prefix: varchar('prefix', { length: 10 }).notNull(),
     rowLabel: varchar('row_label', { length: 5 }).notNull(),
     colNumber: integer('col_number').notNull(),
+    // Nếu xóa ghế thừa trên UI (để làm block khuyết góc), status sẽ update thành 'disabled'
     status: seatStatusEnum('status').notNull().default('available'),
     lockedBy: integer('locked_by').references(() => users.id, { onDelete: 'set null' }),
     lockedAt: timestamp('locked_at', { withTimezone: true }),
@@ -224,7 +257,7 @@ export const seats = pgTable(
   ],
 );
 
-// ── Orders (Cart — can span multiple shows) ────
+// ── Orders ─────────────────────────────────────
 export const orders = pgTable(
   'orders',
   {
@@ -262,10 +295,7 @@ export const orderItems = pgTable(
       .notNull()
       .references(() => seats.id, { onDelete: 'restrict' }),
     priceSnapshot: decimal('price_snapshot', { precision: 12, scale: 2 }).notNull(),
-
-    ticketCode: varchar('ticket_code', { length: 20 }).notNull().unique(),
-    /* Unique human-readable code for manual check-in, e.g. "TIX-A3F8K2" */
-
+    ticketCode: varchar('ticket_code', { length: 20 }).notNull().unique(), // e.g. "TIX-A3F8K2"
     qrCode: text('qr_code'),
     isCheckedIn: boolean('is_checked_in').notNull().default(false),
     checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
@@ -281,7 +311,7 @@ export const orderItems = pgTable(
 );
 
 // ══════════════════════════════════════════════════
-// RELATIONS (Drizzle Query Builder / N+1 prevention)
+// RELATIONS
 // ══════════════════════════════════════════════════
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -289,61 +319,39 @@ export const usersRelations = relations(users, ({ many }) => ({
   orders: many(orders),
 }));
 
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  events: many(events),
+}));
+
 export const eventsRelations = relations(events, ({ one, many }) => ({
-  createdByUser: one(users, {
-    fields: [events.createdBy],
-    references: [users.id],
-  }),
+  category: one(categories, { fields: [events.categoryId], references: [categories.id] }),
+  createdByUser: one(users, { fields: [events.createdBy], references: [users.id] }),
   shows: many(eventShows),
 }));
 
 export const eventShowsRelations = relations(eventShows, ({ one, many }) => ({
-  event: one(events, {
-    fields: [eventShows.eventId],
-    references: [events.id],
-  }),
+  event: one(events, { fields: [eventShows.eventId], references: [events.id] }),
   sections: many(seatSections),
   seats: many(seats),
 }));
 
 export const seatSectionsRelations = relations(seatSections, ({ one, many }) => ({
-  show: one(eventShows, {
-    fields: [seatSections.showId],
-    references: [eventShows.id],
-  }),
+  show: one(eventShows, { fields: [seatSections.showId], references: [eventShows.id] }),
   seats: many(seats),
 }));
 
 export const seatsRelations = relations(seats, ({ one }) => ({
-  section: one(seatSections, {
-    fields: [seats.sectionId],
-    references: [seatSections.id],
-  }),
-  show: one(eventShows, {
-    fields: [seats.showId],
-    references: [eventShows.id],
-  }),
-  lockedByUser: one(users, {
-    fields: [seats.lockedBy],
-    references: [users.id],
-  }),
+  section: one(seatSections, { fields: [seats.sectionId], references: [seatSections.id] }),
+  show: one(eventShows, { fields: [seats.showId], references: [eventShows.id] }),
+  lockedByUser: one(users, { fields: [seats.lockedBy], references: [users.id] }),
 }));
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
-  user: one(users, {
-    fields: [orders.userId],
-    references: [users.id],
-  }),
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
   items: many(orderItems),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
-  order: one(orders, {
-    fields: [orderItems.orderId],
-    references: [orders.id],
-  }),
-  seat: one(seats, {
-    fields: [orderItems.seatId],
-    references: [seats.id],
-  }),
+  order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+  seat: one(seats, { fields: [orderItems.seatId], references: [seats.id] }),
 }));
