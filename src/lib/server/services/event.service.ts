@@ -2,9 +2,15 @@ import { db } from '$lib/server/db';
 import { categories, events, eventShows, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import {
+  addSeatmapSchema,
+  addShowsSchema,
+  createBasicInfoSchema,
   createEventSchema,
   eventIdSchema,
   eventQuerySchema,
+  showIdSchema,
+  updateBasicInfoSchema,
+  updateShowSchema,
   updateShowSectionsSchema,
   type SectionInput,
   type ShowInput,
@@ -221,13 +227,15 @@ export const eventService = {
     // Count total matching events
     const [{ total }] = await db.select({ total: count() }).from(events).where(whereClause);
 
-    // Query events with show/seat aggregation
+    // Query events with category + show/seat aggregation
     const rows = await db
       .select({
         id: events.id,
         title: events.title,
         venue: events.venue,
         categoryId: events.categoryId,
+        categoryName: categories.name,
+        categorySlug: categories.slug,
         bannerImageUrl: events.bannerImageUrl,
         minAge: events.minAge,
         maxTicketsPerUser: events.maxTicketsPerUser,
@@ -239,11 +247,12 @@ export const eventService = {
         availableSeats: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
       })
       .from(events)
+      .leftJoin(categories, eq(categories.id, events.categoryId))
       .leftJoin(eventShows, eq(eventShows.eventId, events.id))
       .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
       .leftJoin(seats, eq(seats.sectionId, seatSections.id))
       .where(whereClause)
-      .groupBy(events.id)
+      .groupBy(events.id, categories.name, categories.slug)
       .orderBy(min(eventShows.showDate))
       .limit(limit)
       .offset(offset);
@@ -254,6 +263,8 @@ export const eventService = {
         title: r.title,
         venue: r.venue,
         category_id: r.categoryId,
+        category_name: r.categoryName,
+        category_slug: r.categorySlug,
         earliest_show_date: r.earliestShowDate,
         banner_image_url: r.bannerImageUrl,
         min_age: r.minAge,
@@ -275,10 +286,36 @@ export const eventService = {
   async getEventDetail(rawEventId: string | number, role?: string, userId?: number) {
     const eventId = validateInput(eventIdSchema, rawEventId);
 
-    // 1. Get event basic info
-    const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+    // 1. Get event basic info with category
+    const [eventRow] = await db
+      .select({
+        id: events.id,
+        categoryId: events.categoryId,
+        categoryName: categories.name,
+        categorySlug: categories.slug,
+        title: events.title,
+        description: events.description,
+        termsAndConditions: events.termsAndConditions,
+        venue: events.venue,
+        bannerImageUrl: events.bannerImageUrl,
+        staticMapImageUrl: events.staticMapImageUrl,
+        minAge: events.minAge,
+        maxTicketsPerUser: events.maxTicketsPerUser,
+        mapConfig: events.mapConfig,
+        stageLayout: events.stageLayout,
+        amenities: events.amenities,
+        organizerInfo: events.organizerInfo,
+        status: events.status,
+        createdBy: events.createdBy,
+        createdAt: events.createdAt,
+      })
+      .from(events)
+      .leftJoin(categories, eq(categories.id, events.categoryId))
+      .where(eq(events.id, eventId))
+      .limit(1);
 
-    if (!event) throwError(Errors.NOT_FOUND);
+    if (!eventRow) throwError(Errors.NOT_FOUND);
+    const event = eventRow;
 
     // Draft events are only visible to the admin who created them
     if (event.status === 'draft') {
@@ -358,6 +395,8 @@ export const eventService = {
     return {
       id: event.id,
       category_id: event.categoryId,
+      category_name: event.categoryName,
+      category_slug: event.categorySlug,
       title: event.title,
       description: event.description,
       terms_and_conditions: event.termsAndConditions,
@@ -491,6 +530,261 @@ export const eventService = {
         total_available_seats,
         sections: sectionsInfo,
       };
+    });
+  },
+
+  // ═══════════════════════════════════════════════════
+  // STEP-BASED EVENT CREATION (3-step flow)
+  // ═══════════════════════════════════════════════════
+
+  /**
+   * Step 1: Create a draft event with basic info only (no shows).
+   * POST /api/events/create/basic-info
+   */
+  async createBasicInfo(adminId: number, data: unknown) {
+    const eventData = validateInput(createBasicInfoSchema, data);
+
+    const [newEvent] = await db
+      .insert(events)
+      .values({
+        categoryId: eventData.category_id,
+        title: eventData.title,
+        description: eventData.description,
+        termsAndConditions: eventData.terms_and_conditions || null,
+        venue: eventData.venue,
+        bannerImageUrl: eventData.banner_image_url || null,
+        staticMapImageUrl: eventData.static_map_image_url || null,
+        minAge: eventData.min_age ?? 0,
+        maxTicketsPerUser: eventData.max_tickets_per_user ?? 0,
+        mapConfig: eventData.map_config,
+        stageLayout: eventData.stage_layout ?? [],
+        amenities: eventData.amenities ?? [],
+        organizerInfo: eventData.organizer_info ?? {},
+        createdBy: adminId,
+        status: 'draft',
+      })
+      .returning();
+
+    return {
+      id: newEvent.id,
+      title: newEvent.title,
+      status: newEvent.status,
+    };
+  },
+
+  /**
+   * PATCH /api/events/create/basic-info
+   */
+  async updateBasicInfo(adminId: number, data: unknown) {
+    const { event_id, ...fields } = validateInput(updateBasicInfoSchema, data);
+
+    const [event] = await db.select().from(events).where(eq(events.id, event_id)).limit(1);
+    if (!event) throwError(Errors.NOT_FOUND);
+    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+    if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+    // Build partial update — only set fields that were provided
+    const updates: Record<string, unknown> = {};
+    if (fields.category_id !== undefined) updates.categoryId = fields.category_id;
+    if (fields.title !== undefined) updates.title = fields.title;
+    if (fields.description !== undefined) updates.description = fields.description;
+    if (fields.terms_and_conditions !== undefined)
+      updates.termsAndConditions = fields.terms_and_conditions || null;
+    if (fields.venue !== undefined) updates.venue = fields.venue;
+    if (fields.banner_image_url !== undefined)
+      updates.bannerImageUrl = fields.banner_image_url || null;
+    if (fields.static_map_image_url !== undefined)
+      updates.staticMapImageUrl = fields.static_map_image_url || null;
+    if (fields.min_age !== undefined) updates.minAge = fields.min_age;
+    if (fields.max_tickets_per_user !== undefined)
+      updates.maxTicketsPerUser = fields.max_tickets_per_user;
+    if (fields.map_config !== undefined) updates.mapConfig = fields.map_config;
+    if (fields.stage_layout !== undefined) updates.stageLayout = fields.stage_layout;
+    if (fields.amenities !== undefined) updates.amenities = fields.amenities;
+    if (fields.organizer_info !== undefined) updates.organizerInfo = fields.organizer_info;
+
+    if (Object.keys(updates).length === 0) {
+      return { id: event.id, title: event.title, status: event.status };
+    }
+
+    const [updated] = await db
+      .update(events)
+      .set(updates)
+      .where(eq(events.id, event_id))
+      .returning();
+
+    return {
+      id: updated.id,
+      title: updated.title,
+      status: updated.status,
+    };
+  },
+
+  /**
+   * Step 2: Add shows (sessions) to an existing draft event.
+   * POST /api/events/create/shows
+   */
+  async addShows(adminId: number, data: unknown) {
+    const { event_id, shows } = validateInput(addShowsSchema, data);
+
+    // Verify event exists, belongs to admin, and is draft
+    const [event] = await db.select().from(events).where(eq(events.id, event_id)).limit(1);
+
+    if (!event) throwError(Errors.NOT_FOUND);
+    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+    if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+    const insertedShows = await db
+      .insert(eventShows)
+      .values(
+        shows.map((show) => ({
+          eventId: event_id,
+          title: show.title || null,
+          showDate: show.show_date,
+          startTime: new Date(show.start_time),
+          endTime: show.end_time ? new Date(show.end_time) : null,
+          itinerary: show.itinerary ?? [],
+          status: 'draft' as const,
+        })),
+      )
+      .returning();
+
+    return {
+      event_id,
+      shows: insertedShows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        show_date: s.showDate,
+        start_time: s.startTime,
+        end_time: s.endTime,
+        status: s.status,
+      })),
+    };
+  },
+
+  /**
+   * Step 3: Add seatmap (sections + seats) to a specific show.
+   * POST /api/events/create/seatmap
+   */
+  async addSeatmap(adminId: number, data: unknown) {
+    const { show_id, sections } = validateInput(addSeatmapSchema, data);
+    validateEventRequirements(sections);
+
+    return await db.transaction(async (tx) => {
+      // Verify show exists & belongs to admin's draft event
+      const [show] = await tx
+        .select()
+        .from(eventShows)
+        .where(eq(eventShows.id, show_id))
+        .limit(1)
+        .for('update');
+      if (!show) throwError(Errors.NOT_FOUND);
+
+      const [event] = await tx.select().from(events).where(eq(events.id, show.eventId)).limit(1);
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+      if (show.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+      // Clear any existing sections/seats for this show (idempotent)
+      await tx.delete(seats).where(eq(seats.showId, show_id));
+      await tx.delete(seatSections).where(eq(seatSections.showId, show_id));
+
+      const { total_seats, total_available_seats, sectionsInfo } = await insertSectionsWithSeats(
+        tx,
+        show_id,
+        sections,
+      );
+
+      return {
+        show_id: show.id,
+        event_id: event.id,
+        event_title: event.title,
+        show_status: show.status,
+        total_seats,
+        total_available_seats,
+        sections: sectionsInfo,
+      };
+    });
+  },
+
+  /**
+   * Update a show's metadata (date, time, itinerary).
+   * PATCH /api/events/create/shows
+   */
+  async updateShow(adminId: number, rawShowId: string | number, data: unknown) {
+    const showId = validateInput(showIdSchema, rawShowId);
+    const fields = validateInput(updateShowSchema, data);
+
+    const [show] = await db.select().from(eventShows).where(eq(eventShows.id, showId)).limit(1);
+    if (!show) throwError(Errors.NOT_FOUND);
+
+    const [event] = await db.select().from(events).where(eq(events.id, show.eventId)).limit(1);
+    if (!event) throwError(Errors.NOT_FOUND);
+    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+    if (show.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+    const updates: Record<string, unknown> = {};
+    if (fields.title !== undefined) updates.title = fields.title || null;
+    if (fields.show_date !== undefined) updates.showDate = fields.show_date;
+    if (fields.start_time !== undefined) updates.startTime = new Date(fields.start_time);
+    if (fields.end_time !== undefined)
+      updates.endTime = fields.end_time ? new Date(fields.end_time) : null;
+    if (fields.itinerary !== undefined) updates.itinerary = fields.itinerary;
+
+    if (Object.keys(updates).length === 0) {
+      return {
+        id: show.id,
+        title: show.title,
+        show_date: show.showDate,
+        start_time: show.startTime,
+        end_time: show.endTime,
+        status: show.status,
+      };
+    }
+
+    const [updated] = await db
+      .update(eventShows)
+      .set(updates)
+      .where(eq(eventShows.id, showId))
+      .returning();
+
+    return {
+      id: updated.id,
+      title: updated.title,
+      show_date: updated.showDate,
+      start_time: updated.startTime,
+      end_time: updated.endTime,
+      status: updated.status,
+    };
+  },
+
+  /**
+   * Delete a show and its sections/seats (cascade).
+   * DELETE /api/events/[id]/shows/[showId]
+   */
+  async deleteShow(adminId: number, rawShowId: string | number) {
+    const showId = validateInput(showIdSchema, rawShowId);
+
+    return await db.transaction(async (tx) => {
+      const [show] = await tx
+        .select()
+        .from(eventShows)
+        .where(eq(eventShows.id, showId))
+        .limit(1)
+        .for('update');
+      if (!show) throwError(Errors.NOT_FOUND);
+
+      const [event] = await tx.select().from(events).where(eq(events.id, show.eventId)).limit(1);
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+      if (show.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+      // Seats cascade from sections, sections cascade from show
+      await tx.delete(seats).where(eq(seats.showId, showId));
+      await tx.delete(seatSections).where(eq(seatSections.showId, showId));
+      await tx.delete(eventShows).where(eq(eventShows.id, showId));
+
+      return { id: showId, event_id: event.id };
     });
   },
 

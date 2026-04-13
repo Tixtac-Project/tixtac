@@ -1,11 +1,19 @@
-import { requireAdmin } from '$lib/server/auth/guards';
+// DEPRECATED: Section updates now happen at the show level.
+// Use PUT /api/events/[id]/shows/[showId] instead.
+// This file is kept for backward compatibility but returns 410 Gone.
+
 import { apiHandler } from '$lib/server/handler';
-import { eventService } from '$lib/server/services/event.service';
 import { json } from '@sveltejs/kit';
 
-export const PUT = apiHandler(async ({ request, params, locals }) => {
-  const admin = requireAdmin(locals);
-  const body = await request.json();
-  const data = await eventService.updateEventSections(admin.id, Number(params.id), body);
-  return json({ data }, { status: 200 });
+export const PUT = apiHandler(async () => {
+  return json(
+    {
+      error: {
+        code: 'DEPRECATED',
+        message:
+          'Section updates are now per-show. Use PUT /api/events/{eventId}/shows/{showId} instead.',
+      },
+    },
+    { status: 410 },
+  );
 });

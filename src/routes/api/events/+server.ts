@@ -11,6 +11,7 @@ export const GET = apiHandler(async ({ url, locals }) => {
 
   const data = await eventService.listEvents({
     q: url.searchParams.get('q') ?? undefined,
+    category: url.searchParams.get('category') ?? undefined,
     page: pageParam !== null && !Number.isNaN(Number(pageParam)) ? Number(pageParam) : undefined,
     limit:
       limitParam !== null && !Number.isNaN(Number(limitParam)) ? Number(limitParam) : undefined,

@@ -289,7 +289,7 @@ const organizerInfoSchema = z
   })
   .optional();
 
-// ── Event Schema (Create) ──────────────────────
+// ── Event Schema (Create — one-shot, backward compat) ──
 export const createEventSchema = z.object({
   category_id: z.number(req('Danh mục là bắt buộc')).int().positive('Danh mục không hợp lệ'),
 
@@ -340,6 +340,154 @@ export const createEventSchema = z.object({
   shows: z.array(showSchema).min(1, 'Phải có ít nhất 1 suất diễn'),
 });
 
+// ═══════════════════════════════════════════════════
+// STEP-BASED EVENT CREATION (3-step flow)
+// ═══════════════════════════════════════════════════
+
+// ── Step 1: Basic Info ─────────────────────────
+// Creates a draft event shell (no shows yet)
+export const createBasicInfoSchema = z.object({
+  category_id: z.number(req('Danh mục là bắt buộc')).int().positive('Danh mục không hợp lệ'),
+
+  title: z
+    .string(req('Tên sự kiện là bắt buộc'))
+    .min(5, 'Tên sự kiện tối thiểu 5 ký tự')
+    .max(200, 'Tên sự kiện tối đa 200 ký tự'),
+
+  description: z.string(req('Mô tả là bắt buộc')).min(1, 'Mô tả không được trống'),
+
+  terms_and_conditions: z.string().optional().or(z.literal('')),
+
+  venue: z.string(req('Địa điểm là bắt buộc')).min(1, 'Địa điểm không được trống'),
+
+  banner_image_url: z
+    .url('URL ảnh không hợp lệ')
+    .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
+    .optional()
+    .or(z.literal('')),
+
+  static_map_image_url: z
+    .url('URL ảnh sơ đồ không hợp lệ')
+    .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
+    .optional()
+    .or(z.literal('')),
+
+  min_age: z.number().int().min(0, 'Tuổi tối thiểu không được âm').default(0),
+
+  max_tickets_per_user: z
+    .number()
+    .int()
+    .min(0, 'Giới hạn vé không được âm (0 = không giới hạn)')
+    .default(0),
+
+  map_config: mapConfigSchema.default({
+    width: 1200,
+    height: 800,
+    gridSize: 20,
+    snapToGrid: true,
+  }),
+
+  stage_layout: z.array(stageLayoutItemSchema).default([]),
+
+  amenities: z.array(z.string()).default([]),
+
+  organizer_info: organizerInfoSchema,
+});
+
+// ── Step 2: Add Shows ──────────────────────────
+// Show without sections (sections added in Step 3)
+const showWithoutSectionsSchema = z
+  .object({
+    title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
+
+    show_date: z.iso.date('Ngày diễn không hợp lệ'),
+
+    start_time: z.string(req('Giờ bắt đầu là bắt buộc')).pipe(z.iso.datetime({ offset: true })),
+
+    end_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional()
+      .or(z.literal('')),
+
+    itinerary: z.array(itineraryItemSchema).default([]),
+  })
+  .superRefine((show, ctx) => {
+    if (show.show_date !== show.start_time.slice(0, 10)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['show_date'],
+        message: 'Ngày diễn phải khớp với ngày bắt đầu của suất diễn',
+      });
+    }
+
+    if (
+      show.end_time &&
+      show.end_time !== '' &&
+      new Date(show.end_time) <= new Date(show.start_time)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end_time'],
+        message: 'Giờ kết thúc phải sau giờ bắt đầu',
+      });
+    }
+  });
+
+export const addShowsSchema = z.object({
+  event_id: z.number(req('ID sự kiện là bắt buộc')).int().positive('ID sự kiện không hợp lệ'),
+  shows: z.array(showWithoutSectionsSchema).min(1, 'Phải có ít nhất 1 suất diễn'),
+});
+
+// ── Step 3: Seatmap (sections + seats per show) ──
+export const addSeatmapSchema = z.object({
+  show_id: z.number(req('ID suất diễn là bắt buộc')).int().positive('ID suất diễn không hợp lệ'),
+  sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
+});
+
+// ── Update Basic Info (for existing draft event) ──
+export const updateBasicInfoSchema = createBasicInfoSchema.partial().extend({
+  event_id: z.number(req('ID sự kiện là bắt buộc')).int().positive('ID sự kiện không hợp lệ'),
+});
+
+// ── Update Show (single show metadata, no sections) ──
+export const updateShowSchema = z
+  .object({
+    title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
+    show_date: z.iso.date('Ngày diễn không hợp lệ').optional(),
+    start_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional(),
+    end_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional()
+      .or(z.literal('')),
+    itinerary: z.array(itineraryItemSchema).optional(),
+  })
+  .superRefine((show, ctx) => {
+    if (show.show_date && show.start_time && show.show_date !== show.start_time.slice(0, 10)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['show_date'],
+        message: 'Ngày diễn phải khớp với ngày bắt đầu của suất diễn',
+      });
+    }
+    if (
+      show.end_time &&
+      show.end_time !== '' &&
+      show.start_time &&
+      new Date(show.end_time) <= new Date(show.start_time)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end_time'],
+        message: 'Giờ kết thúc phải sau giờ bắt đầu',
+      });
+    }
+  });
+
 // ── Update Show Sections Schema ────────────────
 export const updateShowSectionsSchema = z.object({
   sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
@@ -347,6 +495,11 @@ export const updateShowSectionsSchema = z.object({
 
 // ── Types ──────────────────────────────────────
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type CreateBasicInfoInput = z.infer<typeof createBasicInfoSchema>;
+export type UpdateBasicInfoInput = z.infer<typeof updateBasicInfoSchema>;
+export type AddShowsInput = z.infer<typeof addShowsSchema>;
+export type AddSeatmapInput = z.infer<typeof addSeatmapSchema>;
+export type UpdateShowInput = z.infer<typeof updateShowSchema>;
 export type UpdateShowSectionsInput = z.infer<typeof updateShowSectionsSchema>;
 export type SectionInput = z.infer<typeof sectionSchema>;
 export type ShowInput = z.infer<typeof showSchema>;
