@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -57,11 +57,29 @@
 
     if (!error && data) {
       toast.success('Đăng nhập thành công!');
+      await invalidateAll();
       if (data.role === 'admin') {
         goto(resolve('/admin'));
       } else {
         goto(resolve('/'));
       }
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === ' ') {
+      e.preventDefault();
+    }
+  }
+
+  function stripWhitespace(field: 'email' | 'password', e: Event) {
+    const target = e.currentTarget as HTMLInputElement;
+    const sanitized = target.value.replace(/\s+/g, '');
+
+    if (field === 'email') {
+      email = sanitized;
+    } else {
+      password = sanitized;
     }
   }
 </script>
@@ -90,7 +108,9 @@
         bind:value={email}
         onfocus={() => clearError('email')}
         onblur={() => validateField('email')}
+        onkeydown={handleKeydown}
         class="rounded-xl"
+        oninput={(e) => stripWhitespace('email', e)}
       />
       {#if errors.email}
         <span class="text-xs text-destructive">{errors.email}</span>
@@ -107,6 +127,8 @@
           class="rounded-xl pr-10"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
+          onkeydown={handleKeydown}
+          oninput={(e) => stripWhitespace('password', e)}
         />
         <button
           type="button"
@@ -137,5 +159,4 @@
       Đăng nhập
     </Button>
   </form>
-
 </div>
