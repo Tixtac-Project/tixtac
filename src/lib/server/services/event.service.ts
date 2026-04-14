@@ -696,7 +696,7 @@ export const eventService = {
    * POST /api/events/create/seatmap
    */
   async addSeatmap(adminId: number, data: unknown) {
-    const { show_id, sections } = validateInput(addSeatmapSchema, data);
+    const { show_id, sections, map_config, stage_layout } = validateInput(addSeatmapSchema, data);
     validateEventRequirements(sections);
 
     return await db.transaction(async (tx) => {
@@ -713,6 +713,14 @@ export const eventService = {
       if (!event) throwError(Errors.NOT_FOUND);
       if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
       if (show.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+      // Persist map_config / stage_layout on the parent event if provided
+      const eventUpdates: Record<string, unknown> = {};
+      if (map_config !== undefined) eventUpdates.mapConfig = map_config;
+      if (stage_layout !== undefined) eventUpdates.stageLayout = stage_layout;
+      if (Object.keys(eventUpdates).length > 0) {
+        await tx.update(events).set(eventUpdates).where(eq(events.id, event.id));
+      }
 
       // Clear any existing sections/seats for this show (idempotent)
       await tx.delete(seats).where(eq(seats.showId, show_id));

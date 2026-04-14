@@ -443,6 +443,8 @@ export const addShowsSchema = z.object({
 export const addSeatmapSchema = z.object({
   show_id: z.number(req('ID suất diễn là bắt buộc')).int().positive('ID suất diễn không hợp lệ'),
   sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
+  map_config: mapConfigSchema.optional(),
+  stage_layout: z.array(stageLayoutItemSchema).optional(),
 });
 
 // ── Update Basic Info (for existing draft event) ──

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { formatDate } from '$lib/utils/datetime';
 
   interface Event {
     id: number;
@@ -30,17 +31,6 @@
     return placeholderGradients[i % placeholderGradients.length];
   }
 
-  function formatDate(dateStr: string | Date): string {
-    const d = new Date(dateStr);
-    return new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }).format(d);
-  }
-
   function formatPrice(price: number | string): string {
     const val = typeof price === 'string' ? Number(price) : price;
     if (!val || val === 0) return 'Đang cập nhật';
@@ -51,7 +41,7 @@
     }).format(val);
   }
 
-  const eventDate = new Date(event.eventDate);
+  const eventDate = $derived(new Date(event.eventDate));
 </script>
 
 <a
@@ -141,7 +131,7 @@
       <!-- Venue -->
       <div class="flex items-center gap-1.5">
         <svg
-          class="h-3.5 w-3.5 flex-shrink-0 text-slate-400"
+          class="h-3.5 w-3.5 shrink-0 text-slate-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

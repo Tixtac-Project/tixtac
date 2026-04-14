@@ -78,7 +78,7 @@
         onclick={handleNavClick}
         class="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
           {active
-          ? 'bg-primary/10 text-primary shadow-sm dark:bg-primary/15'
+          ? 'bg-primary/10 font-bold! text-primary shadow-sm dark:bg-primary/15'
           : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'}"
         style="transition: all 0.2s var(--ease-bento);"
       >
@@ -88,7 +88,7 @@
           ></div>
         {/if}
         <item.icon
-          class="size-5 {active ? 'text-primary' : ''}"
+          class="size-6 {active ? 'text-primary' : ''}"
           style="transition: transform 0.2s var(--ease-bento);"
         />
         {item.label}
@@ -104,7 +104,7 @@
       <span
         class="rounded-md bg-muted/60 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-muted-foreground/50 uppercase"
       >
-        v1.0
+        v1.0.0
       </span>
     </div>
   </div>

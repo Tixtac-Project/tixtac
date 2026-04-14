@@ -44,7 +44,7 @@
     <Button
       variant="ghost"
       size="icon"
-      class="h-9 w-9 rounded-xl md:hidden"
+      class="md:hidden"
       type="button"
       aria-label="Toggle sidebar"
       onclick={ontogglesidebar}
@@ -65,7 +65,7 @@
         {#snippet child({ props })}
           <button
             {...props}
-            class="flex items-center gap-2.5 rounded-xl border border-border/50 bg-card px-3 py-1.5 hover:bg-accent/60"
+            class="flex items-center gap-2.5 rounded-lg border border-border/50 bg-card px-3 py-1.5 hover:bg-accent/60"
             style="transition: all 0.2s var(--ease-bento);"
             aria-label="Tài khoản Admin"
           >
@@ -78,7 +78,7 @@
           </button>
         {/snippet}
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" class="w-48 rounded-xl p-1.5">
+      <DropdownMenu.Content align="end" class="w-48 rounded-lg p-1.5">
         <DropdownMenu.Group>
           <DropdownMenu.Item class="gap-2 rounded-lg" disabled>
             <User class="h-4 w-4 text-muted-foreground" />

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import Button from '$lib/components/ui/button/button.svelte';
+  import { formatDate } from '$lib/utils/datetime';
   import { ChevronLeft, ChevronRight } from 'lucide-svelte';
 
   interface Event {
@@ -41,17 +42,6 @@
     currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
   }
 
-  function formatDate(dateStr: string | Date): string {
-    const d = new Date(dateStr);
-    return new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }).format(d);
-  }
-
   function formatPrice(price: number | string): string {
     const val = typeof price === 'string' ? Number(price) : price;
     if (!val || val === 0) return 'Đang cập nhật';
@@ -80,7 +70,7 @@
 <section class="mx-auto max-w-7xl px-4 pt-2 pb-4 sm:px-6">
   <div class="relative">
     <div class="overflow-hidden rounded-xl bg-transparent">
-      <div class="relative h-96 sm:h-[500px] md:h-[550px]">
+      <div class="relative h-96 sm:h-125 md:h-137.5">
         <div
           class="flex h-full transition-transform duration-500 ease-out"
           style="transform: translateX(-{currentSlide * 100}%)"

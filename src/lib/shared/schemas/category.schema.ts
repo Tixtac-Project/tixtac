@@ -5,11 +5,17 @@ const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const createCategorySchema = z.object({
   name: z
-    .string({ error: (issue: { input: unknown }) => (issue.input === undefined ? 'Tên danh mục là bắt buộc' : undefined) })
+    .string({
+      error: (issue: { input: unknown }) =>
+        issue.input === undefined ? 'Tên danh mục là bắt buộc' : undefined,
+    })
     .min(1, 'Tên danh mục không được trống')
     .max(100, 'Tên danh mục tối đa 100 ký tự'),
   slug: z
-    .string({ error: (issue: { input: unknown }) => (issue.input === undefined ? 'Slug là bắt buộc' : undefined) })
+    .string({
+      error: (issue: { input: unknown }) =>
+        issue.input === undefined ? 'Slug là bắt buộc' : undefined,
+    })
     .min(1, 'Slug không được trống')
     .max(100, 'Slug tối đa 100 ký tự')
     .regex(slugRegex, 'Slug chỉ chứa chữ thường, số và dấu gạch ngang (vd: nhac-song)'),
@@ -18,7 +24,12 @@ export const createCategorySchema = z.object({
 
 export const updateCategorySchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  slug: z.string().min(1).max(100).regex(slugRegex, 'Slug chỉ chứa chữ thường, số và dấu gạch ngang').optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(slugRegex, 'Slug chỉ chứa chữ thường, số và dấu gạch ngang')
+    .optional(),
   sort_order: z.number().int().min(0).optional(),
 });
 
