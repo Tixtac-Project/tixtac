@@ -64,6 +64,12 @@
       }
     }
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === ' ') {
+      e.preventDefault();
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -90,6 +96,7 @@
         bind:value={email}
         onfocus={() => clearError('email')}
         onblur={() => validateField('email')}
+        onkeydown={handleKeydown}
         class="rounded-xl"
       />
       {#if errors.email}
@@ -107,6 +114,7 @@
           class="rounded-xl pr-10"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
+          onkeydown={handleKeydown}
         />
         <button
           type="button"
@@ -137,5 +145,4 @@
       Đăng nhập
     </Button>
   </form>
-
 </div>

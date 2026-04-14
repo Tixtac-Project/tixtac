@@ -74,6 +74,12 @@
       goto(resolve('/login'));
     }
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === ' ') {
+      e.preventDefault();
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -82,9 +88,7 @@
     <h1 class="font-heading text-2xl font-bold tracking-tight text-foreground">
       Đăng ký tài khoản
     </h1>
-    <p class="mt-1 text-sm text-muted-foreground">
-      Nhập thông tin của bạn để tạo tài khoản mới
-    </p>
+    <p class="mt-1 text-sm text-muted-foreground">Nhập thông tin của bạn để tạo tài khoản mới</p>
   </div>
 
   <!-- Form -->
@@ -136,6 +140,7 @@
           class="rounded-xl pr-10"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
+          onkeydown={handleKeydown}
         />
         <button
           type="button"
@@ -157,7 +162,7 @@
       {/if}
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
       <div class="grid gap-2">
         <Label for="dob">Ngày sinh</Label>
         <Input
@@ -166,6 +171,7 @@
           bind:value={form.date_of_birth}
           class="rounded-xl"
           onfocus={() => clearError('date_of_birth')}
+          onchange={() => validateField('date_of_birth')}
           onblur={() => validateField('date_of_birth')}
         />
         {#if errors.date_of_birth}
@@ -213,5 +219,4 @@
       Đăng ký
     </Button>
   </form>
-
 </div>
