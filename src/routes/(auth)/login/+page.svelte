@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -57,6 +57,7 @@
 
     if (!error && data) {
       toast.success('Đăng nhập thành công!');
+      await invalidateAll();
       if (data.role === 'admin') {
         goto(resolve('/admin'));
       } else {

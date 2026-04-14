@@ -306,7 +306,7 @@
         <h3 class="text-base font-semibold text-foreground">Khu vực ghế ngồi</h3>
         <p class="text-xs text-muted-foreground">
           Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
-           ghế
+          ghế
         </p>
       </div>
     </div>
