@@ -3,19 +3,8 @@ import { z } from 'zod';
 export const registerSchema = z.object({
   email: z
     .email('Email không đúng định dạng')
-    .transform((v) => v.trim().toLowerCase())
-    .pipe(
-      z
-        .string()
-        .max(255, 'Email tối đa 255 ký tự')
-        .refine(
-          (val) => {
-            const domain = val.split('@')[1];
-            return ['gmail.com', 'vnu.edu.vn'].includes(domain);
-          },
-          { message: 'Email phải thuộc miền gmail.com hoặc vnu.edu.vn' },
-        ),
-    ),
+    .max(255, 'Email tối đa 255 ký tự')
+    .transform((v) => v.trim().toLowerCase()),
 
   password: z
     .string()
@@ -47,11 +36,15 @@ export const registerSchema = z.object({
     (val) => {
       const birth = new Date(val);
       const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDiff = today.getMonth() - birth.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
+
+      const age =
+        today.getUTCFullYear() -
+        birth.getUTCFullYear() -
+        (today.getUTCMonth() < birth.getUTCMonth() ||
+        (today.getUTCMonth() === birth.getUTCMonth() && today.getUTCDate() < birth.getUTCDate())
+          ? 1
+          : 0);
+
       return age >= 16;
     },
     { message: 'Bạn phải từ đủ 16 tuổi trở lên' },

@@ -124,6 +124,7 @@
         class="rounded-xl"
         onfocus={() => clearError('email')}
         onblur={() => validateField('email')}
+        onkeydown={handleKeydown}
       />
       {#if errors.email}
         <span class="text-xs text-destructive">{errors.email}</span>
