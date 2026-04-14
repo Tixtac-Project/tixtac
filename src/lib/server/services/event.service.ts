@@ -634,32 +634,61 @@ export const eventService = {
     if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
     if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
 
-    const insertedShows = await db
-      .insert(eventShows)
-      .values(
-        shows.map((show) => ({
-          eventId: event_id,
-          title: show.title || null,
-          showDate: show.show_date,
-          startTime: new Date(show.start_time),
-          endTime: show.end_time ? new Date(show.end_time) : null,
-          itinerary: show.itinerary ?? [],
-          status: 'draft' as const,
-        })),
-      )
-      .returning();
+    return await db.transaction(async (tx) => {
+      // Delete existing shows (and their sections/seats) to prevent duplicates
+      // when user navigates back to Step 2 and re-submits
+      const existingShows = await tx
+        .select({ id: eventShows.id })
+        .from(eventShows)
+        .where(eq(eventShows.eventId, event_id));
 
-    return {
-      event_id,
-      shows: insertedShows.map((s) => ({
-        id: s.id,
-        title: s.title,
-        show_date: s.showDate,
-        start_time: s.startTime,
-        end_time: s.endTime,
-        status: s.status,
-      })),
-    };
+      if (existingShows.length > 0) {
+        const existingShowIds = existingShows.map((s) => s.id);
+        // Delete seats first (FK dependency)
+        await tx.delete(seats).where(
+          sql`${seats.showId} IN (${sql.join(
+            existingShowIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+        // Delete sections
+        await tx.delete(seatSections).where(
+          sql`${seatSections.showId} IN (${sql.join(
+            existingShowIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+        // Delete the shows themselves
+        await tx.delete(eventShows).where(eq(eventShows.eventId, event_id));
+      }
+
+      const insertedShows = await tx
+        .insert(eventShows)
+        .values(
+          shows.map((show) => ({
+            eventId: event_id,
+            title: show.title || null,
+            showDate: show.show_date,
+            startTime: new Date(show.start_time),
+            endTime: show.end_time ? new Date(show.end_time) : null,
+            itinerary: show.itinerary ?? [],
+            status: 'draft' as const,
+          })),
+        )
+        .returning();
+
+      return {
+        event_id,
+        shows: insertedShows.map((s) => ({
+          id: s.id,
+          title: s.title,
+          show_date: s.showDate,
+          start_time: s.startTime,
+          end_time: s.endTime,
+          status: s.status,
+        })),
+      };
+    });
   },
 
   /**

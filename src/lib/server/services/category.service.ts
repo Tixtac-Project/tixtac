@@ -6,10 +6,7 @@ import { eq } from 'drizzle-orm';
 export const categoryService = {
   /** List all categories ordered by sortOrder */
   async listCategories() {
-    const rows = await db
-      .select()
-      .from(categories)
-      .orderBy(categories.sortOrder, categories.name);
+    const rows = await db.select().from(categories).orderBy(categories.sortOrder, categories.name);
 
     return rows.map((r) => ({
       id: r.id,
