@@ -35,8 +35,8 @@
         class="relative flex h-14 items-center text-[15px] font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 {activeCategory ===
         ''
           ? 'text-primary'
-          : 'text-slate-300 hover:text-white'}"
-      >
+          : 'text-black hover:text-primary'}"
+      > Tất cả
         {#if activeCategory === ''}
           <div class="absolute bottom-0 left-0 h-[3px] w-full rounded-t-md bg-primary"></div>
         {/if}

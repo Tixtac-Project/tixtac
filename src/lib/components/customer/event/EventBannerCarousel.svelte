@@ -19,7 +19,9 @@
   let { events }: Props = $props();
 
   let currentSlide = $state(0);
-  let windowWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  // 1. FIX: Khởi tạo giá trị mặc định tĩnh cho SSR (1024)
+  let windowWidth = $state(1024);
 
   let eventsPerSlide = $derived(windowWidth >= 768 ? 2 : 1);
   let totalSlides = $derived(Math.ceil(events.length / eventsPerSlide));
@@ -73,31 +75,23 @@
   }
 </script>
 
-<svelte:window
-  onresize={(e) => {
-    windowWidth = window.innerWidth;
-  }}
-/>
+<svelte:window bind:innerWidth={windowWidth} />
 
 <section class="mx-auto max-w-7xl px-4 pt-2 pb-4 sm:px-6">
   <div class="relative">
-    <!-- Carousel Container -->
     <div class="overflow-hidden rounded-xl bg-transparent">
       <div class="relative h-96 sm:h-[500px] md:h-[550px]">
-        <!-- Slides -->
         <div
           class="flex h-full transition-transform duration-500 ease-out"
           style="transform: translateX(-{currentSlide * 100}%)"
         >
           {#each { length: totalSlides } as _, slideIndex (slideIndex)}
             <div class="relative flex h-full w-full shrink-0 gap-4 p-4 sm:p-6 md:gap-4">
-              <!-- Events in this slide -->
               {#each events.slice(slideIndex * eventsPerSlide, (slideIndex + 1) * eventsPerSlide) as event (event.id)}
                 <a
                   href={resolve(`/events/${event.id}`)}
                   class="group relative flex flex-1 overflow-hidden rounded-lg transition-transform duration-300 hover:scale-105"
                 >
-                  <!-- Banner Image -->
                   <div class="relative h-full w-full">
                     {#if event.bannerImageUrl}
                       <img
@@ -115,12 +109,10 @@
                       </div>
                     {/if}
 
-                    <!-- Gradient Overlay -->
                     <div
                       class="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent"
                     ></div>
 
-                    <!-- Content -->
                     <div class="absolute inset-0 flex flex-col justify-end p-4 sm:p-6">
                       <h3 class="line-clamp-2 text-lg font-bold text-white sm:text-2xl">
                         {event.title}
@@ -142,7 +134,6 @@
           {/each}
         </div>
 
-        <!-- Navigation Buttons -->
         {#if totalSlides > 1}
           <button
             onclick={prevSlide}
@@ -163,7 +154,6 @@
       </div>
     </div>
 
-    <!-- Slide Indicators -->
     {#if totalSlides > 1}
       <div class="mt-2 flex justify-center gap-2">
         {#each Array(totalSlides) as _, index (index)}

@@ -26,7 +26,6 @@
   }
 
   const categories = [
-    { label: 'Tất cả', icon: '✨', value: '' },
     { label: 'Concert', icon: '🎵', value: 'concert' },
     { label: 'Festival', icon: '🎉', value: 'festival' },
     { label: 'Thể Thao', icon: '⚽', value: 'sports' },
