@@ -27,7 +27,7 @@
 
     {#if searchQuery}
       <p class="mt-1 text-sm text-slate-500">
-        Kết quả cho: <span class="font-semibold text-purple-600">"{searchQuery}"</span>
+        Kết quả cho: <span class="font-semibold text-primary">"{searchQuery}"</span>
       </p>
     {/if}
   </div>
@@ -35,7 +35,7 @@
   {#if viewAllHref}
     <a
       href={resolve(viewAllHref)}
-      class="inline-flex items-center gap-1 text-sm font-semibold text-purple-700 transition-all duration-200 hover:gap-2"
+      class="inline-flex items-center gap-1 text-sm font-semibold text-primary transition-all duration-200 hover:gap-2"
     >
       Xem tất cả
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

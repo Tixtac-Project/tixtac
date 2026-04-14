@@ -82,9 +82,7 @@
     <h1 class="font-heading text-2xl font-bold tracking-tight text-foreground">
       Đăng ký tài khoản
     </h1>
-    <p class="mt-1 text-sm text-muted-foreground">
-      Nhập thông tin của bạn để tạo tài khoản mới
-    </p>
+    <p class="mt-1 text-sm text-muted-foreground">Nhập thông tin của bạn để tạo tài khoản mới</p>
   </div>
 
   <!-- Form -->
@@ -213,5 +211,4 @@
       Đăng ký
     </Button>
   </form>
-
 </div>

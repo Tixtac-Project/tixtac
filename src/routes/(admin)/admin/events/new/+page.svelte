@@ -640,7 +640,12 @@
             <Tooltip.Root>
               <Tooltip.Trigger>
                 {#snippet child({ props })}
-                  <Button {...props} type="submit" class="w-full gap-2 rounded-xl md:w-auto" disabled>
+                  <Button
+                    {...props}
+                    type="submit"
+                    class="w-full gap-2 rounded-xl md:w-auto"
+                    disabled
+                  >
                     <Save class="h-4 w-4" />
                     Tạo sự kiện
                   </Button>

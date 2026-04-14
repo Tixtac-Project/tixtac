@@ -2,8 +2,13 @@
   import CustomerFooter from './CustomerFooter.svelte';
   import CustomerNavbar from './CustomerNavbar.svelte';
 
+  interface Users {
+    id: number;
+    role: 'admin' | 'customer';
+  }
+
   interface Props {
-    user?: Record<string, any>;
+    user?: Users;
     searchQuery?: string;
   }
 

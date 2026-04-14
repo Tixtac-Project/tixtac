@@ -1,8 +1,7 @@
 <script lang="ts">
-  import CategoryFilterBar from '$lib/components/customer/event/CategoryFilterBar.svelte';
   import EmptyState from '$lib/components/customer/event/EmptyState.svelte';
+  import EventBannerCarousel from '$lib/components/customer/event/EventBannerCarousel.svelte';
   import EventsGrid from '$lib/components/customer/event/EventsGrid.svelte';
-  import HeroSection from '$lib/components/customer/event/HeroSection.svelte';
   import PaginationNav from '$lib/components/customer/event/PaginationNav.svelte';
   import SectionHeader from '$lib/components/customer/event/SectionHeader.svelte';
 
@@ -26,26 +25,17 @@
   // Dữ liệu từ +page.server.ts
   let { data } = $props<{
     data: {
+      featuredEvents: Event[];
       events: Event[];
       pagination: Pagination;
     };
   }>();
 
+  let featuredEvents = $derived(data.featuredEvents);
   let events = $derived(data.events);
   let pagination = $derived(data.pagination);
 
   // Categories filter (client-side, mở rộng sau)
-  const categories = [
-    { label: 'Tất cả', icon: '✨', value: '' },
-    { label: 'Concert', icon: '🎵', value: 'concert' },
-    { label: 'Festival', icon: '🎉', value: 'festival' },
-    { label: 'Thể Thao', icon: '⚽', value: 'sports' },
-    { label: 'Kịch Nghệ', icon: '🎭', value: 'theater' },
-    { label: 'Art & Expo', icon: '🖼️', value: 'art' },
-    { label: 'Comedy', icon: '😂', value: 'comedy' },
-  ];
-
-  let activeCategory = $state('');
 </script>
 
 <svelte:head>
@@ -56,28 +46,13 @@
   />
 </svelte:head>
 
-<!-- Hero Section -->
-<HeroSection
-  title="Trải nghiệm"
-  titleAccent="sự kiện đỉnh cao"
-  subtitle="Đặt vé concert, festival, thể thao và hơn thế nữa chỉ trong vài giây — bảo mật, nhanh chóng, tiện lợi."
-  primaryCTA={{ label: 'Khám phá sự kiện', href: '#events' }}
-  secondaryCTA = {{ label: 'Xem sự kiện hôm nay →', href: '/' }}
-/>
+<!-- Banner Carousel -->
+{#if featuredEvents.length > 0}
+  <EventBannerCarousel events={featuredEvents} />
+{/if}
 
 <!-- Events Section -->
 <section class="mx-auto max-w-7xl px-6 py-16 lg:py-24" id="events">
-  <!-- Category Filter -->
-  <div class="mb-8">
-    <CategoryFilterBar
-      {categories}
-      bind:activeCategory
-      onCategoryChange={(value) => {
-        activeCategory = value;
-      }}
-    />
-  </div>
-
   <!-- Section Header -->
   <SectionHeader
     title="Sự kiện nổi bật"

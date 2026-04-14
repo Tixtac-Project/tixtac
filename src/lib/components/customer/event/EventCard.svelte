@@ -55,8 +55,8 @@
 </script>
 
 <a
-  href={resolve(`/events/${event.id}` as any)}
-  class="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-purple-600 hover:shadow-lg"
+  href={resolve(`/events/${event.id}`)}
+  class="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
 >
   <!-- Banner -->
   <div class="relative h-40 overflow-hidden bg-slate-100 sm:h-48">
@@ -113,7 +113,7 @@
   <div class="flex flex-1 flex-col p-4">
     <!-- Title -->
     <h3
-      class="mb-2.5 line-clamp-2 text-base font-bold text-slate-900 transition-colors group-hover:text-purple-600"
+      class="mb-2.5 line-clamp-2 text-base font-bold text-slate-900 transition-colors group-hover:text-primary"
     >
       {event.title}
     </h3>
@@ -165,9 +165,9 @@
 
     <!-- Footer -->
     <div class="mt-auto flex items-center justify-between border-t border-slate-200 pt-3">
-      <span class="text-sm font-bold text-purple-600">Giá từ: {formatPrice(event.min_price)}</span>
+      <span class="text-sm font-bold text-primary">Giá từ: {formatPrice(event.min_price)}</span>
       <svg
-        class="h-4.5 w-4.5 flex-shrink-0 text-purple-600 transition-transform group-hover:translate-x-1"
+        class="h-4.5 w-4.5 flex-shrink-0 text-primary transition-transform group-hover:translate-x-1"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
