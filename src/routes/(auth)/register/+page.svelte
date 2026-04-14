@@ -80,6 +80,14 @@
       e.preventDefault();
     }
   }
+
+  function stripWhitespace(field: 'email' | 'password', e: Event) {
+    const target = e.currentTarget as HTMLInputElement;
+    const sanitized = target.value.replace(/\s+/g, '');
+    if (sanitized !== target.value) {
+      form[field] = sanitized;
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -125,6 +133,7 @@
         onfocus={() => clearError('email')}
         onblur={() => validateField('email')}
         onkeydown={handleKeydown}
+        oninput={(e) => stripWhitespace('email', e)}
       />
       {#if errors.email}
         <span class="text-xs text-destructive">{errors.email}</span>
@@ -142,6 +151,7 @@
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
           onkeydown={handleKeydown}
+          oninput={(e) => stripWhitespace('password', e)}
         />
         <button
           type="button"
