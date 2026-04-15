@@ -9,6 +9,7 @@
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { formatDate, formatTime } from '$lib/utils/datetime.js';
+  import { formatPrice } from '$lib/utils/price';
   import { getRowLabel } from '$lib/utils/seat-label';
   import {
     ArrowLeft,
@@ -78,10 +79,6 @@
     void selectedShowIndex;
     viewMode = 'overview';
   });
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-  };
 
   // Overall stats across ALL shows
   const totalStats = $derived.by(() => {

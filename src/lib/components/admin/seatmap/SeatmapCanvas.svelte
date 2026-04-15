@@ -473,7 +473,7 @@
           {/each}
         {/if}
 
-        <!-- Stage architecture elements -->
+        <!-- Stage elements -->
         {#each stageElements as el (el.id)}
           {@const isSelected = selection.kind === 'stage' && selection.id === el.id}
           <Group
