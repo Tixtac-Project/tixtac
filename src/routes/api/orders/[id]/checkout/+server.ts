@@ -18,7 +18,7 @@ export const POST = apiHandler(async ({ params, locals }) => {
     }
 
     const orderId = Number(params.id);
-    if (!orderId || isNaN(orderId)) {
+    if (!Number.isInteger(orderId) || orderId <= 0) {
       return json({ error: Errors.INVALID_ID }, { status: 400 });
     }
 

@@ -956,7 +956,10 @@ export async function seed() {
         userId: user.id,
         totalAmount: String(total),
         status: i % 2 === 0 ? 'paid' : 'pending',
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        expiresAt:
+          i % 2 === 0
+            ? new Date(Date.now() + 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 24 * 60 * 60 * 1000),
         paidAt: i % 2 === 0 ? new Date() : null,
       })
       .returning();
@@ -975,7 +978,14 @@ export async function seed() {
       });
 
       // mark seat sold
-      await db.update(seats).set({ status: 'sold' }).where(eq(seats.id, s.id));
+      await db
+        .update(seats)
+        .set(
+          i % 2 === 0
+            ? { status: 'sold', lockedBy: null, lockedAt: null }
+            : { status: 'locked', lockedBy: user.id, lockedAt: new Date() },
+        )
+        .where(eq(seats.id, s.id));
     }
   }
 

@@ -58,8 +58,12 @@ export const Errors = {
     400,
     'Chỉ có thể thanh toán đơn hàng đang chờ xử lý',
   ),
-  LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 400, 'Đơn hàng đã hết hạn, vui lòng đặt lại vé'),
+  ORDER_ALREADY_PROCESSED: new AppError('ORDER_ALREADY_PROCESSED', 400, 'Đơn hàng đã được xử lý'),
+  LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 410, 'Đơn hàng đã hết hạn, vui lòng đặt lại vé'),
   ORDER_EMPTY: new AppError('ORDER_EMPTY', 400, 'Đơn hàng không có vé nào'),
+
+  // Seats
+  SEAT_NOT_AVAILABLE: new AppError('SEAT_NOT_AVAILABLE', 409, 'Một hoặc nhiều ghế đã được đặt'),
 
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
