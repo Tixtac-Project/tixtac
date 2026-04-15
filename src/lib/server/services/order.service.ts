@@ -73,7 +73,7 @@ export const orderService = {
       }
 
       // 4. Kiểm tra hết hạn giữ chỗ
-      if (now > order.expiresAt) {
+      if (now >= order.expiresAt) {
         throwError(Errors.LOCK_EXPIRED);
       }
 
