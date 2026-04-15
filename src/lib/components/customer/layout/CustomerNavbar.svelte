@@ -36,7 +36,11 @@
 
   let { user, searchQuery = '', categories = [] }: Props = $props();
 
-  let activeCategory = $state(pageState.url.searchParams.get('category') ?? '');
+  let activeCategory = $state('');
+
+  $effect(() => {
+    activeCategory = pageState.url.searchParams.get('category') ?? '';
+  });
   let isSearchOpen = $state(false);
   let isUserMenuOpen = $state(false);
   let searchInput: HTMLInputElement | null = null;
