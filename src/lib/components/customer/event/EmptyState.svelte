@@ -29,7 +29,7 @@
 
   {#if ctaLabel}
     <a
-      href={resolve(ctaHref as any)}
+      href={resolve(ctaHref)}
       onclick={(e) => {
         if (onCtaClick) {
           e.preventDefault();

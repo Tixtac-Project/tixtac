@@ -1,4 +1,3 @@
-// src/routes/(customer)/+page.server.ts
 import { db } from '$lib/server/db';
 import { categories, events, eventShows, seats, seatSections } from '$lib/server/db/schema';
 import { and, count, desc, eq, ilike, min, sql } from 'drizzle-orm';
@@ -37,10 +36,7 @@ export const load: PageServerLoad = async ({ url }) => {
       .limit(1);
     if (cat) {
       conditions.push(eq(events.categoryId, cat.id));
-    } else {
-      conditions.push(sql`1 = 0`);
     }
-  }
   }
   const whereClause = and(...conditions);
 

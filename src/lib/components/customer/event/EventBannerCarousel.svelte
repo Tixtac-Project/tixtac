@@ -35,17 +35,18 @@
     const onSelect = () => {
       current = api!.selectedScrollSnap();
       canScrollPrev = api!.canScrollPrev();
-  $effect(() => {
-    if (api) {
-      current = api.selectedScrollSnap();
-      const handler = () => {
-        current = api!.selectedScrollSnap();
-      };
-      api.on('select', handler);
-      return () => {
-        api.off('select', handler);
-      };
-    }
+      canScrollNext = api!.canScrollNext();
+    };
+
+    onSelect(); // Khởi tạo giá trị ban đầu
+
+    api.on('select', onSelect);
+    api.on('reInit', onSelect);
+
+    return () => {
+      api!.off('select', onSelect);
+      api!.off('reInit', onSelect);
+    };
   });
 
   const autoplayPlugin = Autoplay({ delay: 5000, stopOnInteraction: true });
