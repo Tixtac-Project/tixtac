@@ -46,7 +46,7 @@
       snapToGrid: true,
     }),
     stageElements = $bindable<StageElement[]>([]),
-    tiers = $bindable<TicketTier[]>([]),
+    tiers = [] as TicketTier[],
     isSaving = false,
     isSaved = false,
     onSave,
@@ -407,8 +407,8 @@
     <!-- Left: Back + Event & Show info -->
     <div class="flex items-center gap-3 text-sm">
       {#if onBackToInventory && !seatEditMode}
-        <Button variant="ghost" size="sm" class="h-8 gap-1.5 text-xs" onclick={onBackToInventory}>
-          <ArrowLeft class="h-3.5 w-3.5" />
+        <Button variant="ghost" size="sm" onclick={onBackToInventory}>
+          <ArrowLeft class="h-4 w-4" />
           Quay lại
         </Button>
         <div class="h-4 w-px bg-border"></div>

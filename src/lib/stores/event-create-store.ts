@@ -12,7 +12,6 @@ const STORAGE_KEYS = {
   step2Draft: 'tixtac-create-event-step2-v1',
   shows: 'tixtac-create-shows',
   step3Draft: 'tixtac-create-event-step3-v2',
-  tiers: 'tixtac-create-tiers-v1',
   mapConfig: 'tixtac-create-map-config',
   stageElements: 'tixtac-create-stage-elements',
 } as const;

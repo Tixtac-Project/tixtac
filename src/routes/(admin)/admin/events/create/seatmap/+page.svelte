@@ -6,15 +6,12 @@
   import { SeatmapBuilder } from '$lib/components/admin/seatmap';
   import TicketInventory from '$lib/components/admin/seatmap/TicketInventory.svelte';
   import type { StageElement, TicketTier } from '$lib/components/admin/seatmap/types';
-  import {
-    autoGridDimensions,
-    generateExcessDisabledSeats,
-    SECTION_COLORS,
-  } from '$lib/components/admin/seatmap/types';
+  import { SECTION_COLORS } from '$lib/components/admin/seatmap/types';
   import type { MapConfigInput, SectionFormData } from '$lib/shared/schemas/event.schema';
   import {
     clearAllDrafts,
     clearDraft,
+    eventParam,
     getStoredEventId,
     getStoredEventTitle,
     readDraft,
@@ -23,8 +20,8 @@
   } from '$lib/stores/event-create-store';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
-  import { createDefaultSection, generatePrefix } from '$lib/utils/section-defaults';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import { generatePrefix } from '$lib/utils/section-defaults';
+  import { SvelteMap } from 'svelte/reactivity';
 
   // ── Layout data (event + shows loaded from DB when ?event=ID) ──
   type LayoutShow = {
@@ -57,10 +54,6 @@
     shows: LayoutShow[];
   };
 
-  // Read initial server data once (non-reactive — only needed at mount)
-  const serverEvent = (page.data as { event: LayoutEvent | null }).event;
-
-  // ── Get data: layout (DB) > sessionStorage ──
   type ShowInfo = {
     id: number;
     title: string | null;
@@ -68,108 +61,12 @@
     status: string;
   };
 
-  // ── Compute initial values from server or sessionStorage ──
-  function computeInitialState() {
-    let initEventId: number | null = null;
-    let initEventTitle = '';
-    let initShowsList: ShowInfo[] = [];
-    let initMapConfig: MapConfigInput = {
-      width: 1200,
-      height: 800,
-      gridSize: 20,
-      snapToGrid: true,
-    };
-    let initStageElements: StageElement[] = [];
-    let initSectionsByShow = new SvelteMap<number, SectionFormData[]>();
-    let initSectionsLoadedFromDB = false;
+  // Read initial server data once (non-reactive — only needed at mount)
+  const serverEvent = (page.data as { event: LayoutEvent | null }).event;
 
-    if (serverEvent && serverEvent.shows.length > 0) {
-      // Hydrate event identity + shows list from server data (DB-first)
-      initEventId = serverEvent.id;
-      initEventTitle = serverEvent.title;
-      if (browser) storeEventIdentity(serverEvent.id, serverEvent.title);
-
-      initShowsList = serverEvent.shows.map((s) => ({
-        id: s.id,
-        title: s.title,
-        show_date: s.show_date,
-        status: s.status,
-      }));
-
-      if (serverEvent.map_config) initMapConfig = serverEvent.map_config;
-      if (serverEvent.stage_layout) initStageElements = serverEvent.stage_layout;
-
-      // Check if any show already has sections in DB
-      const hasDBSections = serverEvent.shows.some((s) => s.sections.length > 0);
-
-      if (hasDBSections) {
-        // Convert DB sections to SectionFormData
-        for (const show of serverEvent.shows) {
-          if (show.sections.length > 0) {
-            const formSections: SectionFormData[] = show.sections.map((sec, i) => ({
-              name: sec.name,
-              type: sec.type as 'assigned' | 'general',
-              is_seat_pickable: sec.is_seat_pickable,
-              price: sec.price,
-              capacity: sec.capacity,
-              layout_config: sec.layout_config,
-              seat_config: sec.seat_config,
-              disabled_seats: '', // Not re-loaded here; seats are already in DB
-              sort_order: i,
-              sales_start_at: sec.sales_start_at ?? '',
-              sales_end_at: sec.sales_end_at ?? '',
-            }));
-            initSectionsByShow.set(show.id, formSections);
-          }
-        }
-        initSectionsLoadedFromDB = true;
-        // Clear stale section/tier drafts since we loaded from DB
-        if (browser) {
-          clearDraft('step3Draft');
-          clearDraft('tiers');
-          clearDraft('mapConfig');
-          clearDraft('stageElements');
-        }
-      } else if (browser) {
-        // Shows exist in DB but no sections yet (fresh step 3).
-        // Fall back to sessionStorage drafts for sections/tiers.
-        const storedMapConfig = readDraft<MapConfigInput>('mapConfig');
-        if (storedMapConfig) initMapConfig = storedMapConfig;
-
-        const storedStageElements = readDraft<StageElement[]>('stageElements');
-        if (storedStageElements) initStageElements = storedStageElements;
-
-        const seatmapDraft = readSeatmapDraft();
-        if (seatmapDraft) initSectionsByShow = seatmapDraft;
-      }
-    } else if (browser) {
-      // No server data at all — full sessionStorage fallback
-      initEventId = getStoredEventId();
-      initEventTitle = getStoredEventTitle();
-
-      const storedShows = readDraft<ShowInfo[]>('shows');
-      if (storedShows) initShowsList = storedShows;
-
-      const storedMapConfig = readDraft<MapConfigInput>('mapConfig');
-      if (storedMapConfig) initMapConfig = storedMapConfig;
-
-      const storedStageElements = readDraft<StageElement[]>('stageElements');
-      if (storedStageElements) initStageElements = storedStageElements;
-
-      const seatmapDraft = readSeatmapDraft();
-      if (seatmapDraft) initSectionsByShow = seatmapDraft;
-    }
-
-    return {
-      initEventId,
-      initEventTitle,
-      initShowsList,
-      initMapConfig,
-      initStageElements,
-      initSectionsByShow,
-      initSectionsLoadedFromDB,
-    };
-  }
+  // ══════════════════════════════════════════════════
+  // INITIALIZATION — single source of truth setup
+  // ══════════════════════════════════════════════════
 
   function readSeatmapDraft(): SvelteMap<number, SectionFormData[]> | null {
     const raw = readDraft<Record<string, SectionFormData[]>>('step3Draft');
@@ -183,24 +80,146 @@
     return map.size > 0 ? map : null;
   }
 
-  const {
-    initEventId,
-    initEventTitle,
-    initShowsList,
-    initMapConfig,
-    initStageElements,
-    initSectionsByShow,
-    initSectionsLoadedFromDB,
-  } = computeInitialState();
+  /** Validate that draft show IDs match a set of known-good IDs */
+  function isDraftValid(
+    draft: SvelteMap<number, SectionFormData[]>,
+    validIds: Set<number>,
+  ): boolean {
+    for (const id of draft.keys()) {
+      if (!validIds.has(id)) return false;
+    }
+    return true;
+  }
 
-  let eventId = $state<number | null>(initEventId);
-  let eventTitle = $state(initEventTitle);
-  let showsList = $state<ShowInfo[]>(initShowsList);
+  function computeInitialState() {
+    let eventId: number | null = null;
+    let eventTitle = '';
+    let showsList: ShowInfo[] = [];
+    let mapConfig: MapConfigInput = {
+      width: 1200,
+      height: 800,
+      gridSize: 20,
+      snapToGrid: true,
+    };
+    let stageElements: StageElement[] = [];
+    let sectionsByShow = new SvelteMap<number, SectionFormData[]>();
+    let sectionsLoadedFromDB = false;
+
+    if (serverEvent && serverEvent.shows.length > 0) {
+      // ── Source: Server (DB) ──
+      eventId = serverEvent.id;
+      eventTitle = serverEvent.title;
+      if (browser) storeEventIdentity(serverEvent.id, serverEvent.title);
+
+      showsList = serverEvent.shows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        show_date: s.show_date,
+        status: s.status,
+      }));
+
+      // Always sync sessionStorage with authoritative server show IDs
+      if (browser) writeDraft('shows', showsList);
+
+      if (serverEvent.map_config) mapConfig = serverEvent.map_config;
+      if (serverEvent.stage_layout) stageElements = serverEvent.stage_layout;
+
+      const hasDBSections = serverEvent.shows.some((s) => s.sections.length > 0);
+      const serverShowIds = new Set(serverEvent.shows.map((s) => s.id));
+
+      if (hasDBSections) {
+        // Load sections from DB — authoritative
+        for (const show of serverEvent.shows) {
+          const formSections: SectionFormData[] = show.sections.map((sec, i) => ({
+            name: sec.name,
+            type: sec.type as 'assigned' | 'general',
+            is_seat_pickable: sec.is_seat_pickable,
+            price: sec.price,
+            capacity: sec.capacity,
+            layout_config: sec.layout_config,
+            seat_config: sec.seat_config,
+            disabled_seats: '',
+            sort_order: i,
+            sales_start_at: sec.sales_start_at ?? '',
+            sales_end_at: sec.sales_end_at ?? '',
+          }));
+          // Even shows with 0 sections get an empty array
+          sectionsByShow.set(show.id, formSections);
+        }
+        sectionsLoadedFromDB = true;
+        if (browser) {
+          clearDraft('step3Draft');
+          clearDraft('mapConfig');
+          clearDraft('stageElements');
+        }
+      } else if (browser) {
+        // No DB sections — try restoring from draft (validating IDs)
+        const storedMapConfig = readDraft<MapConfigInput>('mapConfig');
+        if (storedMapConfig) mapConfig = storedMapConfig;
+
+        const storedStageElements = readDraft<StageElement[]>('stageElements');
+        if (storedStageElements) stageElements = storedStageElements;
+
+        const seatmapDraft = readSeatmapDraft();
+        if (seatmapDraft && isDraftValid(seatmapDraft, serverShowIds)) {
+          sectionsByShow = seatmapDraft;
+        } else if (seatmapDraft) {
+          clearDraft('step3Draft'); // Stale draft
+        }
+      }
+    } else if (browser) {
+      // ── Source: SessionStorage only (no server data) ──
+      eventId = getStoredEventId();
+      eventTitle = getStoredEventTitle();
+
+      const storedShows = readDraft<ShowInfo[]>('shows');
+      if (storedShows) showsList = storedShows;
+
+      const storedMapConfig = readDraft<MapConfigInput>('mapConfig');
+      if (storedMapConfig) mapConfig = storedMapConfig;
+
+      const storedStageElements = readDraft<StageElement[]>('stageElements');
+      if (storedStageElements) stageElements = storedStageElements;
+
+      const seatmapDraft = readSeatmapDraft();
+      if (seatmapDraft && storedShows) {
+        const storedShowIds = new Set(storedShows.map((s) => s.id));
+        if (isDraftValid(seatmapDraft, storedShowIds)) {
+          sectionsByShow = seatmapDraft;
+        } else {
+          clearDraft('step3Draft');
+        }
+      }
+    }
+
+    // Ensure every show has an entry in the map (even if empty)
+    for (const show of showsList) {
+      if (!sectionsByShow.has(show.id)) {
+        sectionsByShow.set(show.id, []);
+      }
+    }
+
+    return {
+      eventId,
+      eventTitle,
+      showsList,
+      mapConfig,
+      stageElements,
+      sectionsByShow,
+      sectionsLoadedFromDB,
+    };
+  }
+
+  const init = computeInitialState();
+
+  let eventId = $state<number | null>(init.eventId);
+  let eventTitle = $state(init.eventTitle);
+  let showsList = $state<ShowInfo[]>(init.showsList);
   let selectedShowIndex = $state(0);
-  let mapConfig = $state<MapConfigInput>(initMapConfig);
-  let stageElements = $state<StageElement[]>(initStageElements);
-  let sectionsByShow = $state(initSectionsByShow);
-  let sectionsLoadedFromDB = initSectionsLoadedFromDB;
+  let mapConfig = $state<MapConfigInput>(init.mapConfig);
+  let stageElements = $state<StageElement[]>(init.stageElements);
+  let sectionsByShow = $state(init.sectionsByShow);
+  let sectionsLoadedFromDB = init.sectionsLoadedFromDB;
 
   // Redirect if no data from previous steps
   $effect(() => {
@@ -211,23 +230,14 @@
   });
 
   const selectedShow = $derived(showsList[selectedShowIndex] ?? null);
+  const currentShowId = $derived(selectedShow?.id ?? null);
 
-  // ══════════════════════════════════════════════
-  // VIEW STATE: 'inventory' (Phase 1) or 'canvas' (Phase 2)
-  // ══════════════════════════════════════════════
+  // ══════════════════════════════════════════════════
+  // VIEW STATE
+  // ══════════════════════════════════════════════════
   let currentView = $state<'inventory' | 'canvas'>('inventory');
 
-  // ── Ticket Tiers (shared across views) ──
-  let tiers = $state<TicketTier[]>(readDraft<TicketTier[]>('tiers') ?? []);
-
-  // Auto-save tiers
-  $effect(() => {
-    if (!browser) return;
-    const timer = setTimeout(() => writeDraft('tiers', $state.snapshot(tiers)), 300);
-    return () => clearTimeout(timer);
-  });
-
-  // Show restore toast for step 3
+  // Show restore toast (once)
   let step3ToastShown = false;
   $effect(() => {
     if (step3ToastShown) return;
@@ -242,16 +252,46 @@
     }
   });
 
-  // Initialize sections for each show (only if not already loaded)
+  // ══════════════════════════════════════════════════
+  // SECTIONS ↔ SHOW BINDING
+  // Use a getter/setter pattern instead of dual $effects
+  // to avoid the circular dependency issue.
+  // ══════════════════════════════════════════════════
+
+  /**
+   * `editingSections` is the reactive proxy for the currently selected show's sections.
+   * Reading returns the current show's sections from the map.
+   * Writing updates both the local binding and the map.
+   */
+  let editingSections = $state<SectionFormData[]>([]);
+
+  // Load from map when show changes
   $effect(() => {
-    for (const show of showsList) {
-      if (!sectionsByShow.has(show.id)) {
-        sectionsByShow.set(show.id, []);
-      }
-    }
+    const showId = currentShowId;
+    if (showId === null) return;
+    const stored = sectionsByShow.get(showId);
+    // Only update if the show actually changed to avoid overwriting edits
+    editingSections = stored ?? [];
   });
 
-  // Auto-save seatmap draft
+  // Write back to map when editingSections changes (but NOT when show changes)
+  let lastSyncedShowId: number | null = null;
+  $effect(() => {
+    const showId = currentShowId;
+    const sections = editingSections;
+    if (showId === null) return;
+
+    // Skip the write-back if we're in the middle of a show switch
+    // (the read-effect above just set editingSections for the new show)
+    if (lastSyncedShowId !== showId) {
+      lastSyncedShowId = showId;
+      return;
+    }
+
+    sectionsByShow.set(showId, sections);
+  });
+
+  // Auto-save seatmap draft (debounced)
   $effect(() => {
     if (!browser) return;
     const snapshot: Record<string, SectionFormData[]> = {};
@@ -266,43 +306,49 @@
     return () => clearTimeout(timer);
   });
 
-  // Reactive proxy for current show's sections
-  let currentShowId = $derived(selectedShow?.id ?? null);
-  let editingSections = $state<SectionFormData[]>([]);
-
-  // When selected show changes, load sections from map
-  $effect(() => {
-    if (currentShowId !== null) {
-      const stored = sectionsByShow.get(currentShowId);
-      if (stored) {
-        editingSections = stored;
-      } else {
-        const def: SectionFormData[] = [];
-        sectionsByShow.set(currentShowId, def);
-        editingSections = def;
-      }
-    }
-  });
-
-  // When editingSections changes, write back to map
-  $effect(() => {
-    if (currentShowId !== null) {
-      sectionsByShow.set(currentShowId, editingSections);
-    }
-  });
-
-  // Track which shows have been saved
+  // ══════════════════════════════════════════════════
+  // SAVE TRACKING
+  // ══════════════════════════════════════════════════
   let savedShows = $state(new SvelteMap<number, boolean>());
   let savingShowId = $state<number | null>(null);
 
-  // If loaded from DB with sections, mark those shows as already saved
-  if (initSectionsLoadedFromDB && serverEvent) {
+  // Mark shows loaded from DB with sections as already saved
+  if (init.sectionsLoadedFromDB && serverEvent) {
     for (const show of serverEvent.shows) {
       if (show.sections.length > 0) {
         savedShows.set(show.id, true);
       }
     }
   }
+
+  // ══════════════════════════════════════════════════
+  // DERIVED: Tiers for SeatmapBuilder toolbox
+  // ══════════════════════════════════════════════════
+  let tiers = $derived.by(() => {
+    const result: TicketTier[] = [];
+    for (let i = 0; i < editingSections.length; i++) {
+      const sec = editingSections[i];
+      const capacity =
+        sec.type === 'general'
+          ? (sec.capacity ?? 0)
+          : (sec.seat_config.rows ?? 0) * (sec.seat_config.cols ?? 0);
+      result.push({
+        id: `tier-${i}`,
+        name: sec.name,
+        prefix: sec.seat_config.prefix || generatePrefix(sec.name, i),
+        price: sec.price,
+        capacity,
+        color: sec.layout_config.color || SECTION_COLORS[i % SECTION_COLORS.length],
+        type: sec.type as 'assigned' | 'general',
+        placedCount: capacity,
+      });
+    }
+    return result;
+  });
+
+  // ══════════════════════════════════════════════════
+  // PAYLOAD & VALIDATION (shared helpers)
+  // ══════════════════════════════════════════════════
 
   function buildSeatmapPayload(showId: number) {
     const sections = sectionsByShow.get(showId) ?? [];
@@ -334,114 +380,99 @@
     };
   }
 
-  async function handleSave() {
-    if (!selectedShow) return;
-    const showId = selectedShow.id;
-
-    // Validate
+  /** Validate sections for a show. Returns error message or null. */
+  function validateShowSections(showId: number): string | null {
     const sections = sectionsByShow.get(showId) ?? [];
-    if (sections.length === 0) {
-      toast.error('Phải có ít nhất 1 khu vực ghế.');
-      return;
-    }
+    if (sections.length === 0) return 'Phải có ít nhất 1 khu vực ghế.';
+
     for (const [i, sec] of sections.entries()) {
-      if (!sec.name.trim()) {
-        toast.error(`Khu vực "${sec.name || '(trống)'}" thiếu tên.`);
-        return;
+      const label = sec.name?.trim() || `Khu vực #${i + 1}`;
+      if (!sec.name.trim()) return `Khu vực #${i + 1} thiếu tên.`;
+      if (sec.price <= 0) return `"${label}" phải có giá > 0.`;
+      if (sec.type === 'assigned') {
+        if (sec.seat_config.rows < 1 || sec.seat_config.cols < 1)
+          return `"${label}" phải có ít nhất 1 hàng và 1 cột.`;
       }
-      if (sec.price <= 0) {
-        toast.error(`Khu vực "${sec.name}" phải có giá > 0.`);
-        return;
-      }
-      if (sec.type === 'assigned' && (sec.seat_config.rows < 1 || sec.seat_config.cols < 1)) {
-        toast.error(`Khu vực "${sec.name}" phải có ít nhất 1 hàng và 1 cột.`);
-        return;
-      }
-      if (sec.type === 'general' && (sec.capacity ?? 0) < 1) {
-        toast.error(`Khu vực "${sec.name}" phải có sức chứa > 0.`);
-        return;
-      }
-      // Auto-generate prefix if missing for assigned sections
+      if (sec.type === 'general' && (sec.capacity ?? 0) < 1)
+        return `"${label}" phải có sức chứa > 0.`;
+
+      // Auto-fill missing prefix
       if (sec.type === 'assigned' && !sec.seat_config.prefix?.trim()) {
         sec.seat_config.prefix = generatePrefix(sec.name, i);
       }
     }
+    return null;
+  }
 
-    savingShowId = showId;
-    const payload = buildSeatmapPayload(showId);
+  /** Save a single show's seatmap to the server. Returns true on success. */
+  async function saveShowSeatmap(show: ShowInfo): Promise<boolean> {
+    const validationError = validateShowSections(show.id);
+    if (validationError) {
+      toast.error(`Suất "${show.title || show.show_date}": ${validationError}`);
+      return false;
+    }
+
+    savingShowId = show.id;
+    const payload = buildSeatmapPayload(show.id);
     const { error } = await api.post('/events/create/seatmap', payload, { silent: true });
     savingShowId = null;
 
     if (error) {
-      toast.error(error);
-      return;
+      toast.error(`Lỗi khi lưu suất "${show.title || show.show_date}": ${error}`);
+      return false;
     }
 
-    savedShows.set(showId, true);
-    toast.success('Đã lưu sơ đồ ghế cho suất diễn!');
+    savedShows.set(show.id, true);
+    return true;
   }
 
-  /** Save tiers as simple sections (no map layout) — "Finish without map" */
+  // ══════════════════════════════════════════════════
+  // USER ACTIONS
+  // ══════════════════════════════════════════════════
+
+  async function handleSave() {
+    if (!selectedShow) return;
+    const ok = await saveShowSeatmap(selectedShow);
+    if (ok) toast.success('Đã lưu sơ đồ ghế cho suất diễn!');
+  }
+
   async function handleFinishWithoutMap() {
     if (!selectedShow) return;
-    if (tiers.length === 0) {
+
+    // Validate current show has sections
+    const currentSections = sectionsByShow.get(selectedShow.id) ?? [];
+    if (currentSections.length === 0) {
       toast.error('Phải có ít nhất 1 hạng vé.');
       return;
     }
 
-    // Convert tiers → sections (simple, no canvas layout)
+    // If there are other shows without sections, clone from current
     for (const show of showsList) {
-      const sections: SectionFormData[] = tiers.map((tier, i) => {
-        const sec = createDefaultSection(i);
-        sec.name = tier.name;
-        sec.price = tier.price;
-        sec.type = tier.type;
-        sec.layout_config.color = tier.color;
-        sec.seat_config.prefix = tier.prefix || generatePrefix(tier.name, i);
-        if (tier.type === 'assigned') {
-          const { rows, cols } = autoGridDimensions(tier.capacity);
-          sec.seat_config.rows = rows;
-          sec.seat_config.cols = cols;
-          sec.disabled_seats = generateExcessDisabledSeats(
-            tier.capacity,
-            rows,
-            cols,
-            sec.seat_config.prefix,
-            sec.seat_config.startRowIndex,
-            sec.seat_config.startColIndex,
-          );
-        } else {
-          sec.capacity = tier.capacity;
-          sec.is_seat_pickable = false;
-        }
-        return sec;
-      });
-      sectionsByShow.set(show.id, sections);
+      if (show.id === selectedShow.id) continue;
+      const showSections = sectionsByShow.get(show.id) ?? [];
+      if (showSections.length === 0) {
+        const deepCopy = JSON.parse(
+          JSON.stringify($state.snapshot(currentSections)),
+        ) as SectionFormData[];
+        sectionsByShow.set(show.id, deepCopy);
+      }
     }
 
-    // Save all shows
+    // Save all shows sequentially
     for (const show of showsList) {
-      savingShowId = show.id;
-      const payload = buildSeatmapPayload(show.id);
-      const { error } = await api.post('/events/create/seatmap', payload, { silent: true });
-      if (error) {
-        savingShowId = null;
-        toast.error(`Lỗi khi lưu suất "${show.title || show.show_date}": ${error}`);
-        return;
-      }
-      savedShows.set(show.id, true);
+      if (savedShows.get(show.id)) continue;
+      const ok = await saveShowSeatmap(show);
+      if (!ok) return;
     }
-    savingShowId = null;
 
     cleanupAndFinish();
   }
 
-  let allShowsSaved = $derived(showsList.every((s) => savedShows.get(s.id)));
-
   async function handleFinish() {
-    // Save ALL unsaved shows that have sections (not just the current one)
+    // Validate & save all unsaved shows
     for (const show of showsList) {
       if (savedShows.get(show.id)) continue;
+
       const showSections = sectionsByShow.get(show.id) ?? [];
       if (showSections.length === 0) {
         toast.error(
@@ -449,27 +480,9 @@
         );
         return;
       }
-      // Validate & auto-fix prefix
-      for (const [i, sec] of showSections.entries()) {
-        if (sec.type === 'assigned' && !sec.seat_config.prefix?.trim()) {
-          sec.seat_config.prefix = generatePrefix(sec.name, i);
-        }
-      }
-      savingShowId = show.id;
-      const payload = buildSeatmapPayload(show.id);
-      const { error } = await api.post('/events/create/seatmap', payload, { silent: true });
-      if (error) {
-        savingShowId = null;
-        toast.error(`Lỗi khi lưu suất "${show.title || show.show_date}": ${error}`);
-        return;
-      }
-      savedShows.set(show.id, true);
-    }
-    savingShowId = null;
 
-    if (!allShowsSaved) {
-      toast.error('Vui lòng lưu sơ đồ ghế cho tất cả các suất diễn.');
-      return;
+      const ok = await saveShowSeatmap(show);
+      if (!ok) return;
     }
 
     cleanupAndFinish();
@@ -481,28 +494,26 @@
     goto(resolve(`/admin/events/${eventId}`));
   }
 
-  async function handleCloneMap() {
+  /** Clone current show's sections to all other shows */
+  async function handleCloneSections() {
     if (!selectedShow) return;
     const currentSections = sectionsByShow.get(selectedShow.id) ?? [];
     if (currentSections.length === 0) {
       toast.error('Suất hiện tại chưa có khu vực ghế để sao chép.');
       return;
     }
-    const snapshot = JSON.parse(
-      JSON.stringify($state.snapshot(currentSections)),
-    ) as SectionFormData[];
+
+    // Deep clone the source sections (serialized snapshot to break all references)
+    const serialized = JSON.stringify($state.snapshot(currentSections));
 
     let clonedCount = 0;
     for (const show of showsList) {
       if (show.id === selectedShow.id) continue;
-      // Clone to shows that don't have sections yet
-      if (!sectionsByShow.has(show.id) || (sectionsByShow.get(show.id)?.length ?? 0) === 0) {
-        sectionsByShow.set(
-          show.id,
-          snapshot.map((s) => ({ ...s })),
-        );
-        clonedCount++;
-      }
+      const existing = sectionsByShow.get(show.id);
+      if (existing && existing.length > 0) continue; // Don't overwrite existing sections
+
+      sectionsByShow.set(show.id, JSON.parse(serialized) as SectionFormData[]);
+      clonedCount++;
     }
 
     if (clonedCount === 0) {
@@ -510,24 +521,22 @@
       return;
     }
 
-    // Auto-save all cloned shows
+    // Save source show first (if not saved)
+    if (!savedShows.get(selectedShow.id)) {
+      const ok = await saveShowSeatmap(selectedShow);
+      if (!ok) return;
+    }
+
+    // Save all cloned shows
     let saveErrors = 0;
     for (const show of showsList) {
       if (show.id === selectedShow.id || savedShows.get(show.id)) continue;
       const showSections = sectionsByShow.get(show.id) ?? [];
       if (showSections.length === 0) continue;
 
-      savingShowId = show.id;
-      const payload = buildSeatmapPayload(show.id);
-      const { error } = await api.post('/events/create/seatmap', payload, { silent: true });
-      if (error) {
-        saveErrors++;
-        toast.error(`Lỗi khi lưu suất "${show.title || show.show_date}": ${error}`);
-      } else {
-        savedShows.set(show.id, true);
-      }
+      const ok = await saveShowSeatmap(show);
+      if (!ok) saveErrors++;
     }
-    savingShowId = null;
 
     if (saveErrors === 0) {
       toast.success(`Đã sao chép và lưu sơ đồ cho ${clonedCount} suất diễn.`);
@@ -536,7 +545,7 @@
     }
   }
 
-  // ── Switch to canvas view ──
+  // ── View switching ──
   function handleDesignMap() {
     currentView = 'canvas';
   }
@@ -546,59 +555,19 @@
   }
 
   let showTitleDisplay = $derived(selectedShow?.title || `Suất #${selectedShowIndex + 1}`);
-
-  // Reconstruct tiers from existing sections (DB or draft) if tiers are empty.
-  // Always start in inventory view so user can review/edit tiers first.
-  let hasReconstructedTiers = false;
-  $effect(() => {
-    if (hasReconstructedTiers) return;
-    if (tiers.length > 0) {
-      hasReconstructedTiers = true;
-      return;
-    }
-    // Check if any show already has sections placed
-    for (const [, secs] of sectionsByShow.entries()) {
-      if (secs.length > 0) {
-        const reconstructed: TicketTier[] = [];
-        const seen = new SvelteSet<string>();
-        for (const sec of secs) {
-          const key = `${sec.name}||${sec.layout_config.color}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const capacity =
-            sec.type === 'general'
-              ? (sec.capacity ?? 0)
-              : (sec.seat_config.rows ?? 0) * (sec.seat_config.cols ?? 0);
-          reconstructed.push({
-            id: `tier-restored-${reconstructed.length}`,
-            name: sec.name,
-            prefix: sec.seat_config.prefix || generatePrefix(sec.name, reconstructed.length),
-            price: sec.price,
-            capacity,
-            color:
-              sec.layout_config.color ||
-              SECTION_COLORS[reconstructed.length % SECTION_COLORS.length],
-            type: sec.type as 'assigned' | 'general',
-            placedCount: capacity,
-          });
-        }
-        tiers = reconstructed;
-        hasReconstructedTiers = true;
-        break;
-      }
-    }
-  });
 </script>
 
 {#if currentView === 'inventory'}
   <TicketInventory
-    bind:tiers
+    bind:sections={editingSections}
+    {showsList}
+    bind:selectedShowIndex
     onDesignMap={handleDesignMap}
     onFinishWithoutMap={handleFinishWithoutMap}
+    onCloneSections={showsList.length > 1 ? handleCloneSections : undefined}
     isSaving={savingShowId !== null}
     {eventTitle}
-    showTitle={showTitleDisplay}
-    showCount={showsList.length}
+    backHref={resolve(`/admin/events/create/shows${eventId ? eventParam(eventId) : ''}`)}
   />
 {:else}
   <SeatmapBuilder
@@ -609,12 +578,12 @@
     bind:sections={editingSections}
     bind:mapConfig
     bind:stageElements
-    bind:tiers
+    {tiers}
     isSaving={savingShowId !== null}
     isSaved={selectedShow ? (savedShows.get(selectedShow.id) ?? false) : false}
     onSave={handleSave}
     onFinish={handleFinish}
-    onCloneMap={showsList.length > 1 ? handleCloneMap : undefined}
+    onCloneMap={showsList.length > 1 ? handleCloneSections : undefined}
     onBackToInventory={handleBackToInventory}
   />
 {/if}
