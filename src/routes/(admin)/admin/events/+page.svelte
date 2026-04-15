@@ -7,6 +7,7 @@
   import { Button } from '$lib/components/ui/button';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
+  import { formatDate } from '$lib/utils/datetime.js';
   import {
     Calendar,
     ChevronLeft,
@@ -14,6 +15,7 @@
     Globe,
     Loader,
     MapPin,
+    Pencil,
     Plus,
     Ticket,
     Users,
@@ -22,22 +24,6 @@
   let { data } = $props();
 
   let publishingId = $state<number | null>(null);
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   async function handlePublish(eventId: number) {
     if (publishingId) return;
@@ -88,7 +74,7 @@
       <h1 class="font-heading text-2xl font-bold tracking-tight md:text-3xl">Sự kiện</h1>
       <p class="mt-1 text-sm text-muted-foreground">Quản lý danh sách sự kiện của bạn</p>
     </div>
-    <Button href="/admin/events/new" class="w-full gap-2 rounded-2xl md:w-auto">
+    <Button href="/admin/events/create" class="w-full gap-2 md:w-auto">
       <Plus class="h-4 w-4" />
       Tạo sự kiện mới
     </Button>
@@ -107,7 +93,7 @@
         Bắt đầu bằng cách tạo sự kiện đầu tiên. Cấu hình khu vực ghế, giá vé và xuất bản cho khách
         hàng.
       </p>
-      <Button href="/admin/events/new" class="mt-6 gap-2 rounded-2xl">
+      <Button href="/admin/events/create" class="mt-6 gap-2">
         <Plus class="h-4 w-4" />
         Tạo sự kiện đầu tiên
       </Button>
@@ -180,7 +166,11 @@
                 </span>
                 <span class="flex items-center gap-1.5">
                   <Calendar class="h-3.5 w-3.5 opacity-60" />
-                  {formatDate(heroEvent.event_date)} · {formatTime(heroEvent.event_date)}
+                  {#if heroEvent.earliest_show_date}
+                    {formatDate(heroEvent.earliest_show_date)}
+                  {:else}
+                    Chưa có suất diễn
+                  {/if}
                 </span>
               </div>
             </div>
@@ -212,40 +202,66 @@
               </div>
 
               {#if heroEvent.status === 'draft'}
-                <AlertDialog.Root>
-                  <AlertDialog.Trigger>
-                    {#snippet child({ props })}
-                      <Button
-                        {...props}
-                        size="sm"
-                        class="w-full gap-2 rounded-xl"
-                        disabled={publishingId === heroEvent.id}
-                        onclick={(e) => e.stopPropagation()}
-                      >
-                        {#if publishingId === heroEvent.id}
-                          <Loader class="h-3.5 w-3.5 animate-spin" />
-                        {:else}
-                          <Globe class="h-3.5 w-3.5" />
-                        {/if}
-                        Xuất bản
-                      </Button>
-                    {/snippet}
-                  </AlertDialog.Trigger>
-                  <AlertDialog.Content onclick={(e) => e.stopPropagation()}>
-                    <AlertDialog.Header>
-                      <AlertDialog.Title>Xuất bản "{heroEvent.title}"?</AlertDialog.Title>
-                      <AlertDialog.Description>
-                        Sau khi xuất bản, sự kiện sẽ hiển thị công khai và khách hàng có thể đặt vé.
-                      </AlertDialog.Description>
-                    </AlertDialog.Header>
-                    <AlertDialog.Footer>
-                      <AlertDialog.Cancel>Huỷ bỏ</AlertDialog.Cancel>
-                      <AlertDialog.Action onclick={() => handlePublish(heroEvent.id)}>
-                        Xuất bản
-                      </AlertDialog.Action>
-                    </AlertDialog.Footer>
-                  </AlertDialog.Content>
-                </AlertDialog.Root>
+                {@const heroCanPublish = heroEvent.total_seats > 0}
+                <div class="flex w-full gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="flex-1 gap-2"
+                    href={resolve(`/admin/events/create?event=${heroEvent.id}`)}
+                    onclick={(e) => e.stopPropagation()}
+                  >
+                    <Pencil class="h-3.5 w-3.5" />
+                    Sửa
+                  </Button>
+                  {#if heroCanPublish}
+                    <AlertDialog.Root>
+                      <AlertDialog.Trigger>
+                        {#snippet child({ props })}
+                          <Button
+                            {...props}
+                            size="sm"
+                            class="flex-1 gap-2"
+                            disabled={publishingId === heroEvent.id}
+                            onclick={(e) => e.stopPropagation()}
+                          >
+                            {#if publishingId === heroEvent.id}
+                              <Loader class="h-3.5 w-3.5 animate-spin" />
+                            {:else}
+                              <Globe class="h-3.5 w-3.5" />
+                            {/if}
+                            Xuất bản
+                          </Button>
+                        {/snippet}
+                      </AlertDialog.Trigger>
+                      <AlertDialog.Content onclick={(e) => e.stopPropagation()}>
+                        <AlertDialog.Header>
+                          <AlertDialog.Title>Xuất bản "{heroEvent.title}"?</AlertDialog.Title>
+                          <AlertDialog.Description>
+                            Sau khi xuất bản, sự kiện sẽ hiển thị công khai và khách hàng có thể đặt
+                            vé.
+                          </AlertDialog.Description>
+                        </AlertDialog.Header>
+                        <AlertDialog.Footer>
+                          <AlertDialog.Cancel>Huỷ bỏ</AlertDialog.Cancel>
+                          <AlertDialog.Action onclick={() => handlePublish(heroEvent.id)}>
+                            Xuất bản
+                          </AlertDialog.Action>
+                        </AlertDialog.Footer>
+                      </AlertDialog.Content>
+                    </AlertDialog.Root>
+                  {:else}
+                    <Button
+                      size="sm"
+                      class="flex-1 gap-2"
+                      disabled
+                      onclick={(e) => e.stopPropagation()}
+                    >
+                      <Globe class="h-3.5 w-3.5" />
+                      Xuất bản
+                    </Button>
+                  {/if}
+                </div>
               {/if}
             </div>
           </div>
@@ -303,7 +319,13 @@
               </div>
               <div class="flex items-center gap-2">
                 <Calendar class="h-3.5 w-3.5 shrink-0 opacity-50" />
-                <span>{formatDate(event.event_date)} · {formatTime(event.event_date)}</span>
+                <span>
+                  {#if event.earliest_show_date}
+                    {formatDate(event.earliest_show_date)}
+                  {:else}
+                    Chưa có suất diễn
+                  {/if}
+                </span>
               </div>
             </div>
 
@@ -326,7 +348,17 @@
 
             <!-- Publish action -->
             {#if event.status === 'draft'}
-              <div class="mt-4 border-t border-border/50 pt-4">
+              <div class="mt-4 flex gap-2 border-t border-border/50 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="flex-1 gap-2 text-xs"
+                  href={resolve(`/admin/events/create?event=${event.id}`)}
+                  onclick={(e) => e.stopPropagation()}
+                >
+                  <Pencil class="h-3 w-3" />
+                  Sửa
+                </Button>
                 <AlertDialog.Root>
                   <AlertDialog.Trigger>
                     {#snippet child({ props })}
@@ -334,7 +366,7 @@
                         {...props}
                         variant="outline"
                         size="sm"
-                        class="w-full gap-2 rounded-xl text-xs"
+                        class="flex-1 gap-2 text-xs"
                         disabled={publishingId === event.id}
                         onclick={(e) => e.stopPropagation()}
                       >
@@ -381,7 +413,7 @@
           <Button
             variant="outline"
             size="icon"
-            class="h-9 w-9 rounded-xl"
+            class=""
             disabled={data.pagination.page <= 1}
             onclick={() => {
               const params = new URLSearchParams(window.location.search);
@@ -394,7 +426,7 @@
           <Button
             variant="outline"
             size="icon"
-            class="h-9 w-9 rounded-xl"
+            class=""
             disabled={data.pagination.page >= data.pagination.total_pages}
             onclick={() => {
               const params = new URLSearchParams(window.location.search);

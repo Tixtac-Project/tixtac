@@ -20,23 +20,23 @@
   }: Props = $props();
 </script>
 
-<div class="rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-20 text-center">
+<div class="bento-card border-2 border-dashed border-border bg-muted/50 px-6 py-20 text-center">
   <div class="mb-4 text-5xl">{icon}</div>
 
-  <h3 class="mb-2 text-2xl font-bold text-slate-900">{title}</h3>
+  <h3 class="mb-2 text-2xl font-bold text-foreground">{title}</h3>
 
-  <p class="mx-auto mb-8 max-w-md text-slate-600">{description}</p>
+  <p class="mx-auto mb-8 max-w-md text-muted-foreground">{description}</p>
 
   {#if ctaLabel}
     <a
-      href={resolve(ctaHref as any)}
+      href={resolve(ctaHref)}
       onclick={(e) => {
         if (onCtaClick) {
           e.preventDefault();
           onCtaClick();
         }
       }}
-      class="inline-flex items-center gap-2 rounded-full bg-purple-600 px-7 py-3 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-lg hover:shadow-purple-600/50"
+      class="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-lg"
     >
       {ctaLabel}
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -10,38 +10,63 @@ const req = (msg: string) => ({
 const seatLabelRegex = /^[A-Z0-9]+-[A-Z]+[1-9]\d*$/; // VIP-A1, STD-B12, V1-AA3...
 const prefixRegex = /^[A-Z0-9]+$/; // Only uppercase letters and digits, no hyphens
 
-// ── Section Schema ─────────────────────────────
-const baseSectionSchema = z.object({
-  name: z.string(req('Tên khu vực là bắt buộc')).min(1, 'Tên khu vực không được trống'),
+// ── Map Config Schema (Canvas dimensions) ──────
+export const mapConfigSchema = z.object({
+  width: z.number().int().positive('Chiều rộng Canvas phải > 0').default(1200),
+  height: z.number().int().positive('Chiều cao Canvas phải > 0').default(800),
+  gridSize: z.number().int().positive('Grid size phải > 0').default(20),
+  snapToGrid: z.boolean().default(true),
+});
 
-  type: z.enum(['assigned', 'general']).default('assigned'),
+// ── Layout Config Schema (Block positioning on Canvas) ──
+export const layoutConfigSchema = z.object({
+  x: z.number().min(0, 'x không được âm').default(0),
+  y: z.number().min(0, 'y không được âm').default(0),
+  width: z.number().min(1, 'Chiều rộng tối thiểu 1').default(100),
+  height: z.number().min(1, 'Chiều cao tối thiểu 1').default(100),
+  rotation: z.number().default(0),
+  color: z.string().default('#cccccc'),
+  zIndex: z.number().optional(),
+});
 
-  prefix: z
-    .string(req('Mã tiền tố là bắt buộc'))
-    .transform((v) => v.trim().toUpperCase())
-    .pipe(
-      z
-        .string()
-        .min(1, 'Mã tiền tố không được trống')
-        .max(10, 'Mã tiền tố tối đa 10 ký tự')
-        .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
-    ),
-
-  is_seat_pickable: z.boolean().default(true),
-
+// ── Seat Config Schema (Seat generation rules) ─
+export const seatConfigSchema = z.object({
   rows: z
     .number(req('Số hàng là bắt buộc'))
     .int('Số hàng phải là số nguyên')
     .min(0, 'Số hàng không được âm')
     .max(50, 'Tối đa 50 hàng')
     .default(0),
-
   cols: z
     .number(req('Số cột là bắt buộc'))
     .int('Số cột phải là số nguyên')
     .min(0, 'Số cột không được âm')
     .max(100, 'Tối đa 100 cột')
     .default(0),
+  prefix: z
+    .string()
+    .transform((v) => v.trim().toUpperCase())
+    .pipe(
+      z
+        .string()
+        .max(10, 'Mã tiền tố tối đa 10 ký tự')
+        .regex(prefixRegex, 'Mã tiền tố chỉ được chứa chữ in hoa và số (A-Z, 0-9)'),
+    )
+    .nullable()
+    .default(null),
+  rowFormat: z.enum(['alphabetic', 'numeric']).default('alphabetic'),
+  colDirection: z.enum(['ltr', 'rtl']).default('ltr'),
+  startRowIndex: z.number().int().min(0, 'startRowIndex không được âm').default(1),
+  startColIndex: z.number().int().min(1, 'startColIndex phải >= 1').default(1),
+});
+
+// ── Section Schema ─────────────────────────────
+const baseSectionSchema = z.object({
+  name: z.string(req('Tên khu vực là bắt buộc')).min(1, 'Tên khu vực không được trống'),
+
+  type: z.enum(['assigned', 'general']).default('assigned'),
+
+  is_seat_pickable: z.boolean().default(true),
 
   capacity: z
     .number()
@@ -51,11 +76,26 @@ const baseSectionSchema = z.object({
 
   price: z.number(req('Giá là bắt buộc')).positive('Giá phải lớn hơn 0'),
 
-  layout_x: z.number().int().min(0, 'layout_x không được âm').default(0),
-  layout_y: z.number().int().min(0, 'layout_y không được âm').default(0),
+  sort_order: z.number().int().min(0).default(0),
 
-  start_row_index: z.number().int().min(0, 'start_row_index không được âm').default(0),
-  start_col_index: z.number().int().min(1, 'start_col_index phải >= 1').default(1),
+  layout_config: layoutConfigSchema.default({
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    color: '#cccccc',
+  }),
+
+  seat_config: seatConfigSchema.default({
+    rows: 0,
+    cols: 0,
+    prefix: null,
+    rowFormat: 'alphabetic',
+    colDirection: 'ltr',
+    startRowIndex: 1,
+    startColIndex: 1,
+  }),
 
   disabled_seats: z
     .array(
@@ -65,8 +105,6 @@ const baseSectionSchema = z.object({
         .pipe(z.string().regex(seatLabelRegex, 'Seat label phải có dạng VIP-A1, STD-B12...')),
     )
     .default([]),
-
-  sort_order: z.number().int().min(0).default(0),
 
   sales_start_at: z
     .string()
@@ -81,21 +119,23 @@ const baseSectionSchema = z.object({
     .or(z.literal('')),
 });
 
-// Thêm cross-field validation: disabled_seats phải nằm trong phạm vi section và có đúng prefix
+// Cross-field validation
 const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
+  const seatCfg = section.seat_config;
+
   // For assigned sections, rows and cols must be > 0
   if (section.type === 'assigned') {
-    if (section.rows < 1) {
+    if (seatCfg.rows < 1) {
       ctx.addIssue({
         code: 'custom',
-        path: ['rows'],
+        path: ['seat_config', 'rows'],
         message: 'Khu vực assigned phải có ít nhất 1 hàng',
       });
     }
-    if (section.cols < 1) {
+    if (seatCfg.cols < 1) {
       ctx.addIssue({
         code: 'custom',
-        path: ['cols'],
+        path: ['seat_config', 'cols'],
         message: 'Khu vực assigned phải có ít nhất 1 cột',
       });
     }
@@ -117,14 +157,14 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
   // Disabled seats validation only applies to assigned sections
   if (section.type === 'general') return;
 
-  const startRow = section.start_row_index;
-  const endRow = startRow + section.rows - 1;
-  const startCol = section.start_col_index;
-  const endCol = startCol + section.cols - 1;
+  // startRowIndex is 1-based; convert to 0-based for getRowLabel/rowLabelToIndex
+  const startRow0 = seatCfg.startRowIndex - 1;
+  const endRow0 = startRow0 + seatCfg.rows - 1;
+  const startCol = seatCfg.startColIndex;
+  const endCol = startCol + seatCfg.cols - 1;
 
-  // Tính valid row labels để hiển thị trong error message
-  const minRowLabel = getRowLabel(startRow);
-  const maxRowLabel = getRowLabel(endRow);
+  const minRowLabel = getRowLabel(startRow0);
+  const maxRowLabel = getRowLabel(endRow0);
 
   const invalidSeats: string[] = [];
   const wrongPrefix: string[] = [];
@@ -137,8 +177,8 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
       continue;
     }
 
-    // Check prefix matches the section's prefix
-    if (parsed.prefix !== section.prefix) {
+    // Check prefix matches the section's seat_config prefix
+    if (seatCfg.prefix && parsed.prefix !== seatCfg.prefix) {
       wrongPrefix.push(label);
       continue;
     }
@@ -146,8 +186,8 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
     const rowIndex = rowLabelToIndex(parsed.rowLabel);
 
     if (
-      rowIndex < startRow ||
-      rowIndex > endRow ||
+      rowIndex < startRow0 ||
+      rowIndex > endRow0 ||
       parsed.colNumber < startCol ||
       parsed.colNumber > endCol
     ) {
@@ -160,7 +200,7 @@ const sectionSchema = baseSectionSchema.superRefine((section, ctx) => {
       code: 'custom',
       path: ['disabled_seats'],
       message:
-        `Các ghế có prefix không khớp với khu vực "${section.prefix}": ` +
+        `Các ghế có prefix không khớp với khu vực "${seatCfg.prefix}": ` +
         `${wrongPrefix.join(', ')}`,
     });
   }
@@ -249,8 +289,10 @@ const organizerInfoSchema = z
   })
   .optional();
 
-// ── Event Schema (Create) ──────────────────────
+// ── Event Schema (Create — one-shot, backward compat) ──
 export const createEventSchema = z.object({
+  category_id: z.number(req('Danh mục là bắt buộc')).int().positive('Danh mục không hợp lệ'),
+
   title: z
     .string(req('Tên sự kiện là bắt buộc'))
     .min(5, 'Tên sự kiện tối thiểu 5 ký tự')
@@ -282,6 +324,13 @@ export const createEventSchema = z.object({
     .min(0, 'Giới hạn vé không được âm (0 = không giới hạn)')
     .default(0),
 
+  map_config: mapConfigSchema.default({
+    width: 1200,
+    height: 800,
+    gridSize: 20,
+    snapToGrid: true,
+  }),
+
   stage_layout: z.array(stageLayoutItemSchema).default([]),
 
   amenities: z.array(z.string()).default([]),
@@ -291,6 +340,156 @@ export const createEventSchema = z.object({
   shows: z.array(showSchema).min(1, 'Phải có ít nhất 1 suất diễn'),
 });
 
+// ═══════════════════════════════════════════════════
+// STEP-BASED EVENT CREATION (3-step flow)
+// ═══════════════════════════════════════════════════
+
+// ── Step 1: Basic Info ─────────────────────────
+// Creates a draft event shell (no shows yet)
+export const createBasicInfoSchema = z.object({
+  category_id: z.number(req('Danh mục là bắt buộc')).int().positive('Danh mục không hợp lệ'),
+
+  title: z
+    .string(req('Tên sự kiện là bắt buộc'))
+    .min(5, 'Tên sự kiện tối thiểu 5 ký tự')
+    .max(200, 'Tên sự kiện tối đa 200 ký tự'),
+
+  description: z.string(req('Mô tả là bắt buộc')).min(1, 'Mô tả không được trống'),
+
+  terms_and_conditions: z.string().optional().or(z.literal('')),
+
+  venue: z.string(req('Địa điểm là bắt buộc')).min(1, 'Địa điểm không được trống'),
+
+  banner_image_url: z
+    .url('URL ảnh không hợp lệ')
+    .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
+    .optional()
+    .or(z.literal('')),
+
+  static_map_image_url: z
+    .url('URL ảnh sơ đồ không hợp lệ')
+    .refine((url) => /^https?:\/\//i.test(url), 'URL ảnh phải bắt đầu bằng http:// hoặc https://')
+    .optional()
+    .or(z.literal('')),
+
+  min_age: z.number().int().min(0, 'Tuổi tối thiểu không được âm').default(0),
+
+  max_tickets_per_user: z
+    .number()
+    .int()
+    .min(0, 'Giới hạn vé không được âm (0 = không giới hạn)')
+    .default(0),
+
+  map_config: mapConfigSchema.default({
+    width: 1200,
+    height: 800,
+    gridSize: 20,
+    snapToGrid: true,
+  }),
+
+  stage_layout: z.array(stageLayoutItemSchema).default([]),
+
+  amenities: z.array(z.string()).default([]),
+
+  organizer_info: organizerInfoSchema,
+});
+
+// ── Step 2: Add Shows ──────────────────────────
+// Show without sections (sections added in Step 3)
+const showWithoutSectionsSchema = z
+  .object({
+    title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
+
+    show_date: z.iso.date('Ngày diễn không hợp lệ'),
+
+    start_time: z.string(req('Giờ bắt đầu là bắt buộc')).pipe(z.iso.datetime({ offset: true })),
+
+    end_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional()
+      .or(z.literal('')),
+
+    itinerary: z.array(itineraryItemSchema).default([]),
+  })
+  .superRefine((show, ctx) => {
+    if (show.show_date !== show.start_time.slice(0, 10)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['show_date'],
+        message: 'Ngày diễn phải khớp với ngày bắt đầu của suất diễn',
+      });
+    }
+
+    if (
+      show.end_time &&
+      show.end_time !== '' &&
+      new Date(show.end_time) <= new Date(show.start_time)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end_time'],
+        message: 'Giờ kết thúc phải sau giờ bắt đầu',
+      });
+    }
+  });
+
+export const addShowsSchema = z.object({
+  event_id: z.number(req('ID sự kiện là bắt buộc')).int().positive('ID sự kiện không hợp lệ'),
+  shows: z.array(showWithoutSectionsSchema).min(1, 'Phải có ít nhất 1 suất diễn'),
+});
+
+// ── Step 3: Seatmap (sections + seats per show) ──
+export const addSeatmapSchema = z.object({
+  show_id: z.number(req('ID suất diễn là bắt buộc')).int().positive('ID suất diễn không hợp lệ'),
+  sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
+  map_config: mapConfigSchema.optional(),
+  stage_layout: z.array(stageLayoutItemSchema).optional(),
+});
+
+// ── Update Basic Info (for existing draft event) ──
+export const updateBasicInfoSchema = createBasicInfoSchema.partial().extend({
+  event_id: z.number(req('ID sự kiện là bắt buộc')).int().positive('ID sự kiện không hợp lệ'),
+});
+
+// ── Update Show (single show metadata, no sections) ──
+export const updateShowSchema = z
+  .object({
+    title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
+    show_date: z.iso.date('Ngày diễn không hợp lệ').optional(),
+    start_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional(),
+    end_time: z
+      .string()
+      .pipe(z.iso.datetime({ offset: true }))
+      .optional()
+      .or(z.literal('')),
+    itinerary: z.array(itineraryItemSchema).optional(),
+  })
+  .superRefine((show, ctx) => {
+    if (show.show_date && show.start_time && show.show_date !== show.start_time.slice(0, 10)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['show_date'],
+        message: 'Ngày diễn phải khớp với ngày bắt đầu của suất diễn',
+      });
+    }
+    if (
+      show.end_time &&
+      show.end_time !== '' &&
+      show.start_time &&
+      new Date(show.end_time) <= new Date(show.start_time)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end_time'],
+        message: 'Giờ kết thúc phải sau giờ bắt đầu',
+      });
+    }
+  });
+
 // ── Update Show Sections Schema ────────────────
 export const updateShowSectionsSchema = z.object({
   sections: z.array(sectionSchema).min(1, 'Phải có ít nhất 1 khu vực ghế'),
@@ -298,30 +497,85 @@ export const updateShowSectionsSchema = z.object({
 
 // ── Types ──────────────────────────────────────
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type CreateBasicInfoInput = z.infer<typeof createBasicInfoSchema>;
+export type UpdateBasicInfoInput = z.infer<typeof updateBasicInfoSchema>;
+export type AddShowsInput = z.infer<typeof addShowsSchema>;
+export type AddSeatmapInput = z.infer<typeof addSeatmapSchema>;
+export type UpdateShowInput = z.infer<typeof updateShowSchema>;
 export type UpdateShowSectionsInput = z.infer<typeof updateShowSectionsSchema>;
 export type SectionInput = z.infer<typeof sectionSchema>;
 export type ShowInput = z.infer<typeof showSchema>;
 export type ItineraryItem = z.infer<typeof itineraryItemSchema>;
+export type LayoutConfigInput = z.infer<typeof layoutConfigSchema>;
+export type SeatConfigInput = z.infer<typeof seatConfigSchema>;
+export type MapConfigInput = z.infer<typeof mapConfigSchema>;
 
 /** Form-side section type: disabled_seats is a comma-separated string instead of string[] */
 export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & { disabled_seats: string };
 
+/** Form-side show type: includes picker state for date/time selectors */
+export type ShowFormData = {
+  title: string;
+  date?: { year: number; month: number; day: number };
+  startHour: string;
+  startMinute: string;
+  startPeriod: 'AM' | 'PM';
+  endHour: string;
+  endMinute: string;
+  endPeriod: 'AM' | 'PM';
+  hasEndTime: boolean;
+  itinerary: ItineraryItem[];
+  sections: SectionFormData[];
+};
+
 // ── Draft persistence schema (validates shape/types only, not business rules) ──
+const layoutConfigDraftSchema = z.object({
+  x: z.number().default(0),
+  y: z.number().default(0),
+  width: z.number().default(100),
+  height: z.number().default(100),
+  rotation: z.number().default(0),
+  color: z.string().default('#cccccc'),
+  zIndex: z.number().optional(),
+});
+
+const seatConfigDraftSchema = z.object({
+  rows: z.number().int().default(0),
+  cols: z.number().int().default(0),
+  prefix: z.string().nullable().default(null),
+  rowFormat: z.enum(['alphabetic', 'numeric']).default('alphabetic'),
+  colDirection: z.enum(['ltr', 'rtl']).default('ltr'),
+  startRowIndex: z.number().default(1),
+  startColIndex: z.number().default(1),
+});
+
 const sectionFormDraftSchema = z.object({
   name: z.string(),
-  type: z.enum(['assigned', 'general']),
-  prefix: z.string(),
-  is_seat_pickable: z.boolean(),
+  type: z.enum(['assigned', 'general']).default('assigned'),
+  is_seat_pickable: z.boolean().default(true),
   price: z.number(),
-  rows: z.number().int(),
-  cols: z.number().int(),
   capacity: z.number().int().default(0),
-  layout_x: z.number(),
-  layout_y: z.number(),
-  start_row_index: z.number(),
-  start_col_index: z.number(),
+  layout_config: layoutConfigDraftSchema.default({
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    color: '#cccccc',
+  }),
+  seat_config: seatConfigDraftSchema.default({
+    rows: 0,
+    cols: 0,
+    prefix: null,
+    rowFormat: 'alphabetic',
+    colDirection: 'ltr',
+    startRowIndex: 1,
+    startColIndex: 1,
+  }),
   disabled_seats: z.string(),
   sort_order: z.number(),
+  sales_start_at: z.string().default(''),
+  sales_end_at: z.string().default(''),
 });
 
 const showFormDraftSchema = z.object({
@@ -329,11 +583,21 @@ const showFormDraftSchema = z.object({
   show_date: z.string().default(''),
   start_time: z.string().default(''),
   end_time: z.string().default(''),
+  // Picker state for draft restoration (avoids lossy ISO->AM/PM parsing)
+  date: z.object({ year: z.number(), month: z.number(), day: z.number() }).optional(),
+  startHour: z.string().default('7'),
+  startMinute: z.string().default('0'),
+  startPeriod: z.enum(['AM', 'PM']).default('PM'),
+  endHour: z.string().default('10'),
+  endMinute: z.string().default('0'),
+  endPeriod: z.enum(['AM', 'PM']).default('PM'),
+  hasEndTime: z.boolean().default(false),
   itinerary: z.array(itineraryItemSchema).default([]),
   sections: z.array(sectionFormDraftSchema).min(1),
 });
 
 export const formDraftSchema = z.object({
+  category_id: z.number().int().optional(),
   title: z.string(),
   description: z.string(),
   terms_and_conditions: z.string().default(''),
@@ -342,8 +606,18 @@ export const formDraftSchema = z.object({
   staticMapImageUrl: z.string().default(''),
   min_age: z.number().int().default(0),
   max_tickets_per_user: z.number().int().default(0),
+  map_config: mapConfigSchema.default({
+    width: 1200,
+    height: 800,
+    gridSize: 20,
+    snapToGrid: true,
+  }),
   amenities: z.array(z.string()).default([]),
   organizer_info: organizerInfoSchema,
+  organizer_name: z.string().default(''),
+  organizer_email: z.string().default(''),
+  organizer_phone: z.string().default(''),
+  organizer_website: z.string().default(''),
   shows: z.array(showFormDraftSchema).min(1),
 });
 
@@ -352,6 +626,7 @@ export type FormDraft = z.infer<typeof formDraftSchema>;
 // ── Event Query Schema (Public List API) ───────
 export const eventQuerySchema = z.object({
   q: z.string().optional(),
+  category: z.string().optional(), // Filter by category slug
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(12),
 });

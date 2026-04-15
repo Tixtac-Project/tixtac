@@ -1,10 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page as pageState } from '$app/state';
 
   interface Category {
-    label: string;
-    value: string;
+    id?: number;
+    label?: string;
+    name?: string;
+    value?: string;
+    slug?: string;
   }
 
   interface Props {
@@ -14,15 +17,26 @@
 
   let { categories, activeCategory = $bindable() }: Props = $props();
 
-  function handleSelectCategory(value: string) {
-    activeCategory = value;
-    const url = new URL($page.url);
-    if (value) {
-      url.searchParams.set('category', value);
+  function getCategorySlug(cat: Category): string {
+    return cat.slug || cat.value || '';
+  }
+
+  function getCategoryLabel(cat: Category): string {
+    return cat.label || cat.name || '';
+  }
+
+  function handleSelectCategory(slug: string) {
+    activeCategory = slug;
+    const url = new URL(pageState.url);
+    if (slug) {
+      url.searchParams.set('category', slug);
     } else {
       url.searchParams.delete('category');
     }
-    goto(url.toString(), { keepFocus: true, noScroll: true });
+    // Reset to page 1 when changing category
+    url.searchParams.delete('page');
+    // eslint-disable-next-line svelte/no-navigation-without-resolve
+    goto(`${url.pathname}${url.search}`, { keepFocus: true, noScroll: true });
   }
 </script>
 
@@ -35,7 +49,7 @@
         class="relative flex h-14 items-center text-[15px] font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 {activeCategory ===
         ''
           ? 'text-primary'
-          : 'text-black hover:text-primary'}"
+          : 'text-foreground hover:text-primary'}"
       >
         Tất cả
         {#if activeCategory === ''}
@@ -44,18 +58,18 @@
       </button>
     </li>
 
-    {#each categories as cat (cat.value)}
+    {#each categories as cat (getCategorySlug(cat))}
       <li>
         <button
           type="button"
-          onclick={() => handleSelectCategory(cat.value)}
+          onclick={() => handleSelectCategory(getCategorySlug(cat))}
           class="relative flex h-14 items-center text-[15px] font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 {activeCategory ===
-          cat.value
+          getCategorySlug(cat)
             ? 'text-primary'
-            : 'text-shadow-white hover:text-primary'}"
+            : 'text-foreground hover:text-primary'}"
         >
-          {cat.label}
-          {#if activeCategory === cat.value}
+          {getCategoryLabel(cat)}
+          {#if activeCategory === getCategorySlug(cat)}
             <div class="absolute bottom-0 left-0 h-[3px] w-full rounded-t-md bg-primary"></div>
           {/if}
         </button>

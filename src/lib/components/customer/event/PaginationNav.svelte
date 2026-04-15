@@ -1,108 +1,94 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page as pageStore } from '$app/state';
+
   interface Props {
     currentPage: number;
     totalPages: number;
     searchQuery?: string;
     onPageChange?: (page: number) => void;
-    baseUrl?: string;
   }
 
-  let {
-    currentPage,
-    totalPages,
-    searchQuery = '',
-    onPageChange,
-    baseUrl = '?page=',
-  }: Props = $props();
+  let { currentPage, totalPages, searchQuery = '', onPageChange }: Props = $props();
 
   const pageNumbers = $derived(Array.from({ length: totalPages }, (_, i) => i + 1));
 
-  function buildUrl(page: number): string {
-    const query = searchQuery ? `&q=${searchQuery}` : '';
-    return `${baseUrl}${page}${query}`;
-  }
-
-  function handlePageChange(page: number) {
+  function navigateToPage(pageNum: number) {
     if (onPageChange) {
-      onPageChange(page);
+      onPageChange(pageNum);
+      return;
     }
+    const url = new URL(pageStore.url);
+    url.searchParams.set('page', String(pageNum));
+    if (searchQuery) {
+      url.searchParams.set('q', searchQuery);
+    } else {
+      url.searchParams.delete('q');
+    }
+    // eslint-disable-next-line svelte/no-navigation-without-resolve
+    goto(`${url.pathname}${url.search}`, { noScroll: true });
   }
 </script>
 
 {#if totalPages > 1}
   <nav class="mt-12 flex items-center justify-center gap-1.5 pb-4" aria-label="Phân trang">
     <!-- Previous -->
-    <a
-      href={buildUrl(currentPage - 1)}
-      onclick={(e) => {
-        if (currentPage === 1) {
-          e.preventDefault();
-        } else if (onPageChange) {
-          e.preventDefault();
-          handlePageChange(currentPage - 1);
-        }
-      }}
-      class={`inline-flex items-center gap-1 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200
+    <button
+      type="button"
+      onclick={() => navigateToPage(currentPage - 1)}
+      disabled={currentPage === 1}
+      class={`inline-flex items-center gap-1 rounded-xl border px-3.5 py-2 text-sm font-medium transition-all duration-200
         ${
           currentPage === 1
-            ? 'pointer-events-none cursor-not-allowed opacity-40'
-            : 'border-slate-300 bg-white text-slate-700 hover:border-purple-600 hover:text-purple-600'
+            ? 'cursor-not-allowed border-border bg-card opacity-40'
+            : 'border-border bg-card text-foreground hover:border-primary hover:text-primary'
         }
       `}
-      aria-disabled={currentPage === 1}
+      aria-label="Trang trước"
     >
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
       <span class="hidden sm:inline">Trước</span>
-    </a>
+    </button>
 
     <!-- Page numbers -->
     {#each pageNumbers as num (num)}
-      <a
-        href={buildUrl(num)}
-        onclick={(e) => {
-          if (onPageChange) {
-            e.preventDefault();
-            handlePageChange(num);
-          }
-        }}
-        class={`inline-flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200
+      <button
+        type="button"
+        onclick={() => navigateToPage(num)}
+        class={`inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm font-medium transition-all duration-200
           ${
             num === currentPage
-              ? 'border-purple-600 bg-purple-600 text-white shadow-md'
-              : 'border-slate-300 bg-white text-slate-700 hover:border-purple-600 hover:text-purple-600'
+              ? 'border-primary bg-primary text-primary-foreground shadow-md'
+              : 'border-border bg-card text-foreground hover:border-primary hover:text-primary'
           }
         `}
+        aria-label={`Trang ${num}`}
+        aria-current={num === currentPage ? 'page' : undefined}
       >
         {num}
-      </a>
+      </button>
     {/each}
 
     <!-- Next -->
-    <a
-      href={buildUrl(currentPage + 1)}
-      onclick={(e) => {
-        if (currentPage === totalPages) {
-          e.preventDefault();
-        } else if (onPageChange) {
-          e.preventDefault();
-          handlePageChange(currentPage + 1);
-        }
-      }}
-      class={`inline-flex items-center gap-1 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all duration-200
+    <button
+      type="button"
+      onclick={() => navigateToPage(currentPage + 1)}
+      disabled={currentPage === totalPages}
+      class={`inline-flex items-center gap-1 rounded-xl border px-3.5 py-2 text-sm font-medium transition-all duration-200
         ${
           currentPage === totalPages
-            ? 'pointer-events-none cursor-not-allowed opacity-40'
-            : 'border-slate-300 bg-white text-slate-700 hover:border-purple-600 hover:text-purple-600'
+            ? 'cursor-not-allowed border-border bg-card opacity-40'
+            : 'border-border bg-card text-foreground hover:border-primary hover:text-primary'
         }
       `}
-      aria-disabled={currentPage === totalPages}
+      aria-label="Trang tiếp"
     >
       <span class="hidden sm:inline">Tiếp</span>
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
       </svg>
-    </a>
+    </button>
   </nav>
 {/if}
