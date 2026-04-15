@@ -35,15 +35,17 @@
     const onSelect = () => {
       current = api!.selectedScrollSnap();
       canScrollPrev = api!.canScrollPrev();
-      canScrollNext = api!.canScrollNext();
-    };
-
-    onSelect();
-    api.on('select', onSelect);
-
-    return () => {
-      api!.off('select', onSelect);
-    };
+  $effect(() => {
+    if (api) {
+      current = api.selectedScrollSnap();
+      const handler = () => {
+        current = api!.selectedScrollSnap();
+      };
+      api.on('select', handler);
+      return () => {
+        api.off('select', handler);
+      };
+    }
   });
 
   const autoplayPlugin = Autoplay({ delay: 5000, stopOnInteraction: true });
