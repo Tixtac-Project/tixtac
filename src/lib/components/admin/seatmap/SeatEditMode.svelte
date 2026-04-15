@@ -198,9 +198,7 @@
                     : isSelected
                       ? 'text-white shadow-md ring-2 ring-primary ring-offset-2'
                       : 'border-2 border-border bg-background text-foreground hover:border-primary/60 hover:bg-primary/10 hover:shadow-md'}"
-                style={!isDisabled && isSelected
-                  ? `background-color: ${color}`
-                  : ''}
+                style={!isDisabled && isSelected ? `background-color: ${color}` : ''}
                 onmousedown={(e) => handleMouseDown(seat.label, e)}
                 onmouseenter={() => handleMouseEnter(seat.label)}
                 role="gridcell"

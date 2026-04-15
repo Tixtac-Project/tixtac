@@ -4,8 +4,8 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page as pageState } from '$app/state';
+  import Logo2 from '$lib/assets/Logo2.svelte';
   import CategoryFilterBar from '$lib/components/customer/event/CategoryFilterBar.svelte';
-  import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
   import { Button } from '$lib/components/ui/button';
   import {
     DropdownMenu,
@@ -14,8 +14,8 @@
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
-  import { LogOut, Ticket, User } from 'lucide-svelte';
-  import { tick } from 'svelte';
+  import { CircleUserRound, House, LogOut, Search, Ticket, User } from 'lucide-svelte';
+  import { onMount, tick } from 'svelte';
 
   interface Users {
     id: number;
@@ -41,9 +41,10 @@
   $effect(() => {
     activeCategory = pageState.url.searchParams.get('category') ?? '';
   });
+
   let isSearchOpen = $state(false);
   let isUserMenuOpen = $state(false);
-  let searchInput: HTMLInputElement | null = null;
+  let searchInput = $state<HTMLInputElement | null>(null);
 
   $effect(() => {
     if (isSearchOpen) {
@@ -51,131 +52,167 @@
     }
   });
 
+  // Bottom nav visibility — hide when footer is in view
+  let isBottomNavVisible = $state(true);
+
+  onMount(() => {
+    const footer = document.querySelector('footer');
+    if (!footer) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isBottomNavVisible = !entry.isIntersecting;
+      },
+      { threshold: 0 },
+    );
+    observer.observe(footer);
+
+    return () => observer.disconnect();
+  });
+
+  function toggleSearch() {
+    isSearchOpen = !isSearchOpen;
+  }
+
   function handleLogout() {
     return async () => {
       await invalidateAll();
       await goto(resolve('/'));
     };
   }
+
+  let currentPath = $derived(pageState.url.pathname);
+
+  function isActive(path: string): boolean {
+    if (path === '/') return currentPath === '/';
+    return currentPath.startsWith(path);
+  }
 </script>
 
-<header class="sticky top-0 z-40 w-full shadow-sm">
-  <div class="bg-primary transition-all">
-    <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-      <a
-        href={resolve('/')}
-        class="flex shrink-0 items-center gap-2 font-bold text-primary-foreground transition-opacity {isSearchOpen
-          ? 'hidden md:flex'
-          : 'flex'}"
-      >
-        <span class="text-2xl tracking-tighter sm:text-3xl">Tixtac</span>
-      </a>
-
-      <!-- SEARCH BAR -->
-      <form
-        action={resolve('/')}
-        method="GET"
-        class="relative max-w-2xl flex-1 items-center transition-all {isSearchOpen
-          ? 'flex w-full'
-          : 'hidden md:flex'}"
-      >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="mr-2 text-primary-foreground md:hidden"
-          onclick={() => (isSearchOpen = false)}
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- DESKTOP TOP NAV BAR                                -->
+<!-- ═══════════════════════════════════════════════════ -->
+<header class="relative z-40 w-full md:sticky md:top-0">
+  <div class="glass-nav border-b border-outline-variant/10">
+    <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-6 px-4 sm:px-6">
+      <!-- Brand -->
+      <div class="align-center flex items-center gap-2">
+        <span class="size-6 fill-primary">
+          <Logo2 />
+        </span>
+        <a
+          href={resolve('/')}
+          class="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
         >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-        </Button>
+          <span class="font-heading text-2xl font-extrabold tracking-tight text-primary">
+            TixTac
+          </span>
+        </a>
+      </div>
 
-        <div class="relative flex h-10 w-full items-center overflow-hidden rounded-xl bg-card px-4">
-          <svg
-            class="pointer-events-none h-5 w-5 shrink-0 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <!-- Center nav links (desktop only) -->
+      <nav class="hidden items-center gap-1 md:flex">
+        <a
+          href={resolve('/')}
+          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/')
+            ? 'text-foreground'
+            : 'text-muted-foreground hover:text-foreground'}"
+        >
+          Trang chủ
+          {#if isActive('/')}
+            <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+          {/if}
+        </a>
+        <a
+          href={resolve('/events')}
+          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/events')
+            ? 'text-foreground'
+            : 'text-muted-foreground hover:text-foreground'}"
+        >
+          Khám phá
+          {#if isActive('/events')}
+            <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+          {/if}
+        </a>
+        <a
+          href={resolve(user ? '/my-tickets' : '/login?redirect=/my-tickets')}
+          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/my-tickets')
+            ? 'text-foreground'
+            : 'text-muted-foreground hover:text-foreground'}"
+        >
+          Vé của tôi
+          {#if isActive('/my-tickets')}
+            <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+          {/if}
+        </a>
+      </nav>
+
+      <!-- Right side: search + profile -->
+      <div class="flex shrink-0 items-center gap-4">
+        <!-- Animated expandable search -->
+        <div class="relative flex items-center">
+          <form action={resolve('/')} method="GET" class="flex items-center">
+            <div
+              class="flex h-10 items-center overflow-hidden rounded-xl transition-all duration-300 ease-[var(--ease-architectural)] {isSearchOpen
+                ? 'w-56 bg-surface-container-low px-3 sm:w-72'
+                : 'w-0 px-0'}"
+            >
+              <Search
+                class="pointer-events-none h-4 w-4 shrink-0 text-muted-foreground transition-opacity duration-200 {isSearchOpen
+                  ? 'opacity-100'
+                  : 'opacity-0'}"
+              />
+              <input
+                bind:this={searchInput}
+                type="text"
+                name="q"
+                value={searchQuery}
+                placeholder="Tìm sự kiện..."
+                tabindex={isSearchOpen ? 0 : -1}
+                class="w-full flex-1 border-none bg-transparent px-2 py-2 text-sm text-foreground transition-opacity duration-200 outline-none placeholder:text-muted-foreground {isSearchOpen
+                  ? 'opacity-100'
+                  : 'opacity-0'}"
+              />
+              <button type="submit" class="sr-only">Tìm</button>
+            </div>
+          </form>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            class="h-9 w-9 shrink-0 text-muted-foreground transition-colors duration-200 hover:text-foreground"
+            onclick={toggleSearch}
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
-            bind:this={searchInput}
-            type="text"
-            name="q"
-            value={searchQuery}
-            placeholder="Bạn tìm gì hôm nay?"
-            class="w-full flex-1 border-none bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:ring-0"
-          />
-          <div class="mx-2 hidden h-5 w-[1px] bg-border sm:block"></div>
-          <button
-            type="submit"
-            class="hidden px-2 text-sm font-medium whitespace-nowrap text-muted-foreground hover:text-primary sm:block"
-          >
-            Tìm kiếm
-          </button>
+            {#if isSearchOpen}
+              <svg
+                class="h-4.5 w-4.5 transition-opacity duration-200"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            {:else}
+              <Search class="size-6 transition-opacity duration-200" />
+            {/if}
+          </Button>
         </div>
-      </form>
 
-      <!-- AUTH & MENU -->
-      <nav
-        class="flex shrink-0 items-center justify-end gap-4 text-primary-foreground sm:gap-6 {isSearchOpen
-          ? 'hidden md:flex'
-          : 'flex'}"
-      >
-        <!-- Nút mở search mobile -->
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          class="text-primary-foreground md:hidden"
-          onclick={() => (isSearchOpen = true)}
-        >
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </Button>
-
+        <!-- Profile / Auth -->
         {#if user}
-          <a
-            href={resolve('/')}
-            class="flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
-          >
-            <Ticket className="h-5 w-5" />
-            <span class="hidden whitespace-nowrap sm:inline">Vé của tôi</span>
-          </a>
-
-          <!-- User Menu Dropdown -->
           <DropdownMenu bind:open={isUserMenuOpen}>
             <DropdownMenuTrigger>
               <Button
                 variant="ghost"
                 size="icon"
-                class="cursor-pointer gap-2 rounded-xl hover:bg-transparent hover:text-primary-foreground focus:bg-transparent sm:size-auto sm:px-3"
+                class="h-9 w-9 cursor-pointer text-muted-foreground hover:text-foreground"
               >
-                <Avatar class="h-8 w-8">
-                  <AvatarImage src="" alt={`User ${user.id}`} />
-                  <AvatarFallback class="text-xs font-semibold">
-                    {user.id}
-                  </AvatarFallback>
-                </Avatar>
-                <span class="hidden text-sm font-medium sm:inline">Tài khoản</span>
+                <CircleUserRound class="size-6" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="w-48">
@@ -188,6 +225,16 @@
               >
                 <User className="mr-2 h-4 w-4" />
                 <span>Tài khoản của tôi</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onclick={() => {
+                  goto(resolve('/my-tickets'));
+                  isUserMenuOpen = false;
+                }}
+                class="cursor-pointer"
+              >
+                <Ticket className="mr-2 h-4 w-4" />
+                <span>Vé của tôi</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <form
@@ -206,38 +253,82 @@
             </DropdownMenuContent>
           </DropdownMenu>
         {:else}
-          <a
+          <Button
+            variant="ghost"
+            size="icon"
             href={resolve('/login')}
-            class="flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
+            class="h-9 w-9 text-muted-foreground hover:text-foreground"
           >
-            <Ticket className="h-5 w-5" />
-            <span class="hidden whitespace-nowrap sm:inline">Vé của tôi</span>
-          </a>
-          <span>
-            <a
-              href={resolve('/login')}
-              class="text-sm font-medium whitespace-nowrap transition hover:opacity-80"
-            >
-              Đăng nhập
-            </a>
-            <a
-              href={resolve('/register')}
-              class="text-sm font-medium whitespace-nowrap transition hover:opacity-80"
-            >
-              <span class="hidden sm:inline">| Đăng ký</span>
-            </a>
-          </span>
+            <CircleUserRound class="size-6" />
+          </Button>
         {/if}
-      </nav>
+      </div>
     </div>
   </div>
 
-  <!-- TẦNG 2: CATEGORY FILTER -->
+  <!-- CATEGORY FILTER BAR -->
   {#if categories.length > 0}
-    <div class="border-t border-primary/20 bg-secondary">
-      <div class="mx-auto flex h-14 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+    <div class="border-b border-outline-variant/10 bg-surface-container-lowest">
+      <div class="mx-auto flex h-12 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
         <CategoryFilterBar {categories} bind:activeCategory />
       </div>
     </div>
   {/if}
 </header>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MOBILE BOTTOM NAV BAR                              -->
+<!-- ═══════════════════════════════════════════════════ -->
+<nav
+  class="fixed right-0 bottom-0 left-0 z-50 transition-transform duration-300 ease-(--ease-architectural) md:hidden {isBottomNavVisible
+    ? 'translate-y-0'
+    : 'translate-y-full'}"
+>
+  <div class="rounded-t-2xl border-t border-outline-variant/10 bg-accent">
+    <div class="mx-auto flex h-18 max-w-lg items-center justify-around px-2">
+      <!-- Home -->
+      <a
+        href={resolve('/')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/')
+          ? 'text-primary'
+          : 'text-muted-foreground'}"
+      >
+        <House class="h-5 w-5" />
+        <span class="text-[10px] font-semibold tracking-wider uppercase">Home</span>
+      </a>
+
+      <!-- Search -->
+      <a
+        href={resolve('/search')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/search')
+          ? 'text-primary'
+          : 'text-muted-foreground'}"
+      >
+        <Search class="h-5 w-5" />
+        <span class="text-[10px] font-semibold tracking-wider uppercase">Tìm kiếm</span>
+      </a>
+
+      <!-- My Tickets -->
+      <a
+        href={resolve(user ? '/my-tickets' : '/login?redirect=/my-tickets')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/my-tickets')
+          ? 'text-primary'
+          : 'text-muted-foreground'}"
+      >
+        <Ticket class="h-5 w-5" />
+        <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
+      </a>
+
+      <!-- Profile -->
+      <a
+        href={resolve(user ? '/profile' : '/login')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/profile')
+          ? 'text-primary'
+          : 'text-muted-foreground'}"
+      >
+        <User class="h-5 w-5" />
+        <span class="text-[10px] font-semibold tracking-wider uppercase">Cá nhân</span>
+      </a>
+    </div>
+  </div>
+</nav>
