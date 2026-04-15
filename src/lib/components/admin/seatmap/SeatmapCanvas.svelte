@@ -296,7 +296,8 @@
     const st = stageRef?.node;
     if (!st) return;
     const oldScale = st.scaleX();
-    const pointer = st.getPointerPosition()!;
+    const pointer = st.getPointerPosition();
+    if (!pointer) return;
     const mousePointTo = {
       x: (pointer.x - st.x()) / oldScale,
       y: (pointer.y - st.y()) / oldScale,
