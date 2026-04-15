@@ -60,8 +60,23 @@ export const seatService = {
       2. Nếu DB chưa có color/width/height/ --> gán giá trị mặc định cho FE vẽ
       */
 
-      const visualLayout: any =
-        Array.isArray(sec.visualLayout) && sec.visualLayout.length > 0 ? sec.visualLayout[0] : {};
+      const layout = sec.layoutConfig ?? {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        rotation: 0,
+        color: '#cccccc',
+      };
+      const seatConfig = sec.seatConfig ?? {
+        rows: 0,
+        cols: 0,
+        prefix: null,
+        rowFormat: 'alphabetic',
+        colDirection: 'ltr',
+        startRowIndex: 1,
+        startColIndex: 1,
+      };
 
       return {
         id: sec.id,
@@ -73,23 +88,22 @@ export const seatService = {
         sort_order: sec.sortOrder,
         // Map: layoutConfig
         layout_config: {
-          x: sec.layoutX,
-          y: sec.layoutY,
-          width: visualLayout?.w ?? 100,
-          height: visualLayout?.h ?? 100,
-          rotation: visualLayout?.rotation ?? 0,
-          color: visualLayout?.color ?? '#cccccc',
-          zIndex: visualLayout?.zIndex ?? 10,
+          x: layout.x ?? 0,
+          y: layout.y ?? 0,
+          width: layout.width ?? 100,
+          height: layout.height ?? 100,
+          rotation: layout.rotation ?? 0,
+          color: layout.color ?? '#cccccc',
         },
         // Map: cấu hình ghế
         seat_config: {
-          rows: sec.type === 'general' ? 0 : sec.rows,
-          columns: sec.type === 'general' ? 0 : sec.cols,
-          prefix: sec.prefix,
-          rowFormat: 'alphabetic',
-          colDirection: 'ltr',
-          starRowIndex: sec.startRowIndex,
-          startColIndex: sec.startColIndex,
+          rows: sec.type === 'general' ? 0 : (seatConfig.rows ?? 0),
+          cols: sec.type === 'general' ? 0 : (seatConfig.cols ?? 0),
+          prefix: seatConfig.prefix,
+          rowFormat: seatConfig.rowFormat,
+          colDirection: seatConfig.colDirection,
+          startRowIndex: seatConfig.startRowIndex,
+          startColIndex: seatConfig.startColIndex,
         },
 
         sales_start_at: sec.salesStartAt ? sec.salesStartAt.toISOString() : null,
