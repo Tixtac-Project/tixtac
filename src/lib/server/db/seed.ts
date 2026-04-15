@@ -934,6 +934,53 @@ export async function seed() {
 
   console.log(`🎤 Event 6: "${ev6.title}" — Runway stage + mixed assigned/GA`);
 
+  console.log('🧾 Seeding orders...');
+
+  const allUsers = await db.select().from(users).where(eq(users.role, 'customer'));
+
+  const allSeats = await db.select().from(seats).limit(200); // lấy 200 ghế đầu để test
+
+  let seatIndex = 0;
+
+  for (let i = 0; i < 5; i++) {
+    const user = randPick(allUsers);
+
+    const pickedSeats = allSeats.slice(seatIndex, seatIndex + 3);
+    seatIndex += 3;
+
+    const total = pickedSeats.reduce((sum) => sum + 500000, 0);
+
+    const [order] = await db
+      .insert(orders)
+      .values({
+        userId: user.id,
+        totalAmount: String(total),
+        status: i % 2 === 0 ? 'paid' : 'pending',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        paidAt: i % 2 === 0 ? new Date() : null,
+      })
+      .returning();
+
+    for (const s of pickedSeats) {
+      const code = `TIX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+      await db.insert(orderItems).values({
+        orderId: order.id,
+        seatId: s.id,
+        priceSnapshot: '500000',
+        ticketCode: code,
+        qrCode: code,
+        isCheckedIn: false,
+        checkedInAt: null,
+      });
+
+      // mark seat sold
+      await db.update(seats).set({ status: 'sold' }).where(eq(seats.id, s.id));
+    }
+  }
+
+  console.log('🧾 Orders seeded: 5 orders × 3 items');
+
   // ── Summary ────────────────────────────────
   console.log('');
   console.log('✅ Seed completed!');
