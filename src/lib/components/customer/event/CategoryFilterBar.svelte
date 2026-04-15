@@ -36,7 +36,8 @@
         ''
           ? 'text-primary'
           : 'text-black hover:text-primary'}"
-      > Tất cả
+      >
+        Tất cả
         {#if activeCategory === ''}
           <div class="absolute bottom-0 left-0 h-[3px] w-full rounded-t-md bg-primary"></div>
         {/if}

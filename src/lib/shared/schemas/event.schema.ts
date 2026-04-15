@@ -213,7 +213,11 @@ const showSchema = z
       });
     }
 
-    if (show.end_time && show.end_time !== '' && new Date(show.end_time) <= new Date(show.start_time)) {
+    if (
+      show.end_time &&
+      show.end_time !== '' &&
+      new Date(show.end_time) <= new Date(show.start_time)
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['end_time'],
