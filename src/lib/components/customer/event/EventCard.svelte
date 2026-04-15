@@ -5,10 +5,14 @@
   interface Event {
     id: number;
     title: string;
-    eventDate: string | Date;
     venue: string;
-    bannerImageUrl?: string;
-    min_price: number | string;
+    bannerImageUrl?: string | null;
+    categoryName?: string | null;
+    categorySlug?: string | null;
+    earliestShowDate?: string | null;
+    min_price: number;
+    totalSeats?: number;
+    availableSeats?: number;
   }
 
   interface Props {
@@ -20,11 +24,11 @@
   let { event, badge, index = 0 }: Props = $props();
 
   const placeholderGradients = [
-    'linear-gradient(135deg, #EEF2FF, #C7D2FE)',
-    'linear-gradient(135deg, #F0F9FF, #BAE6FD)',
-    'linear-gradient(135deg, #FFF1F2, #FECDD3)',
-    'linear-gradient(135deg, #F0FDF4, #BBF7D0)',
-    'linear-gradient(135deg, #FFF7ED, #FFEDD5)',
+    'linear-gradient(135deg, oklch(0.96 0.02 262), oklch(0.90 0.06 262))',
+    'linear-gradient(135deg, oklch(0.96 0.02 250), oklch(0.90 0.06 250))',
+    'linear-gradient(135deg, oklch(0.96 0.02 280), oklch(0.90 0.06 280))',
+    'linear-gradient(135deg, oklch(0.96 0.02 155), oklch(0.90 0.06 155))',
+    'linear-gradient(135deg, oklch(0.96 0.02 85), oklch(0.90 0.06 85))',
   ];
 
   function getGradient(i: number): string {
@@ -41,20 +45,28 @@
     }).format(val);
   }
 
-  const eventDate = $derived(new Date(event.eventDate));
+  const showDate = $derived(event.earliestShowDate ? new Date(event.earliestShowDate) : null);
+
+  // Availability status
+  const availabilityStatus = $derived.by(() => {
+    if (event.availableSeats === undefined || event.totalSeats === undefined) return null;
+    if (event.availableSeats === 0) return 'soldout';
+    if (event.availableSeats <= 10) return 'limited';
+    return 'available';
+  });
 </script>
 
 <a
   href={resolve(`/events/${event.id}`)}
-  class="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
+  class="bento-card-interactive group flex flex-col overflow-hidden !p-0"
 >
   <!-- Banner -->
-  <div class="relative h-40 overflow-hidden bg-slate-100 sm:h-48">
+  <div class="relative h-40 overflow-hidden bg-muted sm:h-48">
     {#if event.bannerImageUrl}
       <img
         src={event.bannerImageUrl}
         alt={event.title}
-        class="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
+        class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         loading="lazy"
       />
     {:else}
@@ -74,13 +86,13 @@
       <div class="absolute top-3 left-3 z-10">
         {#if badge === 'hot'}
           <span
-            class="inline-block rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white"
+            class="inline-block rounded-full bg-danger px-2.5 py-1 text-xs font-bold text-danger-foreground"
           >
             🔥 HOT
           </span>
         {:else if badge === 'live'}
           <span
-            class="inline-block rounded-full bg-red-400 px-2.5 py-1 text-xs font-bold text-slate-900"
+            class="inline-block rounded-full bg-warning px-2.5 py-1 text-xs font-bold text-warning-foreground"
           >
             🔴 LIVE
           </span>
@@ -88,54 +100,81 @@
       </div>
     {/if}
 
-    <!-- Date badge -->
-    <div
-      class="absolute top-3 right-3 z-10 rounded-lg border border-slate-200 bg-white/90 p-1.5 text-center backdrop-blur"
-    >
-      <div class="block text-sm font-black text-slate-900">{eventDate.getDate()}</div>
-      <div class="block text-xs font-bold text-slate-500 uppercase">
-        {eventDate.toLocaleString('vi-VN', { month: 'short' })}
+    <!-- Availability badge -->
+    {#if availabilityStatus === 'soldout'}
+      <div class="absolute top-3 left-3 z-10">
+        <span
+          class="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground"
+        >
+          Sold out
+        </span>
       </div>
-    </div>
+    {:else if availabilityStatus === 'limited'}
+      <div class="absolute top-3 left-3 z-10">
+        <span
+          class="inline-block rounded-full bg-warning-muted px-2.5 py-1 text-xs font-bold text-warning-muted-foreground"
+        >
+          Sắp hết vé
+        </span>
+      </div>
+    {/if}
+
+    <!-- Date badge -->
+    {#if showDate}
+      <div
+        class="absolute top-3 right-3 z-10 rounded-xl border border-border bg-card/90 p-1.5 text-center backdrop-blur"
+      >
+        <div class="block text-sm font-black text-foreground">{showDate.getDate()}</div>
+        <div class="block text-xs font-bold text-muted-foreground uppercase">
+          {showDate.toLocaleString('vi-VN', { month: 'short' })}
+        </div>
+      </div>
+    {/if}
   </div>
 
   <!-- Card body -->
-  <div class="flex flex-1 flex-col p-4">
+  <div class="flex flex-1 flex-col p-5">
+    <!-- Category tag -->
+    {#if event.categoryName}
+      <span
+        class="mb-2 inline-block w-fit rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground"
+      >
+        {event.categoryName}
+      </span>
+    {/if}
+
     <!-- Title -->
     <h3
-      class="mb-2.5 line-clamp-2 text-base font-bold text-slate-900 transition-colors group-hover:text-primary"
+      class="mb-2.5 line-clamp-2 text-base font-bold text-foreground transition-colors group-hover:text-primary"
     >
       {event.title}
     </h3>
 
     <!-- Meta info -->
-    <div class="mb-3 space-y-1 text-sm text-slate-600">
+    <div class="mb-3 space-y-1.5 text-sm text-muted-foreground">
       <!-- Date -->
-      <div class="flex items-center gap-1.5">
-        <svg
-          class="h-3.5 w-3.5 flex-shrink-0 text-slate-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-        <span>{formatDate(event.eventDate)}</span>
-      </div>
+      {#if event.earliestShowDate}
+        <div class="flex items-center gap-1.5">
+          <svg
+            class="h-3.5 w-3.5 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+          <span>{formatDate(event.earliestShowDate)}</span>
+        </div>
+      {/if}
 
       <!-- Venue -->
       <div class="flex items-center gap-1.5">
-        <svg
-          class="h-3.5 w-3.5 shrink-0 text-slate-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -154,7 +193,7 @@
     </div>
 
     <!-- Footer -->
-    <div class="mt-auto flex items-center justify-between border-t border-slate-200 pt-3">
+    <div class="mt-auto flex items-center justify-between border-t border-border pt-3">
       <span class="text-sm font-bold text-primary">Giá từ: {formatPrice(event.min_price)}</span>
       <svg
         class="h-4.5 w-4.5 flex-shrink-0 text-primary transition-transform group-hover:translate-x-1"

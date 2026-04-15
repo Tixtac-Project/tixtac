@@ -1,16 +1,20 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import Button from '$lib/components/ui/button/button.svelte';
+  import type { CarouselAPI } from '$lib/components/ui/carousel/context.js';
+  import * as Carousel from '$lib/components/ui/carousel/index.js';
   import { formatDate } from '$lib/utils/datetime';
-  import { ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import Autoplay from 'embla-carousel-autoplay';
+  import { Calendar, ChevronLeft, ChevronRight, MapPin, Ticket } from 'lucide-svelte';
 
   interface Event {
     id: number;
     title: string;
-    eventDate: string | Date;
     venue: string;
-    bannerImageUrl?: string;
-    min_price: number | string;
+    bannerImageUrl?: string | null;
+    categoryName?: string | null;
+    categorySlug?: string | null;
+    earliestShowDate?: string | null;
+    min_price: number;
   }
 
   interface Props {
@@ -19,28 +23,30 @@
 
   let { events }: Props = $props();
 
-  let currentSlide = $state(0);
+  let api = $state<CarouselAPI>();
+  let current = $state(0);
+  let canScrollPrev = $state(false);
+  let canScrollNext = $state(false);
+  const count = $derived(api ? api.scrollSnapList().length : 0);
 
-  // 1. FIX: Khởi tạo giá trị mặc định tĩnh cho SSR (1024)
-  let windowWidth = $state(1024);
-
-  let eventsPerSlide = $derived(windowWidth >= 768 ? 2 : 1);
-  let totalSlides = $derived(Math.ceil(events.length / eventsPerSlide));
-
-  // Resume slide if it exceeds totalSlides when responsive changes
   $effect(() => {
-    if (currentSlide >= totalSlides && totalSlides > 0) {
-      currentSlide = 0;
-    }
+    if (!api) return;
+
+    const onSelect = () => {
+      current = api!.selectedScrollSnap();
+      canScrollPrev = api!.canScrollPrev();
+      canScrollNext = api!.canScrollNext();
+    };
+
+    onSelect();
+    api.on('select', onSelect);
+
+    return () => {
+      api!.off('select', onSelect);
+    };
   });
 
-  function nextSlide() {
-    currentSlide = (currentSlide + 1) % totalSlides;
-  }
-
-  function prevSlide() {
-    currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
-  }
+  const autoplayPlugin = Autoplay({ delay: 5000, stopOnInteraction: true });
 
   function formatPrice(price: number | string): string {
     const val = typeof price === 'string' ? Number(price) : price;
@@ -53,11 +59,11 @@
   }
 
   const placeholderGradients = [
-    'linear-gradient(135deg, #EEF2FF, #C7D2FE)',
-    'linear-gradient(135deg, #F0F9FF, #BAE6FD)',
-    'linear-gradient(135deg, #FFF1F2, #FECDD3)',
-    'linear-gradient(135deg, #F0FDF4, #BBF7D0)',
-    'linear-gradient(135deg, #FFF7ED, #FFEDD5)',
+    'linear-gradient(135deg, oklch(0.96 0.02 262), oklch(0.85 0.08 262))',
+    'linear-gradient(135deg, oklch(0.96 0.02 250), oklch(0.85 0.08 250))',
+    'linear-gradient(135deg, oklch(0.96 0.02 280), oklch(0.85 0.08 280))',
+    'linear-gradient(135deg, oklch(0.96 0.02 155), oklch(0.85 0.08 155))',
+    'linear-gradient(135deg, oklch(0.96 0.02 85), oklch(0.85 0.08 85))',
   ];
 
   function getGradient(i: number): string {
@@ -65,102 +71,140 @@
   }
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} />
-
-<section class="mx-auto max-w-7xl px-4 pt-2 pb-4 sm:px-6">
-  <div class="relative">
-    <div class="overflow-hidden rounded-xl bg-transparent">
-      <div class="relative h-96 sm:h-125 md:h-137.5">
-        <div
-          class="flex h-full transition-transform duration-500 ease-out"
-          style="transform: translateX(-{currentSlide * 100}%)"
-        >
-          {#each { length: totalSlides } as _, slideIndex (slideIndex)}
-            <div class="relative flex h-full w-full shrink-0 gap-4 p-4 sm:p-6 md:gap-4">
-              {#each events.slice(slideIndex * eventsPerSlide, (slideIndex + 1) * eventsPerSlide) as event (event.id)}
-                <a
-                  href={resolve(`/events/${event.id}`)}
-                  class="group relative flex flex-1 overflow-hidden rounded-lg transition-transform duration-300 hover:scale-105"
+<section class="mx-auto max-w-7xl px-4 pt-4 pb-2 sm:px-6" aria-label="Sự kiện nổi bật">
+  <Carousel.Root
+    opts={{
+      align: 'start',
+      loop: true,
+    }}
+    plugins={[autoplayPlugin]}
+    setApi={(emblaApi) => (api = emblaApi)}
+    class="w-full"
+    onmouseenter={autoplayPlugin.stop}
+    onmouseleave={autoplayPlugin.reset}
+  >
+    <Carousel.Content class="-ms-5">
+      {#each events as event, i (event.id)}
+        <Carousel.Item class="basis-full ps-5 md:basis-1/2">
+          <a
+            href={resolve(`/events/${event.id}`)}
+            class="group relative block overflow-hidden rounded-2xl"
+          >
+            <!-- 16:9 aspect ratio -->
+            <div class="relative aspect-video">
+              <!-- Image / Placeholder -->
+              {#if event.bannerImageUrl}
+                <img
+                  src={event.bannerImageUrl}
+                  alt=""
+                  class="h-full w-full object-cover transition-transform duration-700 ease-(--ease-bento) group-hover:scale-105"
+                  loading={i < 2 ? 'eager' : 'lazy'}
+                />
+              {:else}
+                <div
+                  class="flex h-full w-full items-center justify-center"
+                  style="background: {getGradient(event.id)}"
                 >
-                  <div class="relative h-full w-full">
-                    {#if event.bannerImageUrl}
-                      <img
-                        src={event.bannerImageUrl}
-                        alt={event.title}
-                        class="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    {:else}
-                      <div
-                        class="flex h-full w-full items-center justify-center"
-                        style="background: {getGradient(event.id)}"
-                      >
-                        <span class="text-6xl opacity-60">🎫</span>
-                      </div>
-                    {/if}
+                  <span class="text-6xl opacity-40 sm:text-7xl">🎫</span>
+                </div>
+              {/if}
 
-                    <div
-                      class="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent"
-                    ></div>
+              <!-- Gradient overlay -->
+              <div
+                class="absolute inset-0 bg-linear-to-t from-black/70 via-black/25 to-transparent"
+              ></div>
 
-                    <div class="absolute inset-0 flex flex-col justify-end p-4 sm:p-6">
-                      <h3 class="line-clamp-2 text-lg font-bold text-white sm:text-2xl">
-                        {event.title}
-                      </h3>
-                      <p class="mt-1 line-clamp-1 text-sm text-slate-200 sm:text-base">
-                        📍 {event.venue}
-                      </p>
-                      <p class="mt-1 text-xs text-slate-300 sm:text-sm">
-                        📅 {formatDate(event.eventDate)}
-                      </p>
-                      <p class="mt-2 text-base font-semibold text-primary sm:text-lg">
-                        {formatPrice(event.min_price)}
-                      </p>
-                    </div>
-                  </div>
-                </a>
-              {/each}
+              <!-- Content -->
+              <div class="absolute inset-x-0 bottom-0 flex flex-col justify-end p-4 sm:p-6">
+                {#if event.categoryName}
+                  <span
+                    class="mb-1.5 inline-block w-fit rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm sm:text-xs"
+                  >
+                    {event.categoryName}
+                  </span>
+                {/if}
+
+                <h3
+                  class="line-clamp-2 font-heading text-base leading-snug font-bold text-white sm:text-xl lg:text-2xl"
+                >
+                  {event.title}
+                </h3>
+
+                <div
+                  class="mt-1.5 flex flex-col gap-1 text-xs text-white/75 sm:flex-row sm:items-center sm:gap-3 sm:text-sm"
+                >
+                  {#if event.earliestShowDate}
+                    <span class="inline-flex items-center gap-1">
+                      <Calendar class="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+                      {formatDate(event.earliestShowDate)}
+                    </span>
+                  {/if}
+                  <span class="inline-flex items-center gap-1">
+                    <MapPin class="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+                    <span class="line-clamp-1">{event.venue}</span>
+                  </span>
+                </div>
+
+                <div class="mt-2 flex items-center gap-3">
+                  <span
+                    class="inline-flex items-center gap-1 text-sm font-bold text-white sm:text-base"
+                  >
+                    <Ticket class="h-4 w-4" />
+                    {formatPrice(event.min_price)}
+                  </span>
+                  <span
+                    class="hidden rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-transform group-hover:scale-105 sm:inline-block"
+                  >
+                    Mua vé →
+                  </span>
+                </div>
+              </div>
             </div>
+          </a>
+        </Carousel.Item>
+      {/each}
+    </Carousel.Content>
+
+    <!-- Controls below the carousel -->
+    {#if count > 1}
+      <div class="mt-3 flex items-center justify-between px-1">
+        <!-- Dot indicators -->
+        <div class="flex gap-1.5">
+          {#each [...Array(count).keys()] as index (index)}
+            <button
+              type="button"
+              onclick={() => api?.scrollTo(index)}
+              class="h-1.5 rounded-full transition-all duration-300 {current === index
+                ? 'w-7 bg-primary'
+                : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50'}"
+              aria-label="Đi đến slide {index + 1}"
+              aria-current={current === index ? 'true' : undefined}
+            ></button>
           {/each}
         </div>
 
-        {#if totalSlides > 1}
+        <!-- Custom arrow buttons -->
+        <div class="flex gap-2">
           <button
-            onclick={prevSlide}
-            class="absolute top-1/2 left-2 z-10 flex -translate-y-1/2 items-center justify-center rounded-full bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/40 sm:left-4 sm:p-3"
-            aria-label="Previous slide"
-          >
-            <ChevronLeft className="h-5 w-5 text-white sm:h-6 sm:w-6" />
-          </button>
-
-          <button
-            onclick={nextSlide}
-            class="absolute top-1/2 right-2 z-10 flex -translate-y-1/2 items-center justify-center rounded-full bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/40 sm:right-4 sm:p-3"
-            aria-label="Next slide"
-          >
-            <ChevronRight className="h-5 w-5 text-white sm:h-6 sm:w-6" />
-          </button>
-        {/if}
-      </div>
-    </div>
-
-    {#if totalSlides > 1}
-      <div class="mt-2 flex justify-center gap-2">
-        {#each Array(totalSlides) as _, index (index)}
-          <Button
             type="button"
-            variant="ghost"
-            size="icon"
-            onclick={() => (currentSlide = index)}
-            class={`h-2 rounded-full transition-all duration-300 hover:bg-slate-400 ${
-              currentSlide === index
-                ? 'w-6 bg-primary hover:bg-primary'
-                : 'w-2 bg-slate-300 hover:bg-slate-400'
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
-        {/each}
+            onclick={() => api?.scrollPrev()}
+            disabled={!canScrollPrev}
+            class="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-all hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+            aria-label="Slide trước"
+          >
+            <ChevronLeft class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onclick={() => api?.scrollNext()}
+            disabled={!canScrollNext}
+            class="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-all hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+            aria-label="Slide tiếp"
+          >
+            <ChevronRight class="h-4 w-4" />
+          </button>
+        </div>
       </div>
     {/if}
-  </div>
+  </Carousel.Root>
 </section>

@@ -8,17 +8,24 @@
     role: 'admin' | 'customer';
   }
 
+  interface Category {
+    id: number;
+    name: string;
+    slug: string;
+  }
+
   interface Props {
     user?: Users;
     searchQuery?: string;
+    categories?: Category[];
     children: Snippet;
   }
 
-  let { user, searchQuery = '', children }: Props = $props();
+  let { user, searchQuery = '', categories = [], children }: Props = $props();
 </script>
 
 <div class="flex min-h-screen flex-col bg-background text-foreground">
-  <CustomerNavbar {user} {searchQuery} />
+  <CustomerNavbar {user} {searchQuery} {categories} />
   <main class="flex-1">
     {@render children()}
   </main>
