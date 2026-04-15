@@ -1,5 +1,6 @@
+// src/routes/(customer)/+page.server.ts
 import { db } from '$lib/server/db';
-import { categories, events, eventShows, seatSections, seats } from '$lib/server/db/schema';
+import { categories, events, eventShows, seats, seatSections } from '$lib/server/db/schema';
 import { and, count, desc, eq, ilike, min, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
@@ -75,8 +76,8 @@ export const load: PageServerLoad = async ({ url }) => {
       categorySlug: categories.slug,
       earliestShowDate: min(eventShows.showDate),
       minPrice: min(seatSections.price),
-      totalSeats: count(sql`CASE WHEN ${seats.status} != 'disabled' THEN 1 END`),
-      availableSeats: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
+      totalSeats: sql<number>`COALESCE(SUM(CASE WHEN ${seatSections.type} = 'general' THEN ${seatSections.capacity} WHEN ${seats.status} != 'disabled' THEN 1 ELSE 0 END), 0)::int`,
+      availableSeats: sql<number>`COALESCE(SUM(CASE WHEN ${seatSections.type} = 'general' THEN ${seatSections.capacity} WHEN ${seats.status} = 'available' THEN 1 ELSE 0 END), 0)::int`,
     })
     .from(events)
     .leftJoin(categories, eq(categories.id, events.categoryId))
@@ -110,8 +111,8 @@ export const load: PageServerLoad = async ({ url }) => {
       categorySlug: e.categorySlug,
       earliestShowDate: e.earliestShowDate,
       min_price: e.minPrice ? Number(e.minPrice) : 0,
-      totalSeats: e.totalSeats,
-      availableSeats: e.availableSeats,
+      totalSeats: Number(e.totalSeats),
+      availableSeats: Number(e.availableSeats),
     })),
     pagination: {
       currentPage: page,
