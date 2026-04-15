@@ -36,7 +36,10 @@ export const load: PageServerLoad = async ({ url }) => {
       .limit(1);
     if (cat) {
       conditions.push(eq(events.categoryId, cat.id));
+    } else {
+      conditions.push(sql`1 = 0`);
     }
+  }
   }
   const whereClause = and(...conditions);
 
