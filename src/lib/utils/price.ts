@@ -4,7 +4,8 @@
  * @returns {string} The formatted price string
  */
 export function formatPrice(price: number): string {
-  if (!price || price === 0) return 'Miễn phí';
+  if (!Number.isFinite(price)) return 'Đang cập nhật';
+  if (price === 0) return 'Miễn phí';
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',

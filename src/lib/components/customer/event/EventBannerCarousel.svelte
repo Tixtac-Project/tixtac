@@ -3,6 +3,7 @@
   import type { CarouselAPI } from '$lib/components/ui/carousel/context.js';
   import * as Carousel from '$lib/components/ui/carousel/index.js';
   import { formatDate } from '$lib/utils/datetime';
+  import { formatPrice } from '$lib/utils/price';
   import Autoplay from 'embla-carousel-autoplay';
   import { Calendar, ChevronLeft, ChevronRight, MapPin, Ticket } from 'lucide-svelte';
 
@@ -50,16 +51,6 @@
   });
 
   const autoplayPlugin = Autoplay({ delay: 5000, stopOnInteraction: true });
-
-  function formatPrice(price: number | string): string {
-    const val = typeof price === 'string' ? Number(price) : price;
-    if (!val || val === 0) return 'Đang cập nhật';
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0,
-    }).format(val);
-  }
 
   const placeholderGradients = [
     'linear-gradient(135deg, oklch(0.96 0.02 262), oklch(0.85 0.08 262))',

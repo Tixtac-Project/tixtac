@@ -253,15 +253,14 @@
             </DropdownMenuContent>
           </DropdownMenu>
         {:else}
-          <a href={resolve('/login')} class="flex items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-9 w-9 text-muted-foreground hover:text-foreground"
-            >
-              <CircleUserRound class="h-5 w-5" />
-            </Button>
-          </a>
+          <Button
+            variant="ghost"
+            size="icon"
+            href={resolve('/login')}
+            class="h-9 w-9 text-muted-foreground hover:text-foreground"
+          >
+            <CircleUserRound class="size-6" />
+          </Button>
         {/if}
       </div>
     </div>

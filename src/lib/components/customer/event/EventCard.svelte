@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { formatDate } from '$lib/utils/datetime';
+  import { formatPrice } from '$lib/utils/price';
 
   interface Event {
     id: number;
@@ -33,16 +34,6 @@
 
   function getGradient(i: number): string {
     return placeholderGradients[i % placeholderGradients.length];
-  }
-
-  function formatPrice(price: number | string): string {
-    const val = typeof price === 'string' ? Number(price) : price;
-    if (!val || val === 0) return 'Đang cập nhật';
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0,
-    }).format(val);
   }
 
   const showDate = $derived(event.earliestShowDate ? new Date(event.earliestShowDate) : null);
