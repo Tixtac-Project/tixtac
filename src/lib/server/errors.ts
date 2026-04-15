@@ -51,8 +51,24 @@ export const Errors = {
   NO_SEATS: new AppError('NO_SEATS', 400, 'Không có ghế trống để xuất bản'),
   EVENT_NOT_DRAFT: new AppError('EVENT_NOT_DRAFT', 409, 'Chỉ được sửa khi ở trạng thái Draft'),
 
+  // Orders
+  ORDER_NOT_OWNED: new AppError('ORDER_NOT_OWNED', 403, 'Không có quyền với đơn hàng này'),
+  ORDER_NOT_PENDING: new AppError(
+    'ORDER_NOT_PENDING',
+    400,
+    'Chỉ có thể thanh toán đơn hàng đang chờ xử lý',
+  ),
+  ORDER_ALREADY_PROCESSED: new AppError('ORDER_ALREADY_PROCESSED', 400, 'Đơn hàng đã được xử lý'),
+  LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 410, 'Đơn hàng đã hết hạn, vui lòng đặt lại vé'),
+  ORDER_EMPTY: new AppError('ORDER_EMPTY', 400, 'Đơn hàng không có vé nào'),
+
+  // Seats
+  SEAT_NOT_AVAILABLE: new AppError('SEAT_NOT_AVAILABLE', 409, 'Một hoặc nhiều ghế đã được đặt'),
+
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
+  INTERNAL_ERROR: new AppError('INTERNAL_ERROR', 500, 'Đã có lỗi xảy ra, vui lòng thử lại'),
+  INVALID_ID: new AppError('INVALID_ID', 400, 'ID không hợp lệ'),
 
   // Validation (factory — accepts dynamic details)
   VALIDATION: (details?: Record<string, string>) =>
