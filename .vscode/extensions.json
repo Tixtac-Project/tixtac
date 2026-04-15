@@ -9,9 +9,9 @@
     "mikestead.dotenv",
     "aaron-bond.better-comments",
     // Git
-    "mhutchie.git-graph",
+    "mhutchie.git-graph"
     // DB
-    "cweijan.vscode-postgresql-client2"
+    // "cweijan.vscode-postgresql-client2"
   ],
   "unwantedRecommendations": ["hookyqr.beautify", "tabnine.tabnine-vscode"]
 }

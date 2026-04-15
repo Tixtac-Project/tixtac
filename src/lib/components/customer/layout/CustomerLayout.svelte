@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import CustomerFooter from './CustomerFooter.svelte';
   import CustomerNavbar from './CustomerNavbar.svelte';
 
@@ -7,18 +8,26 @@
     role: 'admin' | 'customer';
   }
 
+  interface Category {
+    id: number;
+    name: string;
+    slug: string;
+  }
+
   interface Props {
     user?: Users;
     searchQuery?: string;
+    categories?: Category[];
+    children: Snippet;
   }
 
-  let { user, searchQuery = '' }: Props = $props();
+  let { user, searchQuery = '', categories = [], children }: Props = $props();
 </script>
 
-<div class="flex min-h-screen flex-col bg-white text-slate-900">
-  <CustomerNavbar {user} {searchQuery} />
-  <main class="mx-auto w-full max-w-7xl flex-1 px-6 py-10 sm:px-6 sm:py-12">
-    <slot />
+<div class="flex min-h-screen flex-col bg-background text-foreground">
+  <CustomerNavbar {user} {searchQuery} {categories} />
+  <main class="flex-1">
+    {@render children()}
   </main>
   <CustomerFooter />
 </div>

@@ -3,6 +3,7 @@
   import { enhance } from '$app/forms';
   import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { page as pageState } from '$app/state';
   import CategoryFilterBar from '$lib/components/customer/event/CategoryFilterBar.svelte';
   import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
   import { Button } from '$lib/components/ui/button';
@@ -14,31 +15,41 @@
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
   import { LogOut, Ticket, User } from 'lucide-svelte';
+  import { tick } from 'svelte';
 
   interface Users {
     id: number;
     role: 'admin' | 'customer';
   }
 
+  interface Category {
+    id: number;
+    name: string;
+    slug: string;
+  }
+
   interface Props {
     user?: Users;
     searchQuery?: string;
+    categories?: Category[];
   }
 
-  const categories = [
-    { label: 'Concert', icon: '🎵', value: 'concert' },
-    { label: 'Festival', icon: '🎉', value: 'festival' },
-    { label: 'Thể Thao', icon: '⚽', value: 'sports' },
-    { label: 'Kịch Nghệ', icon: '🎭', value: 'theater' },
-    { label: 'Art & Expo', icon: '🖼️', value: 'art' },
-    { label: 'Comedy', icon: '😂', value: 'comedy' },
-  ];
+  let { user, searchQuery = '', categories = [] }: Props = $props();
 
   let activeCategory = $state('');
 
-  let { user, searchQuery = '' }: Props = $props();
+  $effect(() => {
+    activeCategory = pageState.url.searchParams.get('category') ?? '';
+  });
   let isSearchOpen = $state(false);
   let isUserMenuOpen = $state(false);
+  let searchInput: HTMLInputElement | null = null;
+
+  $effect(() => {
+    if (isSearchOpen) {
+      tick().then(() => searchInput?.focus());
+    }
+  });
 
   function handleLogout() {
     return async () => {
@@ -53,7 +64,7 @@
     <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
       <a
         href={resolve('/')}
-        class="flex shrink-0 items-center gap-2 font-bold text-white transition-opacity {isSearchOpen
+        class="flex shrink-0 items-center gap-2 font-bold text-primary-foreground transition-opacity {isSearchOpen
           ? 'hidden md:flex'
           : 'flex'}"
       >
@@ -72,7 +83,7 @@
           type="button"
           variant="ghost"
           size="icon"
-          class="mr-2 text-white md:hidden"
+          class="mr-2 text-primary-foreground md:hidden"
           onclick={() => (isSearchOpen = false)}
         >
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,11 +96,9 @@
           </svg>
         </Button>
 
-        <div
-          class="relative flex h-10 w-full items-center overflow-hidden rounded-lg bg-white px-4"
-        >
+        <div class="relative flex h-10 w-full items-center overflow-hidden rounded-xl bg-card px-4">
           <svg
-            class="pointer-events-none h-5 w-5 shrink-0 text-slate-400"
+            class="pointer-events-none h-5 w-5 shrink-0 text-muted-foreground"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -102,17 +111,17 @@
             />
           </svg>
           <input
+            bind:this={searchInput}
             type="text"
             name="q"
             value={searchQuery}
             placeholder="Bạn tìm gì hôm nay?"
-            class="w-full flex-1 border-none bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:ring-0"
-            autofocus={isSearchOpen}
+            class="w-full flex-1 border-none bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:ring-0"
           />
-          <div class="mx-2 hidden h-5 w-[1px] bg-slate-300 sm:block"></div>
+          <div class="mx-2 hidden h-5 w-[1px] bg-border sm:block"></div>
           <button
             type="submit"
-            class="hidden px-2 text-sm font-medium whitespace-nowrap text-slate-600 hover:text-primary sm:block"
+            class="hidden px-2 text-sm font-medium whitespace-nowrap text-muted-foreground hover:text-primary sm:block"
           >
             Tìm kiếm
           </button>
@@ -121,7 +130,7 @@
 
       <!-- AUTH & MENU -->
       <nav
-        class="flex shrink-0 items-center justify-end gap-4 text-white sm:gap-6 {isSearchOpen
+        class="flex shrink-0 items-center justify-end gap-4 text-primary-foreground sm:gap-6 {isSearchOpen
           ? 'hidden md:flex'
           : 'flex'}"
       >
@@ -130,7 +139,7 @@
           type="button"
           variant="ghost"
           size="icon"
-          class="text-white md:hidden"
+          class="text-primary-foreground md:hidden"
           onclick={() => (isSearchOpen = true)}
         >
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,7 +155,6 @@
         {#if user}
           <a
             href={resolve('/')}
-            // href={resolve('/my-tickets')}
             class="flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
           >
             <Ticket className="h-5 w-5" />
@@ -159,7 +167,7 @@
               <Button
                 variant="ghost"
                 size="icon"
-                class="cursor-pointer gap-2 rounded-lg hover:bg-transparent hover:text-white focus:bg-transparent sm:size-auto sm:px-3"
+                class="cursor-pointer gap-2 rounded-xl hover:bg-transparent hover:text-primary-foreground focus:bg-transparent sm:size-auto sm:px-3"
               >
                 <Avatar class="h-8 w-8">
                   <AvatarImage src="" alt={`User ${user.id}`} />
@@ -174,7 +182,6 @@
               <DropdownMenuItem
                 onclick={() => {
                   goto(resolve('/'));
-                  // goto(resolve('/account'));
                   isUserMenuOpen = false;
                 }}
                 class="cursor-pointer"
@@ -225,20 +232,12 @@
     </div>
   </div>
 
-  <!-- TẦNG 2: CATEGORY FILTER (Đặc trưng Ticketbox) -->
-  <div class="border-t border-white/10 bg-secondary">
-    <div class="mx-auto flex h-14 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-      <CategoryFilterBar {categories} bind:activeCategory />
+  <!-- TẦNG 2: CATEGORY FILTER -->
+  {#if categories.length > 0}
+    <div class="border-t border-primary/20 bg-secondary">
+      <div class="mx-auto flex h-14 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+        <CategoryFilterBar {categories} bind:activeCategory />
+      </div>
     </div>
-  </div>
+  {/if}
 </header>
-
-<style>
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-</style>

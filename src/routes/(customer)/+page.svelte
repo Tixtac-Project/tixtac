@@ -5,28 +5,32 @@
   import PaginationNav from '$lib/components/customer/event/PaginationNav.svelte';
   import SectionHeader from '$lib/components/customer/event/SectionHeader.svelte';
 
-  // Interface for Event data
-  interface Event {
+  // Shared Event interface
+  interface EventItem {
     id: number;
     title: string;
-    eventDate: string | Date;
     venue: string;
-    bannerImageUrl?: string;
-    min_price: number | string;
+    bannerImageUrl?: string | null;
+    categoryName?: string | null;
+    categorySlug?: string | null;
+    earliestShowDate?: string | null;
+    min_price: number;
+    totalSeats?: number;
+    availableSeats?: number;
   }
 
-  // Interface for Pagination data
   interface Pagination {
     currentPage: number;
     totalPages: number;
     searchQuery: string;
+    categorySlug: string;
   }
 
-  // Dữ liệu từ +page.server.ts
   let { data } = $props<{
     data: {
-      featuredEvents: Event[];
-      events: Event[];
+      categories: { id: number; name: string; slug: string }[];
+      featuredEvents: EventItem[];
+      events: EventItem[];
       pagination: Pagination;
     };
   }>();
@@ -34,8 +38,6 @@
   let featuredEvents = $derived(data.featuredEvents);
   let events = $derived(data.events);
   let pagination = $derived(data.pagination);
-
-  // Categories filter (client-side, mở rộng sau)
 </script>
 
 <svelte:head>

@@ -7,10 +7,17 @@ export function validateDisabledSeats(sections: SectionInput[]): void {
 
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
-    const startRow = section.start_row_index ?? 0;
-    const startCol = section.start_col_index ?? 1;
-    const endRow = startRow + section.rows - 1;
-    const endCol = startCol + section.cols - 1;
+    const seatCfg = section.seat_config;
+
+    // GA sections don't have disabled seats
+    if (section.type === 'general') continue;
+
+    // startRowIndex is 1-based; rowLabelToIndex returns 0-based
+    // Convert to 0-based range for comparison
+    const startRow0 = (seatCfg.startRowIndex ?? 1) - 1;
+    const endRow0 = startRow0 + seatCfg.rows - 1;
+    const startCol = seatCfg.startColIndex ?? 1;
+    const endCol = startCol + seatCfg.cols - 1;
 
     const invalid: string[] = [];
 
@@ -21,16 +28,16 @@ export function validateDisabledSeats(sections: SectionInput[]): void {
         continue;
       }
 
-      // Check prefix matches the section's prefix
-      if (parsed.prefix !== section.prefix) {
+      // Check prefix matches the section's seat_config prefix
+      if (seatCfg.prefix && parsed.prefix !== seatCfg.prefix) {
         invalid.push(label);
         continue;
       }
 
       const rowIndex = rowLabelToIndex(parsed.rowLabel);
       if (
-        rowIndex < startRow ||
-        rowIndex > endRow ||
+        rowIndex < startRow0 ||
+        rowIndex > endRow0 ||
         parsed.colNumber < startCol ||
         parsed.colNumber > endCol
       ) {

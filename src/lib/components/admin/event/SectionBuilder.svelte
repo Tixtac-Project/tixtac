@@ -3,35 +3,23 @@
   import * as Tooltip from '$lib/components/ui/tooltip';
   import type { SectionFormData } from '$lib/shared/schemas/event.schema';
   import { getRowLabel } from '$lib/utils/seat-label';
-  import { Plus } from 'lucide-svelte';
+  import { createDefaultSection } from '$lib/utils/section-defaults';
+  import { LayoutGrid, Plus } from 'lucide-svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import SectionItem from './SectionItem.svelte';
 
   let {
     sections = $bindable(),
     errors = {},
+    errPrefix = '',
     onvalidationchange,
   }: {
     sections: SectionFormData[];
     errors?: Record<string, string>;
+    /** Prefix for error keys, e.g. "shows.0." so field errors resolve to "shows.0.sections.0.name" */
+    errPrefix?: string;
     onvalidationchange?: (state: { hasOverlap: boolean; duplicatePrefixes: string[] }) => void;
   } = $props();
-
-  function createDefaultSection(): SectionFormData {
-    return {
-      name: '',
-      prefix: '',
-      price: 0,
-      rows: 1,
-      cols: 1,
-      layout_x: 0,
-      layout_y: 0,
-      start_row_index: 0,
-      start_col_index: 1,
-      disabled_seats: '',
-      sort_order: sections.length,
-    };
-  }
 
   function addSection() {
     sections = [...sections, createDefaultSection()];
@@ -43,8 +31,11 @@
 
   let totalSeats = $derived(
     sections.reduce((sum, s) => {
-      const r = s.rows > 0 ? s.rows : 0;
-      const c = s.cols > 0 ? s.cols : 0;
+      if (s.type === 'general') {
+        return sum + Math.max(s.capacity ?? 0, 0);
+      }
+      const r = s.seat_config.rows > 0 ? s.seat_config.rows : 0;
+      const c = s.seat_config.cols > 0 ? s.seat_config.cols : 0;
       return sum + r * c;
     }, 0),
   );
@@ -106,7 +97,7 @@
   let computedDuplicatePrefixes = $derived.by(() => {
     const prefixCount = new SvelteMap<string, number>();
     for (const s of sections) {
-      const p = s.prefix.trim().toUpperCase();
+      const p = (s.seat_config.prefix ?? '').trim().toUpperCase();
       if (!p) continue;
       prefixCount.set(p, (prefixCount.get(p) || 0) + 1);
     }
@@ -123,16 +114,19 @@
       maxCol = -Infinity;
 
     const parsedSections = sections.map((s, idx) => {
-      // Seat labeling (determines seat names like VIP-A1, STD-B5, etc.)
-      const prefix = s.prefix || '';
-      const labelStartRow = Math.max(s.start_row_index, 0);
-      const labelStartCol = Math.max(s.start_col_index, 1);
-      const rows = Math.max(s.rows, 0);
-      const cols = Math.max(s.cols, 0);
+      const seatCfg = s.seat_config;
+      const layoutCfg = s.layout_config;
 
-      // Visual position on venue map (layout_x = column offset, layout_y = row offset)
-      const gridStartRow = Math.max(s.layout_y, 0);
-      const gridStartCol = Math.max(s.layout_x, 0);
+      // Seat labeling
+      const prefix = seatCfg.prefix || '';
+      const labelStartRow = Math.max(seatCfg.startRowIndex, 1);
+      const labelStartCol = Math.max(seatCfg.startColIndex, 1);
+      const rows = Math.max(seatCfg.rows, 0);
+      const cols = Math.max(seatCfg.cols, 0);
+
+      // Visual position on venue map
+      const gridStartRow = Math.max(layoutCfg.y, 0);
+      const gridStartCol = Math.max(layoutCfg.x, 0);
       const gridEndRow = gridStartRow + rows - 1;
       const gridEndCol = gridStartCol + cols - 1;
 
@@ -190,12 +184,12 @@
     const seatLabelOwner = new SvelteMap<string, string>();
     const duplicateLabels = new SvelteSet<string>();
 
-    // First pass: detect duplicate seat labels (matches server validation)
+    // First pass: detect duplicate seat labels
     for (const sec of parsedSections) {
       if (sec.rows <= 0 || sec.cols <= 0) continue;
       for (let r = 0; r < sec.rows; r++) {
         for (let c = 0; c < sec.cols; c++) {
-          const rowLabel = getRowLabel(sec.labelStartRow + r);
+          const rowLabel = getRowLabel(sec.labelStartRow + r - 1);
           const colNum = sec.labelStartCol + c;
           const seatLabel = sec.prefix
             ? `${sec.prefix}-${rowLabel}${colNum}`
@@ -209,31 +203,27 @@
       }
     }
 
-    // Second pass: fill grid cells & detect visual (grid position) overlap
+    // Second pass: fill grid cells & detect visual overlap
     let labelOverlapCount = duplicateLabels.size;
     let visualOverlapCount = 0;
-    // Track which section owns each grid cell for visual overlap detection
     const gridCellOwner = new SvelteMap<string, { sectionName: string; seatLabel: string }>();
 
     for (const sec of parsedSections) {
       if (sec.rows <= 0 || sec.cols <= 0) continue;
       for (let r = 0; r < sec.rows; r++) {
         for (let c = 0; c < sec.cols; c++) {
-          // Grid position from layout_x / layout_y
           const gridAbsRow = sec.gridStartRow + r;
           const gridAbsCol = sec.gridStartCol + c;
           const gridR = gridAbsRow - minRow;
           const gridC = gridAbsCol - minCol;
           if (gridR >= displayRows || gridC >= displayCols) continue;
 
-          // Seat label from start_row_index / start_col_index (independent of layout position)
-          const rowLabel = getRowLabel(sec.labelStartRow + r);
+          const rowLabel = getRowLabel(sec.labelStartRow + r - 1);
           const colNum = sec.labelStartCol + c;
           const seatLabel = sec.prefix
             ? `${sec.prefix}-${rowLabel}${colNum}`
             : `${rowLabel}${colNum}`;
 
-          // Check for visual overlap (different section already placed a seat in this grid cell)
           const cellKey = `${gridR},${gridC}`;
           const existingOwner = gridCellOwner.get(cellKey);
           const isVisualOverlap =
@@ -242,7 +232,6 @@
             visualOverlapCount++;
           }
 
-          // Check for seat label overlap
           const isLabelDuplicate = duplicateLabels.has(seatLabel);
           const duplicateOwner = isLabelDuplicate ? seatLabelOwner.get(seatLabel) : undefined;
 
@@ -271,14 +260,11 @@
 
     const overlapCount = labelOverlapCount + visualOverlapCount;
 
-    // Row labels for display — use numeric grid Y coordinates (not letters)
-    // because different sections at the same layoutY can have different startRowIndex
     const rowLabels: number[] = [];
     for (let r = 0; r < displayRows; r++) {
       rowLabels.push(minRow + r);
     }
 
-    // Col labels for display — use numeric grid X coordinates
     const colLabels: number[] = [];
     for (let c = 0; c < displayCols; c++) {
       colLabels.push(minCol + c);
@@ -299,11 +285,11 @@
 <div class="space-y-5">
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10">
-        <span class="text-lg">📦</span>
+      <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-success/10">
+        <LayoutGrid class="h-5 w-5 text-success" />
       </div>
       <div>
-        <h3 class="text-base font-semibold text-foreground">Khu vực ghế ngồi</h3>
+        <h3 class="text-base font-semibold text-foreground">Khu vực ghế & vé</h3>
         <p class="text-xs text-muted-foreground">
           Tổng: <strong class="text-foreground">{totalSeats.toLocaleString('vi-VN')}</strong>
           ghế
@@ -312,8 +298,8 @@
     </div>
   </div>
 
-  {#if errors['sections']}
-    <p class="text-sm text-destructive">{errors['sections']}</p>
+  {#if errors[`${errPrefix}sections`]}
+    <p class="text-sm text-destructive">{errors[`${errPrefix}sections`]}</p>
   {/if}
 
   {#if computedDuplicatePrefixes.length > 0}
@@ -328,15 +314,16 @@
   {/if}
 
   {#each sections as section, i (section)}
-    <SectionItem bind:section={sections[i]} index={i} onremove={() => removeSection(i)} {errors} />
+    <SectionItem
+      bind:section={sections[i]}
+      index={i}
+      onremove={() => removeSection(i)}
+      {errors}
+      {errPrefix}
+    />
   {/each}
 
-  <Button
-    type="button"
-    variant="outline"
-    class="w-full rounded-2xl border-dashed py-5"
-    onclick={addSection}
-  >
+  <Button type="button" variant="outline" class="w-full border-dashed py-5" onclick={addSection}>
     <Plus class="mr-2 h-4 w-4" />
     Thêm khu vực ghế
   </Button>

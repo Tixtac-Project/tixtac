@@ -12,13 +12,13 @@
 </script>
 
 <div
-  class={`mb-6 flex items-end justify-between
-    ${variant === 'small' ? 'mb-4' : 'mb-6'}
+  class={`flex items-end justify-between
+    ${variant === 'small' ? 'mb-4' : 'mb-8'}
   `}
 >
   <div>
     <h2
-      class={`font-bold tracking-tight text-slate-900
+      class={`font-heading font-bold tracking-tight text-foreground
         ${variant === 'small' ? 'text-xl' : 'text-2xl sm:text-3xl'}
       `}
     >
@@ -26,7 +26,7 @@
     </h2>
 
     {#if searchQuery}
-      <p class="mt-1 text-sm text-slate-500">
+      <p class="mt-1.5 text-sm text-muted-foreground">
         Kết quả cho: <span class="font-semibold text-primary">"{searchQuery}"</span>
       </p>
     {/if}
