@@ -8,10 +8,10 @@ export const GET = apiHandler(async ({ locals }) => {
   const user = requireAuth(locals);
 
   if (user.role !== 'customer') {
-    throwError(Errors.FORBIDDEN, 'Chỉ khách hàng mới có quyền xem vé của mình.');
+    throwError(Errors.FORBIDDEN, 'Chỉ khách hàng mới có quyền xem vé của mình');
   }
 
-  const tickets = await orderService.getMyTickets(user.id);
+  const dashboardData = await orderService.getMyOrdersAndTickets(user.id);
 
-  return json({ data: tickets }, { status: 200 });
+  return json({ data: dashboardData }, { status: 200 });
 });
