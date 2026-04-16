@@ -319,12 +319,7 @@ export const orderService = {
 
     return {
       pending_orders: pendingOrders,
-      paid_events: Array.from(paidEventsMap.values()), 
-    };
-
-    return {
-      pending_orders: pendingOrders,
-      paid_events: Object.values(paidEventsMap),
+      paid_events: Array.from(paidEventsMap.values()),
     };
   },
 };
