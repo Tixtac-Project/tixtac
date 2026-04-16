@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db';
 import { orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { and, gte, eq, inArray, or, desc } from 'drizzle-orm';
+import { and, gt, eq, inArray, or, desc } from 'drizzle-orm';
 
 /* ================= TYPE ================= */
 
@@ -207,7 +207,7 @@ export const orderService = {
         eq(orders.userId, userId),
         or(
           eq(orders.status, 'paid'),
-          and(eq(orders.status, 'pending'), gte(orders.expiresAt, now)),
+          and(eq(orders.status, 'pending'), gt(orders.expiresAt, now)),
         ),
       ),
       orderBy: [desc(orders.createdAt)],
