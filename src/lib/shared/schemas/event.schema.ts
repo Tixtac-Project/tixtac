@@ -66,8 +66,6 @@ const baseSectionSchema = z.object({
 
   type: z.enum(['assigned', 'general']).default('assigned'),
 
-  is_seat_pickable: z.boolean().default(true),
-
   capacity: z
     .number()
     .int('Sức chứa phải là số nguyên')
@@ -269,7 +267,16 @@ const showSchema = z
 // ── Stage layout item schema (discriminated union) ──
 const baseStageItem = { id: z.string(), label: z.string(), x: z.number(), y: z.number() };
 
+// Semantic stage elements from the seatmap builder (all rectangular)
+const semanticRectItem = {
+  ...baseStageItem,
+  width: z.number(),
+  height: z.number(),
+  rotation: z.number().default(0),
+};
+
 const stageLayoutItemSchema = z.discriminatedUnion('type', [
+  // Geometric shapes (generic)
   z.object({ ...baseStageItem, type: z.literal('rect'), w: z.number(), h: z.number() }),
   z.object({ ...baseStageItem, type: z.literal('circle'), radius: z.number() }),
   z.object({
@@ -277,6 +284,10 @@ const stageLayoutItemSchema = z.discriminatedUnion('type', [
     type: z.literal('polygon'),
     points: z.array(z.object({ x: z.number(), y: z.number() })),
   }),
+  // Semantic elements from seatmap builder (rectangular with rotation)
+  z.object({ ...semanticRectItem, type: z.literal('stage') }),
+  z.object({ ...semanticRectItem, type: z.literal('obstacle') }),
+  z.object({ ...semanticRectItem, type: z.literal('entrance') }),
 ]);
 
 // ── Organizer Info Schema ──────────────────────
@@ -511,7 +522,11 @@ export type SeatConfigInput = z.infer<typeof seatConfigSchema>;
 export type MapConfigInput = z.infer<typeof mapConfigSchema>;
 
 /** Form-side section type: disabled_seats is a comma-separated string instead of string[] */
-export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & { disabled_seats: string };
+export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & {
+  disabled_seats: string;
+  /** @deprecated kept for backward compat with existing drafts; ignored by server */
+  is_seat_pickable?: boolean;
+};
 
 /** Form-side show type: includes picker state for date/time selectors */
 export type ShowFormData = {
@@ -552,7 +567,6 @@ const seatConfigDraftSchema = z.object({
 const sectionFormDraftSchema = z.object({
   name: z.string(),
   type: z.enum(['assigned', 'general']).default('assigned'),
-  is_seat_pickable: z.boolean().default(true),
   price: z.number(),
   capacity: z.number().int().default(0),
   layout_config: layoutConfigDraftSchema.default({

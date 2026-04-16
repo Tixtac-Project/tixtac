@@ -64,11 +64,8 @@
   function handleTypeChange(newType: string) {
     section.type = newType as 'assigned' | 'general';
     if (newType === 'general') {
-      section.is_seat_pickable = false;
       section.seat_config.cols = 1;
       section.disabled_seats = '';
-    } else {
-      section.is_seat_pickable = true;
     }
   }
 
@@ -114,13 +111,6 @@
           >
             {isGeneral ? 'GA' : 'Seated'}
           </span>
-          {#if !isGeneral && !section.is_seat_pickable}
-            <span
-              class="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-            >
-              Auto-assign
-            </span>
-          {/if}
         </div>
         <span class="text-xs text-muted-foreground">
           {isGeneral ? `${section.capacity} vé` : `${seatCount} ghế`}
@@ -137,7 +127,7 @@
     </Button>
   </div>
 
-  <!-- Type & Pickable row -->
+  <!-- Type selector row -->
   <div class="mb-4 rounded-2xl border border-border/50 bg-muted/20 p-4">
     <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
       <div class="grid gap-1.5">
@@ -175,42 +165,7 @@
         </Select.Root>
       </div>
 
-      {#if !isGeneral}
-        <div class="grid gap-1.5">
-          <div class="flex items-center gap-1.5">
-            <Label for="section-pickable-{index}">Cho phép chọn ghế</Label>
-            <Tooltip.Root>
-              <Tooltip.Trigger>
-                <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip.Trigger>
-              <Tooltip.Content class="max-w-60">
-                <p class="text-xs">
-                  <strong>Có:</strong>
-                  Khách tự chọn vị trí ghế trên sơ đồ.
-                  <br />
-                  <strong>Không:</strong>
-                  Hệ thống tự phân bổ ghế theo thứ tự.
-                </p>
-              </Tooltip.Content>
-            </Tooltip.Root>
-          </div>
-          <Select.Root
-            type="single"
-            value={section.is_seat_pickable ? 'true' : 'false'}
-            onValueChange={(v) => (section.is_seat_pickable = v === 'true')}
-          >
-            <Select.Trigger id="section-pickable-{index}">
-              {section.is_seat_pickable ? 'Cho phép chọn ghế' : 'Hệ thống tự phân bổ'}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Group>
-                <Select.Item value="true">Cho phép chọn ghế</Select.Item>
-                <Select.Item value="false">Hệ thống tự phân bổ</Select.Item>
-              </Select.Group>
-            </Select.Content>
-          </Select.Root>
-        </div>
-      {:else}
+      {#if isGeneral}
         <div class="flex items-center">
           <p
             class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"

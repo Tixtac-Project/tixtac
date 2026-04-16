@@ -69,7 +69,7 @@
   }
 
   function removeSection(index: number) {
-    sections = sections.filter((_, i) => i !== index);
+    sections = sections.filter((_, i) => i !== index).map((sec, i) => ({ ...sec, sort_order: i }));
     if (editingIndex === index) editingIndex = null;
     else if (editingIndex !== null && editingIndex > index) editingIndex--;
   }
@@ -98,7 +98,10 @@
       case 'type': {
         const newType = value as 'assigned' | 'general';
         updated.type = newType;
-        updated.is_seat_pickable = newType !== 'general';
+        if (newType === 'general') {
+          updated.seat_config = { ...updated.seat_config, cols: 1 };
+          updated.disabled_seats = '';
+        }
         break;
       }
       case 'price':
@@ -323,52 +326,58 @@
                 />
               </div>
 
-              <!-- Prefix (mandatory for assigned) -->
-              {#if sec.type === 'assigned'}
-                <div class="grid gap-1.5">
-                  <div class="flex items-center gap-1.5">
-                    <Label>
-                      Mã tiền tố (Prefix) <span class="text-destructive">*</span>
-                    </Label>
-                    <Tooltip.Root>
-                      <Tooltip.Trigger>
-                        <span
-                          class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground"
-                        >
-                          ?
-                        </span>
-                      </Tooltip.Trigger>
-                      <Tooltip.Content class="max-w-60">
-                        <p class="text-xs">
+              <!-- Prefix -->
+              <div class="grid gap-1.5">
+                <div class="flex items-center gap-1.5">
+                  <Label>
+                    Mã tiền tố (Prefix)
+                    {#if sec.type === 'assigned'}<span class="text-destructive">*</span>{/if}
+                  </Label>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger>
+                      <span
+                        class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground"
+                      >
+                        ?
+                      </span>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content class="max-w-60">
+                      <p class="text-xs">
+                        {#if sec.type === 'assigned'}
                           Mã dùng cho nhãn ghế, VD: prefix <strong>VIP</strong>
                           → ghế
                           <strong>VIP-A1</strong>
                           ,
                           <strong>VIP-B3</strong>
                           ...
-                          <br />
-                          Chỉ chứa chữ in hoa và số (A-Z, 0-9), tối đa 10 ký tự.
-                        </p>
-                      </Tooltip.Content>
-                    </Tooltip.Root>
-                  </div>
-                  <Input
-                    placeholder="VD: VIP, STD, K1"
-                    value={prefix}
-                    maxlength={10}
-                    oninput={(e) => {
-                      const val = (e.target as HTMLInputElement).value
-                        .toUpperCase()
-                        .replace(/[^A-Z0-9]/g, '');
-                      (e.target as HTMLInputElement).value = val;
-                      updateSection(i, 'prefix', val);
-                    }}
-                  />
-                  {#if prefix && !prefixRegex.test(prefix)}
-                    <p class="text-xs text-destructive">Chỉ chứa chữ in hoa và số (A-Z, 0-9)</p>
-                  {/if}
+                        {:else}
+                          Mã nhận dạng khu vực đứng, VD: <strong>GA</strong>
+                          ,
+                          <strong>STD</strong>
+                          .
+                        {/if}
+                        <br />
+                        Chỉ chứa chữ in hoa và số (A-Z, 0-9), tối đa 10 ký tự.
+                      </p>
+                    </Tooltip.Content>
+                  </Tooltip.Root>
                 </div>
-              {/if}
+                <Input
+                  placeholder="VD: VIP, STD, GA"
+                  value={prefix}
+                  maxlength={10}
+                  oninput={(e) => {
+                    const val = (e.target as HTMLInputElement).value
+                      .toUpperCase()
+                      .replace(/[^A-Z0-9]/g, '');
+                    (e.target as HTMLInputElement).value = val;
+                    updateSection(i, 'prefix', val);
+                  }}
+                />
+                {#if prefix && !prefixRegex.test(prefix)}
+                  <p class="text-xs text-destructive">Chỉ chứa chữ in hoa và số (A-Z, 0-9)</p>
+                {/if}
+              </div>
 
               <!-- Type -->
               <div class="grid gap-1.5">

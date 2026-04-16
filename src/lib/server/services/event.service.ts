@@ -52,7 +52,7 @@ async function insertSectionsWithSeats(
         showId,
         name: sec.name,
         type: sec.type ?? 'assigned',
-        isSeatPickable: sec.is_seat_pickable ?? true,
+        isSeatPickable: true,
         capacity: sec.capacity ?? 0,
         price: String(sec.price),
         sortOrder: sec.sort_order,
@@ -430,7 +430,6 @@ export const eventService = {
               id: s.id,
               name: s.name,
               type: s.type,
-              is_seat_pickable: s.isSeatPickable,
               price: Number(s.price),
               capacity: s.capacity,
               layout_config: s.layoutConfig,
@@ -635,8 +634,7 @@ export const eventService = {
     if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
 
     return await db.transaction(async (tx) => {
-      // Delete existing shows (and their sections/seats) to prevent duplicates
-      // when user navigates back to Step 2 and re-submits
+      // For fresh creation, delete any stale shows first
       const existingShows = await tx
         .select({ id: eventShows.id })
         .from(eventShows)
@@ -644,21 +642,18 @@ export const eventService = {
 
       if (existingShows.length > 0) {
         const existingShowIds = existingShows.map((s) => s.id);
-        // Delete seats first (FK dependency)
         await tx.delete(seats).where(
           sql`${seats.showId} IN (${sql.join(
             existingShowIds.map((id) => sql`${id}`),
             sql`, `,
           )})`,
         );
-        // Delete sections
         await tx.delete(seatSections).where(
           sql`${seatSections.showId} IN (${sql.join(
             existingShowIds.map((id) => sql`${id}`),
             sql`, `,
           )})`,
         );
-        // Delete the shows themselves
         await tx.delete(eventShows).where(eq(eventShows.eventId, event_id));
       }
 
@@ -687,6 +682,124 @@ export const eventService = {
           end_time: s.endTime,
           status: s.status,
         })),
+      };
+    });
+  },
+
+  /**
+   * Step 2 (Edit): Update shows for an existing draft event.
+   * PUT /api/events/create/shows
+   * Updates existing shows in-place (preserving sections/seats),
+   * inserts new shows, and removes deleted shows.
+   */
+  async updateShows(adminId: number, data: unknown) {
+    const { event_id, shows } = validateInput(addShowsSchema, data);
+
+    const [event] = await db.select().from(events).where(eq(events.id, event_id)).limit(1);
+
+    if (!event) throwError(Errors.NOT_FOUND);
+    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+    if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
+    return await db.transaction(async (tx) => {
+      const existingShows = await tx
+        .select()
+        .from(eventShows)
+        .where(eq(eventShows.eventId, event_id))
+        .orderBy(eventShows.id);
+
+      const resultShows: {
+        id: number;
+        title: string | null;
+        show_date: string;
+        start_time: Date;
+        end_time: Date | null;
+        status: string;
+      }[] = [];
+
+      const keptShowIds = new Set<number>();
+
+      for (let i = 0; i < shows.length; i++) {
+        const show = shows[i];
+
+        if (i < existingShows.length) {
+          // Update existing show in-place — preserves its sections/seats
+          const existing = existingShows[i];
+          keptShowIds.add(existing.id);
+
+          const [updated] = await tx
+            .update(eventShows)
+            .set({
+              title: show.title || null,
+              showDate: show.show_date,
+              startTime: new Date(show.start_time),
+              endTime: show.end_time ? new Date(show.end_time) : null,
+              itinerary: show.itinerary ?? [],
+            })
+            .where(eq(eventShows.id, existing.id))
+            .returning();
+
+          resultShows.push({
+            id: updated.id,
+            title: updated.title,
+            show_date: updated.showDate,
+            start_time: updated.startTime,
+            end_time: updated.endTime,
+            status: updated.status,
+          });
+        } else {
+          // New show — insert
+          const [inserted] = await tx
+            .insert(eventShows)
+            .values({
+              eventId: event_id,
+              title: show.title || null,
+              showDate: show.show_date,
+              startTime: new Date(show.start_time),
+              endTime: show.end_time ? new Date(show.end_time) : null,
+              itinerary: show.itinerary ?? [],
+              status: 'draft' as const,
+            })
+            .returning();
+
+          resultShows.push({
+            id: inserted.id,
+            title: inserted.title,
+            show_date: inserted.showDate,
+            start_time: inserted.startTime,
+            end_time: inserted.endTime,
+            status: inserted.status,
+          });
+        }
+      }
+
+      // Delete excess shows the user removed
+      const showsToDelete = existingShows.filter((s) => !keptShowIds.has(s.id));
+      if (showsToDelete.length > 0) {
+        const deleteIds = showsToDelete.map((s) => s.id);
+        await tx.delete(seats).where(
+          sql`${seats.showId} IN (${sql.join(
+            deleteIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+        await tx.delete(seatSections).where(
+          sql`${seatSections.showId} IN (${sql.join(
+            deleteIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+        await tx.delete(eventShows).where(
+          sql`${eventShows.id} IN (${sql.join(
+            deleteIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+      }
+
+      return {
+        event_id,
+        shows: resultShows,
       };
     });
   },

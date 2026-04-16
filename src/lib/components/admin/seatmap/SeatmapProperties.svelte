@@ -317,9 +317,6 @@
             value={selectedSection.type}
             onValueChange={(v) => {
               updateSection('type', v);
-              if (v === 'general') {
-                updateSection('is_seat_pickable', false);
-              }
             }}
           >
             <Select.Trigger class="rounded-lg text-xs">

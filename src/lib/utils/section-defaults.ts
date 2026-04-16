@@ -17,7 +17,6 @@ export function createDefaultSection(sortOrder = 0): SectionFormData {
   return {
     name: '',
     type: 'assigned',
-    is_seat_pickable: true,
     price: 0,
     capacity: 0,
     layout_config: {
