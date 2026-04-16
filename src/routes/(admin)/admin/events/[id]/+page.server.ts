@@ -140,6 +140,8 @@ export const load: PageServerLoad = async ({ params }) => {
   };
 
   // 7. Build response with show-based hierarchy
+  // Returns SeatMapSection-compatible shape (snake_case) so the SeatMap
+  // component can consume it directly without client-side conversion.
   function buildSectionData(s: typeof seatSections.$inferSelect) {
     const sectionSeats = seatsBySection.get(s.id) ?? [];
     const layout = (s.layoutConfig ?? defaultLayout) as SectionLayoutConfig;
@@ -157,7 +159,7 @@ export const load: PageServerLoad = async ({ params }) => {
     }
     const totalActive = available + locked + sold;
 
-    // Build seat grid: rowLabel -> colNumber -> { status, label }
+    // Build seat grid for SectionDetail component
     const seatGrid: Record<string, Record<number, { status: string; label: string }>> = {};
     for (const seat of sectionSeats) {
       if (!seatGrid[seat.rowLabel]) seatGrid[seat.rowLabel] = {};
@@ -172,13 +174,37 @@ export const load: PageServerLoad = async ({ params }) => {
       id: s.id,
       name: s.name,
       type: s.type,
-      isSeatPickable: s.isSeatPickable,
-      price: Number(s.price),
+      is_seat_pickable: s.isSeatPickable,
+      price: String(Number(s.price)),
       capacity: s.capacity,
-      layoutConfig: layout,
-      seatConfig: seatCfg,
-      salesStartAt: s.salesStartAt?.toISOString() ?? null,
-      salesEndAt: s.salesEndAt?.toISOString() ?? null,
+      sort_order: s.sortOrder,
+      layout_config: {
+        x: layout.x ?? 0,
+        y: layout.y ?? 0,
+        width: layout.width ?? 100,
+        height: layout.height ?? 100,
+        rotation: layout.rotation ?? 0,
+        color: layout.color ?? '#cccccc',
+      },
+      seat_config: {
+        rows: s.type === 'general' ? 0 : (seatCfg.rows ?? 0),
+        cols: s.type === 'general' ? 0 : (seatCfg.cols ?? 0),
+        prefix: seatCfg.prefix,
+        rowFormat: seatCfg.rowFormat ?? 'alphabetic',
+        colDirection: seatCfg.colDirection ?? 'ltr',
+        startRowIndex: seatCfg.startRowIndex ?? 1,
+        startColIndex: seatCfg.startColIndex ?? 1,
+      },
+      sales_start_at: s.salesStartAt?.toISOString() ?? null,
+      sales_end_at: s.salesEndAt?.toISOString() ?? null,
+      seats: sectionSeats.map((seat) => ({
+        id: seat.id,
+        prefix: seat.prefix,
+        row_label: s.type === 'general' ? '' : seat.rowLabel,
+        col_number: seat.colNumber,
+        status: seat.status as 'available' | 'locked' | 'sold' | 'disabled',
+      })),
+      // Extra fields for admin UI (SectionDetail component)
       stats: { total: totalActive, available, locked, sold, disabled },
       seatGrid,
     };
