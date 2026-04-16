@@ -82,7 +82,6 @@ export const seatService = {
         id: sec.id,
         name: sec.name,
         type: sec.type,
-        is_seat_pickable: sec.isSeatPickable,
         capacity: sec.capacity,
         price: Number(sec.price).toFixed(2),
         sort_order: sec.sortOrder,

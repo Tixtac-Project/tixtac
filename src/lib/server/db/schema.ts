@@ -193,7 +193,7 @@ export const seatSections = pgTable(
       .references(() => eventShows.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 50 }).notNull(),
     type: seatTypeEnum('type').notNull().default('assigned'), // assigned: vé ngồi, general: vé đứng
-    isSeatPickable: boolean('is_pickable').notNull().default(true),
+    isSeatPickable: boolean('is_pickable').notNull().default(true), // Will not be implemented now
     price: decimal('price', { precision: 12, scale: 2 }).notNull(),
     capacity: integer('capacity').notNull().default(0), // Bắt buộc cho vé đứng (general)
     sortOrder: integer('sort_order').notNull().default(0),

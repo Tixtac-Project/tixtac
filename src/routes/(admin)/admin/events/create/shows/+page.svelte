@@ -11,15 +11,7 @@
   import { Label } from '$lib/components/ui/label';
   import * as Popover from '$lib/components/ui/popover';
   import * as Tooltip from '$lib/components/ui/tooltip';
-  import {
-    clearDraft,
-    eventParam,
-    getStoredEventId,
-    getStoredEventTitle,
-    readDraft,
-    storeEventIdentity,
-    writeDraft,
-  } from '$lib/stores/event-create-store';
+  import { eventStore } from '$lib/stores/event-create-store.svelte';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import {
@@ -58,17 +50,14 @@
   // Read initial server data (non-reactive — only needed at mount)
   const serverEvent = (page.data as { event: LayoutEvent | null }).event;
 
-  // ── Get event ID: layout (DB) > sessionStorage ──
-  let eventId = $state<number | null>(null);
-  let eventTitle = $state('');
-  if (serverEvent) {
-    eventId = serverEvent.id;
-    eventTitle = serverEvent.title;
-    if (browser) storeEventIdentity(serverEvent.id, serverEvent.title);
-  } else if (browser) {
-    eventId = getStoredEventId();
-    eventTitle = getStoredEventTitle();
+  // ── Sync server data to store ──
+  if (serverEvent && browser) {
+    eventStore.setEventIdentity(serverEvent.id, serverEvent.title);
   }
+
+  // Reactive references from store
+  const eventId = $derived(eventStore.eventId);
+  const eventTitle = $derived(eventStore.eventTitle);
 
   // Redirect if no event ID
   $effect(() => {
@@ -166,12 +155,12 @@
     // 1. Server-loaded shows from DB (via layout)
     if (serverEvent?.shows && serverEvent.shows.length > 0) {
       // Clear stale draft since we loaded from DB
-      if (browser) clearDraft('step2Draft');
+      if (browser) eventStore.clearDraft('step2Draft');
       return serverEvent.shows.map(apiShowToForm);
     }
 
     // 2. SessionStorage draft
-    const draft = readDraft<Step2Draft>('step2Draft');
+    const draft = eventStore.readDraft<Step2Draft>('step2Draft');
     if (draft && Array.isArray(draft) && draft.length > 0) {
       return draft.map((s) => ({
         title: s.title ?? '',
@@ -197,6 +186,9 @@
   let errors = $state<Record<string, string>>({});
   let submitted = $state(false);
   let showsLoadedFromDB = serverEvent?.shows && serverEvent.shows.length > 0;
+  // Event already exists in DB (either loaded from server or stored in session)
+  // This determines whether to use PUT (update) or POST (create) for shows
+  let eventExistsInDB = !!serverEvent;
 
   // Show restore toast
   let toastShown = false;
@@ -206,7 +198,7 @@
     if (showsLoadedFromDB) {
       toast.info('Đã tải suất diễn hiện có từ hệ thống.');
     } else {
-      const draft = readDraft<Step2Draft>('step2Draft');
+      const draft = eventStore.readDraft<Step2Draft>('step2Draft');
       if (draft && draft.length > 0) {
         toast.info('Đã khôi phục bản nháp suất diễn từ phiên trước.');
       }
@@ -228,7 +220,7 @@
       hasEndTime: s.hasEndTime,
       itinerary: s.itinerary,
     }));
-    const timer = setTimeout(() => writeDraft('step2Draft', snapshot), 300);
+    const timer = setTimeout(() => eventStore.writeDraft('step2Draft', snapshot), 300);
     return () => clearTimeout(timer);
   });
 
@@ -343,7 +335,7 @@
   }
 
   async function handleSubmit() {
-    if (!eventId) return;
+    if (!eventId || loading) return;
     submitted = true;
 
     // Client-side field-level validation
@@ -370,10 +362,16 @@
 
     loading = true;
     const payload = buildPayload();
-    const { data, error, details } = await api.post<{
+    type ShowsResponse = {
       event_id: number;
       shows: { id: number; title: string | null; show_date: string; status: string }[];
-    }>('/events/create/shows', payload, { silent: true });
+    };
+    // Use PUT when event already has shows in DB (preserves sections/seats),
+    // POST only for the very first time shows are added to a new event
+    const isEditing = eventExistsInDB && showsLoadedFromDB;
+    const { data, error, details } = isEditing
+      ? await api.put<ShowsResponse>('/events/create/shows', payload, { silent: true })
+      : await api.post<ShowsResponse>('/events/create/shows', payload, { silent: true });
     loading = false;
 
     if (details) {
@@ -387,10 +385,33 @@
     }
 
     if (data) {
-      // Store show IDs for Step 3
-      if (browser) writeDraft('shows', data.shows);
+      if (browser) {
+        if (isEditing) {
+          // PUT preserved show IDs — step3Draft keys are still valid
+          // Only clear drafts for shows that were removed
+          const oldStep3 = eventStore.readDraft<Record<string, unknown>>('step3Draft');
+          if (oldStep3) {
+            const newShowIds = new Set(data.shows.map((s) => String(s.id)));
+            const cleaned: Record<string, unknown> = {};
+            for (const [key, val] of Object.entries(oldStep3)) {
+              if (newShowIds.has(key)) cleaned[key] = val;
+            }
+            eventStore.writeDraft('step3Draft', cleaned);
+          }
+        } else {
+          // POST created fresh shows — clear stale seatmap drafts
+          eventStore.clearDraft('step3Draft');
+          eventStore.clearDraft('mapConfig');
+          eventStore.clearDraft('stageElements');
+        }
+
+        // Always update the shows list
+        eventStore.writeDraft('shows', data.shows);
+      }
       toast.success('Đã lưu suất diễn! Tiếp tục cấu hình sơ đồ ghế.');
-      goto(resolve(`/admin/events/create/seatmap${eventParam(eventId!)}`));
+      goto(resolve(`/admin/events/create/seatmap${eventStore.eventParam(eventId)}`), {
+        invalidateAll: true,
+      });
     }
   }
 </script>
@@ -400,7 +421,7 @@
   <Button
     variant="ghost"
     size="sm"
-    href={resolve(`/admin/events/create${eventId ? eventParam(eventId) : ''}`)}
+    href={resolve(`/admin/events/create${eventStore.eventParam(eventId)}`)}
     class="gap-2"
   >
     <ArrowLeft class="h-4 w-4" />
@@ -674,7 +695,7 @@
       isValid={isFormValid}
       {loading}
       issues={validationIssues}
-      backHref={`/admin/events/create${eventId ? eventParam(eventId) : ''}`}
+      backHref={`/admin/events/create${eventStore.eventParam(eventId)}`}
       backLabel="Quay lại"
     />
   </form>

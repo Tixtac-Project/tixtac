@@ -5,7 +5,6 @@ export interface EventDetailSection {
   id: number;
   name: string;
   type: 'assigned' | 'general';
-  is_seat_pickable: boolean;
   price: number;
   capacity: number;
   layout_config: unknown;

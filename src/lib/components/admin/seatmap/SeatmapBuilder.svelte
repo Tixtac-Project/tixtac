@@ -205,7 +205,6 @@
       const { rows, cols } = autoGridDimensions(remaining);
       sec.seat_config.rows = rows;
       sec.seat_config.cols = cols;
-      sec.is_seat_pickable = true;
       sec.layout_config.width = Math.max(150, cols * 22);
       sec.layout_config.height = Math.max(100, rows * 22);
       // Auto-disable excess seats so exact capacity is preserved
@@ -219,7 +218,6 @@
       );
     } else {
       sec.capacity = remaining;
-      sec.is_seat_pickable = false;
       sec.layout_config.width = 150;
       sec.layout_config.height = 100;
     }
@@ -251,7 +249,6 @@
     }
     if (type === 'general') {
       sec.capacity = 100;
-      sec.is_seat_pickable = false;
     }
 
     sections = [...sections, sec];

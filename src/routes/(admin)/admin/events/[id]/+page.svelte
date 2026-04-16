@@ -2,15 +2,19 @@
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import MarkdownViewer from '$lib/components/admin/event/MarkdownViewer.svelte';
+  import SectionDetail from '$lib/components/admin/event/SectionDetail.svelte';
+  import SeatmapPreview, {
+    fromAdminSection,
+    type PreviewSection,
+  } from '$lib/components/customer/event/SeatmapPreview.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import * as Tooltip from '$lib/components/ui/tooltip';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
-  import { formatDate, formatTime } from '$lib/utils/datetime.js';
+  import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
-  import { getRowLabel } from '$lib/utils/seat-label';
   import {
     ArrowLeft,
     Calendar,
@@ -18,12 +22,12 @@
     Globe,
     ListOrdered,
     Loader,
+    Map,
     Pencil,
     ShieldAlert,
     Ticket,
     Users,
   } from 'lucide-svelte';
-  import { SvelteMap } from 'svelte/reactivity';
 
   let { data } = $props();
 
@@ -70,14 +74,39 @@
     selectedShowIndex >= 0 && selectedShowIndex < shows.length ? shows[selectedShowIndex] : null,
   );
 
-  // View mode within a show: 'overview' = combined map, null = all sections, number = specific section
-  let viewMode = $state<'overview' | null | number>('overview');
+  // Detect whether an interactive seatmap was actually configured.
+  // If all sections sit at default position (0,0) with default size (100×100)
+  // and there's no stage layout, the admin skipped the map builder.
+  const hasInteractiveMap = $derived.by(() => {
+    const hasStage = Array.isArray(event.stageLayout) && event.stageLayout.length > 0;
+    if (hasStage) return true;
 
-  // Reset view mode when switching shows
+    // Check if any section has non-default layout (i.e. was placed on the canvas)
+    for (const show of shows) {
+      for (const sec of show.sections) {
+        const lc = sec.layoutConfig;
+        if (!lc) continue;
+        // If any section was moved/resized from the default, the map was configured
+        const isDefault =
+          lc.x === 0 &&
+          lc.y === 0 &&
+          lc.width === 100 &&
+          lc.height === 100 &&
+          (lc.rotation ?? 0) === 0;
+        if (!isDefault) return true;
+      }
+    }
+    return false;
+  });
+
+  // View mode within a show: 'seatmap' = visual map, null = all sections, number = specific section
+  let viewMode = $state<'seatmap' | null | number>('seatmap');
+
+  // Reset view mode when switching shows; fall back to 'all sections' if no interactive map
   $effect(() => {
     // Reference selectedShowIndex to trigger
     void selectedShowIndex;
-    viewMode = 'overview';
+    viewMode = hasInteractiveMap ? 'seatmap' : null;
   });
 
   // Overall stats across ALL shows
@@ -103,119 +132,17 @@
   );
   const sections = $derived(selectedShow?.sections ?? []);
 
-  // Build combined grid for "Tổng quan" view using CSS Grid positioning
-  type CombinedCell = { status: string; label: string; sectionName: string };
-
-  type OverviewData = {
-    cells: Map<string, CombinedCell>;
-    totalGridRows: number;
-    totalGridCols: number;
-    sectionHeaders: { name: string; gridRow: number; gridColStart: number; gridColEnd: number }[];
-    colHeaders: { num: number; gridRow: number; gridCol: number }[];
-    rowHeaders: { coordY: number; gridRow: number }[];
-  };
-
-  const overview = $derived.by((): OverviewData => {
-    const cells = new SvelteMap<string, CombinedCell>();
-    const sectionHeaders: OverviewData['sectionHeaders'] = [];
-    const colHeaders: OverviewData['colHeaders'] = [];
-    const rowHeaders: OverviewData['rowHeaders'] = [];
-    let maxGridCol = 1;
-
-    const sorted = [...sections].sort(
-      (a, b) =>
-        (a.layoutConfig.y ?? 0) - (b.layoutConfig.y ?? 0) ||
-        (a.layoutConfig.x ?? 0) - (b.layoutConfig.x ?? 0),
+  // ── Seatmap preview sections (converted for the SVG preview component) ──
+  const previewSections = $derived.by((): PreviewSection[] => {
+    if (!selectedShow) return [];
+    return selectedShow.sections.map((sec) =>
+      fromAdminSection(sec as Parameters<typeof fromAdminSection>[0]),
     );
-
-    const bandMap = new SvelteMap<number, typeof sorted>();
-    for (const sec of sorted) {
-      const bandY = sec.layoutConfig.y ?? 0;
-      const band = bandMap.get(bandY) ?? [];
-      band.push(sec);
-      bandMap.set(bandY, band);
-    }
-    const bandKeys = [...bandMap.keys()].sort((a, b) => a - b);
-
-    let gridRow = 0;
-    for (const bandY of bandKeys) {
-      const bandSections = bandMap.get(bandY)!;
-      const sectionLabelRow = gridRow;
-      gridRow++;
-      const colHeaderRow = gridRow;
-      gridRow++;
-      const dataStartRow = gridRow;
-
-      let maxRows = 0;
-      for (const sec of bandSections) {
-        const seatCfg = sec.seatConfig;
-        const layoutCfg = sec.layoutConfig;
-        const secRows = seatCfg?.rows ?? 0;
-        const secCols = seatCfg?.cols ?? 0;
-        const secLayoutX = layoutCfg?.x ?? 0;
-        const secStartRowIndex = seatCfg?.startRowIndex ?? 1;
-        const secStartColIndex = seatCfg?.startColIndex ?? 1;
-
-        if (secRows > maxRows) maxRows = secRows;
-
-        const gcStart = secLayoutX + 1;
-        const gcEnd = gcStart + secCols;
-
-        sectionHeaders.push({
-          name: sec.name,
-          gridRow: sectionLabelRow,
-          gridColStart: gcStart,
-          gridColEnd: gcEnd,
-        });
-
-        for (let c = 0; c < secCols; c++) {
-          colHeaders.push({
-            num: secLayoutX + c,
-            gridRow: colHeaderRow,
-            gridCol: gcStart + c,
-          });
-        }
-
-        for (let r = 0; r < secRows; r++) {
-          const rowLabel = getRowLabel(secStartRowIndex + r);
-          const seatRow = dataStartRow + r;
-
-          for (let c = 0; c < secCols; c++) {
-            const colNum = secStartColIndex + c;
-            const seatInfo = sec.seatGrid[rowLabel]?.[colNum];
-            if (seatInfo) {
-              cells.set(`${seatRow},${gcStart + c}`, {
-                status: seatInfo.status,
-                label: seatInfo.label,
-                sectionName: sec.name,
-              });
-            }
-          }
-        }
-
-        if (gcEnd > maxGridCol) maxGridCol = gcEnd;
-      }
-
-      for (let r = 0; r < maxRows; r++) {
-        rowHeaders.push({ coordY: bandY + r, gridRow: dataStartRow + r });
-      }
-
-      gridRow += maxRows;
-    }
-
-    return {
-      cells,
-      totalGridRows: gridRow,
-      totalGridCols: maxGridCol,
-      sectionHeaders,
-      colHeaders,
-      rowHeaders,
-    };
   });
 
   // Filtered sections for individual view
   const visibleSections = $derived.by(() => {
-    if (viewMode === 'overview') return [];
+    if (viewMode === 'seatmap') return [];
     if (viewMode === null) return sections;
     return sections.filter((s) => s.id === viewMode);
   });
@@ -223,36 +150,6 @@
   const selectedSection = $derived(
     typeof viewMode === 'number' ? sections.find((s) => s.id === viewMode) : null,
   );
-
-  function seatColor(status: string): string {
-    switch (status) {
-      case 'available':
-        return 'bg-green-500 hover:bg-green-600 text-white';
-      case 'locked':
-        return 'bg-red-500 hover:bg-red-600 text-white';
-      case 'sold':
-        return 'bg-gray-800 hover:bg-gray-900 dark:bg-gray-600 dark:hover:bg-gray-500 text-white';
-      case 'disabled':
-        return 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600';
-      default:
-        return 'bg-gray-300 text-gray-500';
-    }
-  }
-
-  function statusLabelVi(status: string): string {
-    switch (status) {
-      case 'available':
-        return 'Còn trống';
-      case 'locked':
-        return 'Đang giữ';
-      case 'sold':
-        return 'Đã bán';
-      case 'disabled':
-        return 'Vô hiệu';
-      default:
-        return status;
-    }
-  }
 
   function showStatusBadge(status: string): { label: string; class: string } {
     switch (status) {
@@ -322,7 +219,7 @@
         <div class="flex shrink-0 gap-2">
           <Button
             variant="outline"
-            class="gap-2"
+            class="gap-2 border-2 border-warning text-warning hover:bg-warning/10 hover:text-warning"
             href={resolve(`/admin/events/create?event=${event.id}`)}
           >
             <Pencil class="h-4 w-4" />
@@ -494,7 +391,6 @@
               <span class="text-sm font-semibold {isActive ? 'text-primary' : 'text-foreground'}">
                 {show.title || `Suất #${i + 1}`}
               </span>
-              <Badge variant="secondary" class="text-[10px] {badge.class}">{badge.label}</Badge>
             </div>
             <div class="flex items-center gap-3 text-xs text-muted-foreground">
               <span class="flex items-center gap-1">
@@ -621,13 +517,17 @@
     {#if sections.length > 0}
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-medium">Xem:</span>
-        <Button
-          size="sm"
-          variant={viewMode === 'overview' ? 'default' : 'outline'}
-          onclick={() => (viewMode = 'overview')}
-        >
-          Tổng quan
-        </Button>
+        {#if hasInteractiveMap}
+          <Button
+            size="sm"
+            variant={viewMode === 'seatmap' ? 'default' : 'outline'}
+            onclick={() => (viewMode = 'seatmap')}
+            class="gap-1.5"
+          >
+            <Map class="h-3.5 w-3.5" />
+            Sơ đồ
+          </Button>
+        {/if}
         <Button
           size="sm"
           variant={viewMode === null ? 'default' : 'outline'}
@@ -660,175 +560,23 @@
       </div>
     {/if}
 
-    <!-- ═══ OVERVIEW: Combined seat map ═══ -->
-    {#if viewMode === 'overview' && sections.length > 0}
-      <div class="rounded-lg border bg-card p-4 shadow-sm md:p-6">
-        <h2 class="mb-4 text-base font-semibold">Sơ đồ tổng quan</h2>
-
-        <div class="overflow-x-auto">
-          <div
-            class="inline-grid gap-1"
-            style="grid-template-columns: 2rem repeat({overview.totalGridCols -
-              1}, 1.75rem); grid-template-rows: repeat({overview.totalGridRows}, auto);"
-          >
-            <!-- Section name headers -->
-            {#each overview.sectionHeaders as sh (sh.name + sh.gridRow)}
-              <div
-                class="flex items-end pb-0.5 text-xs font-semibold text-primary"
-                style="grid-row: {sh.gridRow + 1}; grid-column: {sh.gridColStart +
-                  1} / {sh.gridColEnd + 1};"
-              >
-                ▸ {sh.name}
-              </div>
-            {/each}
-
-            <!-- Column number headers -->
-            {#each overview.colHeaders as ch (`ch-${ch.gridRow}-${ch.gridCol}`)}
-              <div
-                class="flex h-5 items-center justify-center text-[10px] font-medium text-muted-foreground"
-                style="grid-row: {ch.gridRow + 1}; grid-column: {ch.gridCol + 1};"
-              >
-                {ch.num}
-              </div>
-            {/each}
-
-            <!-- Row labels -->
-            {#each overview.rowHeaders as rh (`rh-${rh.gridRow}`)}
-              <div
-                class="flex h-7 items-center justify-center text-xs font-semibold text-muted-foreground"
-                style="grid-row: {rh.gridRow + 1}; grid-column: 1;"
-              >
-                {rh.coordY}
-              </div>
-            {/each}
-
-            <!-- Seat cells -->
-            {#each [...overview.cells.entries()] as [key, cell] (key)}
-              {@const [r, c] = key.split(',').map(Number)}
-              <div style="grid-row: {r + 1}; grid-column: {c + 1};">
-                <Tooltip.Root>
-                  <Tooltip.Trigger aria-label="{cell.label} — {statusLabelVi(cell.status)}">
-                    {#if cell.status === 'disabled'}
-                      <div
-                        class="flex h-7 w-7 cursor-default items-center justify-center rounded border border-dashed border-gray-300 text-[9px] dark:border-gray-700 {seatColor(
-                          cell.status,
-                        )}"
-                      >
-                        ✕
-                      </div>
-                    {:else}
-                      <div
-                        class="flex h-7 w-7 cursor-default items-center justify-center rounded text-[10px] font-medium transition-colors {seatColor(
-                          cell.status,
-                        )}"
-                      ></div>
-                    {/if}
-                  </Tooltip.Trigger>
-                  <Tooltip.Content>
-                    <p class="font-medium">{cell.label}</p>
-                    <p class="text-xs opacity-80">
-                      {cell.sectionName} — {statusLabelVi(cell.status)}
-                    </p>
-                  </Tooltip.Content>
-                </Tooltip.Root>
-              </div>
-            {/each}
-          </div>
-        </div>
+    <!-- ═══ SEATMAP: Visual SVG preview ═══ -->
+    {#if viewMode === 'seatmap' && sections.length > 0}
+      <div class="bento-card space-y-3">
+        <h2 class="text-base font-semibold">Sơ đồ chỗ ngồi</h2>
+        <SeatmapPreview
+          mapConfig={event.mapConfig}
+          stageLayout={event.stageLayout}
+          sections={previewSections}
+          showAvailability={true}
+        />
       </div>
     {/if}
 
     <!-- ═══ INDIVIDUAL SECTION VIEWS ═══ -->
-    {#if viewMode !== 'overview'}
+    {#if viewMode !== 'seatmap'}
       {#each visibleSections as section (section.id)}
-        {@const sectionRows = section.seatConfig?.rows ?? 0}
-        {@const sectionCols = section.seatConfig?.cols ?? 0}
-        {@const sectionStartRowIndex = section.seatConfig?.startRowIndex ?? 1}
-        {@const sectionStartColIndex = section.seatConfig?.startColIndex ?? 1}
-        <div class="rounded-lg border bg-card p-4 shadow-sm md:p-6">
-          <div class="mb-4 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 class="text-base font-semibold">
-                {section.name}
-                <span class="ml-2 text-sm font-normal text-muted-foreground">
-                  ({section.stats.total + section.stats.disabled} ghế — {section.stats.total} ghế bán
-                  được)
-                </span>
-              </h2>
-              <p class="text-xs text-muted-foreground">
-                Giá: {formatPrice(section.price)}
-                — {section.stats.available} còn trống, {section.stats.locked} đang giữ, {section
-                  .stats.sold} đã bán, {section.stats.disabled} vô hiệu
-              </p>
-            </div>
-          </div>
-
-          <!-- Seat grid -->
-          <div class="overflow-x-auto">
-            <div class="inline-block min-w-fit">
-              <!-- Column headers -->
-              <div class="mb-1 flex items-center gap-1">
-                <div class="w-8 shrink-0"></div>
-                {#each Array.from({ length: sectionCols }, (_, i) => sectionStartColIndex + i) as col (col)}
-                  <div
-                    class="flex h-6 w-8 shrink-0 items-center justify-center text-xs font-medium text-muted-foreground"
-                  >
-                    {col}
-                  </div>
-                {/each}
-              </div>
-
-              <!-- Rows -->
-              {#each Array.from({ length: sectionRows }, (_, i) => i) as rowIdx (rowIdx)}
-                {@const rowLabel = getRowLabel(sectionStartRowIndex + rowIdx)}
-                <div class="mb-1 flex items-center gap-1">
-                  <!-- Row label -->
-                  <div
-                    class="flex h-8 w-8 shrink-0 items-center justify-center text-xs font-semibold text-muted-foreground"
-                  >
-                    {rowLabel}
-                  </div>
-
-                  <!-- Seats -->
-                  {#each Array.from({ length: sectionCols }, (_, i) => sectionStartColIndex + i) as col (col)}
-                    {@const seatInfo = section.seatGrid[rowLabel]?.[col]}
-                    {#if seatInfo}
-                      <Tooltip.Root>
-                        <Tooltip.Trigger
-                          aria-label="{seatInfo.label} — {statusLabelVi(seatInfo.status)}"
-                        >
-                          {#if seatInfo.status === 'disabled'}
-                            <div
-                              class="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded border border-dashed border-gray-300 dark:border-gray-700 {seatColor(
-                                seatInfo.status,
-                              )} text-[10px]"
-                            >
-                              ✕
-                            </div>
-                          {:else}
-                            <div
-                              class="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded text-xs font-medium transition-colors {seatColor(
-                                seatInfo.status,
-                              )}"
-                            >
-                              {col}
-                            </div>
-                          {/if}
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>
-                          <p>{seatInfo.label} — {statusLabelVi(seatInfo.status)}</p>
-                        </Tooltip.Content>
-                      </Tooltip.Root>
-                    {:else}
-                      <!-- No seat in this position -->
-                      <div class="h-8 w-8 shrink-0"></div>
-                    {/if}
-                  {/each}
-                </div>
-              {/each}
-            </div>
-          </div>
-        </div>
+        <SectionDetail {section} />
       {/each}
     {/if}
 

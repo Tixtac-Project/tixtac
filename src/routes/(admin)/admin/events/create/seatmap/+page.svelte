@@ -8,16 +8,7 @@
   import type { StageElement, TicketTier } from '$lib/components/admin/seatmap/types';
   import { SECTION_COLORS } from '$lib/components/admin/seatmap/types';
   import type { MapConfigInput, SectionFormData } from '$lib/shared/schemas/event.schema';
-  import {
-    clearAllDrafts,
-    clearDraft,
-    eventParam,
-    getStoredEventId,
-    getStoredEventTitle,
-    readDraft,
-    storeEventIdentity,
-    writeDraft,
-  } from '$lib/stores/event-create-store';
+  import { eventStore } from '$lib/stores/event-create-store.svelte';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { generatePrefix } from '$lib/utils/section-defaults';
@@ -33,7 +24,6 @@
       id: number;
       name: string;
       type: string;
-      is_seat_pickable: boolean;
       price: number;
       capacity: number;
       layout_config: SectionFormData['layout_config'];
@@ -69,7 +59,7 @@
   // ══════════════════════════════════════════════════
 
   function readSeatmapDraft(): SvelteMap<number, SectionFormData[]> | null {
-    const raw = readDraft<Record<string, SectionFormData[]>>('step3Draft');
+    const raw = eventStore.readDraft<Record<string, SectionFormData[]>>('step3Draft');
     if (!raw) return null;
     const map = new SvelteMap<number, SectionFormData[]>();
     for (const [key, val] of Object.entries(raw)) {
@@ -109,7 +99,7 @@
       // ── Source: Server (DB) ──
       eventId = serverEvent.id;
       eventTitle = serverEvent.title;
-      if (browser) storeEventIdentity(serverEvent.id, serverEvent.title);
+      if (browser) eventStore.setEventIdentity(serverEvent.id, serverEvent.title);
 
       showsList = serverEvent.shows.map((s) => ({
         id: s.id,
@@ -119,7 +109,7 @@
       }));
 
       // Always sync sessionStorage with authoritative server show IDs
-      if (browser) writeDraft('shows', showsList);
+      if (browser) eventStore.writeDraft('shows', showsList);
 
       if (serverEvent.map_config) mapConfig = serverEvent.map_config;
       if (serverEvent.stage_layout) stageElements = serverEvent.stage_layout;
@@ -133,7 +123,6 @@
           const formSections: SectionFormData[] = show.sections.map((sec, i) => ({
             name: sec.name,
             type: sec.type as 'assigned' | 'general',
-            is_seat_pickable: sec.is_seat_pickable,
             price: sec.price,
             capacity: sec.capacity,
             layout_config: sec.layout_config,
@@ -148,37 +137,37 @@
         }
         sectionsLoadedFromDB = true;
         if (browser) {
-          clearDraft('step3Draft');
-          clearDraft('mapConfig');
-          clearDraft('stageElements');
+          eventStore.clearDraft('step3Draft');
+          eventStore.clearDraft('mapConfig');
+          eventStore.clearDraft('stageElements');
         }
       } else if (browser) {
         // No DB sections — try restoring from draft (validating IDs)
-        const storedMapConfig = readDraft<MapConfigInput>('mapConfig');
+        const storedMapConfig = eventStore.readDraft<MapConfigInput>('mapConfig');
         if (storedMapConfig) mapConfig = storedMapConfig;
 
-        const storedStageElements = readDraft<StageElement[]>('stageElements');
+        const storedStageElements = eventStore.readDraft<StageElement[]>('stageElements');
         if (storedStageElements) stageElements = storedStageElements;
 
         const seatmapDraft = readSeatmapDraft();
         if (seatmapDraft && isDraftValid(seatmapDraft, serverShowIds)) {
           sectionsByShow = seatmapDraft;
         } else if (seatmapDraft) {
-          clearDraft('step3Draft'); // Stale draft
+          eventStore.clearDraft('step3Draft'); // Stale draft
         }
       }
     } else if (browser) {
       // ── Source: SessionStorage only (no server data) ──
-      eventId = getStoredEventId();
-      eventTitle = getStoredEventTitle();
+      eventId = eventStore.eventId;
+      eventTitle = eventStore.eventTitle;
 
-      const storedShows = readDraft<ShowInfo[]>('shows');
+      const storedShows = eventStore.readDraft<ShowInfo[]>('shows');
       if (storedShows) showsList = storedShows;
 
-      const storedMapConfig = readDraft<MapConfigInput>('mapConfig');
+      const storedMapConfig = eventStore.readDraft<MapConfigInput>('mapConfig');
       if (storedMapConfig) mapConfig = storedMapConfig;
 
-      const storedStageElements = readDraft<StageElement[]>('stageElements');
+      const storedStageElements = eventStore.readDraft<StageElement[]>('stageElements');
       if (storedStageElements) stageElements = storedStageElements;
 
       const seatmapDraft = readSeatmapDraft();
@@ -187,7 +176,7 @@
         if (isDraftValid(seatmapDraft, storedShowIds)) {
           sectionsByShow = seatmapDraft;
         } else {
-          clearDraft('step3Draft');
+          eventStore.clearDraft('step3Draft');
         }
       }
     }
@@ -245,7 +234,7 @@
     if (sectionsLoadedFromDB) {
       toast.info('Đã tải sơ đồ ghế hiện có từ hệ thống.');
     } else {
-      const raw = readDraft<Record<string, SectionFormData[]>>('step3Draft');
+      const raw = eventStore.readDraft<Record<string, SectionFormData[]>>('step3Draft');
       if (raw && Object.keys(raw).length > 0) {
         toast.info('Đã khôi phục bản nháp sơ đồ ghế từ phiên trước.');
       }
@@ -289,6 +278,10 @@
     }
 
     sectionsByShow.set(showId, sections);
+    // Mark this show as unsaved so it will be re-saved on finish
+    if (savedShows.has(showId)) {
+      savedShows.delete(showId);
+    }
   });
 
   // Auto-save seatmap draft (debounced)
@@ -299,9 +292,9 @@
       snapshot[String(key)] = $state.snapshot(val);
     }
     const timer = setTimeout(() => {
-      writeDraft('step3Draft', snapshot);
-      writeDraft('mapConfig', $state.snapshot(mapConfig));
-      writeDraft('stageElements', $state.snapshot(stageElements));
+      eventStore.writeDraft('step3Draft', snapshot);
+      eventStore.writeDraft('mapConfig', $state.snapshot(mapConfig));
+      eventStore.writeDraft('stageElements', $state.snapshot(stageElements));
     }, 300);
     return () => clearTimeout(timer);
   });
@@ -359,14 +352,25 @@
       sections: sections.map((sec, i) => ({
         name: sec.name.trim(),
         type: sec.type ?? 'assigned',
-        is_seat_pickable: sec.is_seat_pickable ?? true,
-        price: Number(sec.price),
+        price: Number(sec.price) || 0,
         capacity: Number(sec.capacity ?? 0),
         sort_order: Number(sec.sort_order ?? i),
-        layout_config: sec.layout_config,
+        layout_config: {
+          x: Number(sec.layout_config.x) || 0,
+          y: Number(sec.layout_config.y) || 0,
+          width: Number(sec.layout_config.width) || 100,
+          height: Number(sec.layout_config.height) || 100,
+          rotation: Number(sec.layout_config.rotation) || 0,
+          color: sec.layout_config.color || '#cccccc',
+        },
         seat_config: {
-          ...sec.seat_config,
-          prefix: sec.seat_config.prefix?.trim().toUpperCase() || null,
+          rows: Number(sec.seat_config.rows) || 0,
+          cols: Number(sec.seat_config.cols) || 0,
+          prefix: sec.seat_config.prefix?.trim().toUpperCase() || generatePrefix(sec.name, i),
+          rowFormat: sec.seat_config.rowFormat || 'alphabetic',
+          colDirection: sec.seat_config.colDirection || 'ltr',
+          startRowIndex: Number(sec.seat_config.startRowIndex) || 1,
+          startColIndex: Number(sec.seat_config.startColIndex) || 1,
         },
         disabled_seats: sec.disabled_seats
           ? sec.disabled_seats
@@ -385,21 +389,29 @@
     const sections = sectionsByShow.get(showId) ?? [];
     if (sections.length === 0) return 'Phải có ít nhất 1 khu vực ghế.';
 
+    const usedPrefixes = new Set<string>();
+
     for (const [i, sec] of sections.entries()) {
       const label = sec.name?.trim() || `Khu vực #${i + 1}`;
       if (!sec.name.trim()) return `Khu vực #${i + 1} thiếu tên.`;
-      if (sec.price <= 0) return `"${label}" phải có giá > 0.`;
+      if (Number(sec.price) <= 0 || isNaN(Number(sec.price))) return `"${label}" phải có giá > 0.`;
       if (sec.type === 'assigned') {
-        if (sec.seat_config.rows < 1 || sec.seat_config.cols < 1)
+        const rows = Number(sec.seat_config.rows);
+        const cols = Number(sec.seat_config.cols);
+        if (rows < 1 || cols < 1 || isNaN(rows) || isNaN(cols))
           return `"${label}" phải có ít nhất 1 hàng và 1 cột.`;
-      }
-      if (sec.type === 'general' && (sec.capacity ?? 0) < 1)
-        return `"${label}" phải có sức chứa > 0.`;
 
-      // Auto-fill missing prefix
-      if (sec.type === 'assigned' && !sec.seat_config.prefix?.trim()) {
-        sec.seat_config.prefix = generatePrefix(sec.name, i);
+        // Use effective prefix for validation without mutating state
+        const prefix = (
+          sec.seat_config.prefix?.trim() || generatePrefix(sec.name, i)
+        ).toUpperCase();
+        if (usedPrefixes.has(prefix)) {
+          return `Mã tiền tố "${prefix}" bị trùng. Mỗi khu vực phải có mã riêng.`;
+        }
+        usedPrefixes.add(prefix);
       }
+      if (sec.type === 'general' && Number(sec.capacity ?? 0) < 1)
+        return `"${label}" phải có sức chứa > 0.`;
     }
     return null;
   }
@@ -414,11 +426,24 @@
 
     savingShowId = show.id;
     const payload = buildSeatmapPayload(show.id);
-    const { error } = await api.post('/events/create/seatmap', payload, { silent: true });
+    const resp = await api.post('/events/create/seatmap', payload, { silent: true });
     savingShowId = null;
 
-    if (error) {
-      toast.error(`Lỗi khi lưu suất "${show.title || show.show_date}": ${error}`);
+    if (resp.error) {
+      const showLabel = show.title || show.show_date;
+      console.error(`[Seatmap Save Error] Show "${showLabel}" (id=${show.id}):`, {
+        error: resp.error,
+        details: resp.details,
+        status: resp.status,
+        payload: JSON.parse(JSON.stringify(payload)),
+      });
+      if (resp.details) {
+        const fieldErrors = Object.entries(resp.details).slice(0, 3);
+        const detailMsg = fieldErrors.map(([field, msg]) => `• ${field}: ${msg}`).join('\n');
+        toast.error(`Suất "${showLabel}" — dữ liệu không hợp lệ:\n${detailMsg}`);
+      } else {
+        toast.error(`Lỗi khi lưu suất "${showLabel}": ${resp.error}`);
+      }
       return false;
     }
 
@@ -489,9 +514,10 @@
   }
 
   function cleanupAndFinish() {
-    clearAllDrafts();
+    const eid = eventId;
+    eventStore.clearAllDrafts();
     toast.success('Tạo sự kiện hoàn tất! Sự kiện đang ở trạng thái Draft.');
-    goto(resolve(`/admin/events/${eventId}`));
+    goto(resolve(`/admin/events/${eid}`));
   }
 
   /** Clone current show's sections to all other shows */
@@ -567,7 +593,7 @@
     onCloneSections={showsList.length > 1 ? handleCloneSections : undefined}
     isSaving={savingShowId !== null}
     {eventTitle}
-    backHref={resolve(`/admin/events/create/shows${eventId ? eventParam(eventId) : ''}`)}
+    backHref={resolve(`/admin/events/create/shows${eventStore.eventParam(eventId)}`)}
   />
 {:else}
   <SeatmapBuilder

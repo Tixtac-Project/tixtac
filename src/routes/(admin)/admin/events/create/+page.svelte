@@ -13,14 +13,7 @@
   import * as Tooltip from '$lib/components/ui/tooltip';
   import { formatZodErrors } from '$lib/shared/format-errors';
   import { createBasicInfoSchema } from '$lib/shared/schemas/event.schema';
-  import {
-    clearDraft,
-    eventParam,
-    getStoredEventId,
-    readDraft,
-    storeEventIdentity,
-    writeDraft,
-  } from '$lib/stores/event-create-store';
+  import { eventStore } from '$lib/stores/event-create-store.svelte';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import {
@@ -88,23 +81,29 @@
     organizer_website: string;
   };
 
-  const draft = readDraft<Step1Draft>('step1Draft');
+  // If navigating to /create without ?event= but the store still holds a
+  // previous eventId, this is a fresh creation — wipe stale session data
+  // so old show IDs / seatmap drafts don't pollute the new flow.
+  if (browser && !page.url.searchParams.has('event') && eventStore.hasEvent) {
+    eventStore.clearAllDrafts();
+  }
+
+  const draft = eventStore.readDraft<Step1Draft>('step1Draft');
 
   // Server-loaded edit data (when ?event=ID is passed via layout)
   const initEdit = (() => {
     const e = layoutData.event;
     if (!e) return null;
     // Sync to store so subsequent steps work
-    if (browser) storeEventIdentity(e.id, e.title);
+    if (browser) eventStore.setEventIdentity(e.id, e.title);
     return e;
   })();
 
   // Check if we already have an event from a previous Step 1 submission or editing
-  let initialExistingEventId: number | null = initEdit?.id ?? null;
-  if (!initialExistingEventId && browser) {
-    initialExistingEventId = getStoredEventId();
+  if (!eventStore.hasEvent && initEdit) {
+    // already set above
   }
-  let existingEventId = $state<number | null>(initialExistingEventId);
+  let existingEventId = $derived(initEdit?.id ?? eventStore.eventId);
 
   // ── Form state (edit takes priority > draft > defaults) ──
   let categoryId = $state<number | undefined>(
@@ -136,6 +135,7 @@
   let errors = $state<Record<string, string>>({});
 
   const isEditing = $derived(!!existingEventId);
+  const eventId = $derived(existingEventId);
 
   // Show restore toast (skip when editing from server data)
   let draftToastShown = false;
@@ -165,7 +165,7 @@
       organizer_phone: organizerPhone,
       organizer_website: organizerWebsite,
     };
-    const timer = setTimeout(() => writeDraft('step1Draft', snapshot), 300);
+    const timer = setTimeout(() => eventStore.writeDraft('step1Draft', snapshot), 300);
     return () => clearTimeout(timer);
   });
 
@@ -185,7 +185,7 @@
     organizerPhone = '';
     organizerWebsite = '';
     errors = {};
-    clearDraft('step1Draft');
+    eventStore.clearDraft('step1Draft');
     toast.info('Đã đặt lại biểu mẫu.');
   }
 
@@ -292,10 +292,11 @@
       return;
     }
     if (respData) {
-      storeEventIdentity(respData.id, respData.title);
-      existingEventId = respData.id;
+      eventStore.setEventIdentity(respData.id, respData.title);
       toast.success('Đã lưu thông tin cơ bản! Tiếp tục thêm suất diễn.');
-      goto(resolve(`/admin/events/create/shows${eventParam(respData.id)}`));
+      goto(resolve(`/admin/events/create/shows${eventStore.eventParam(respData.id)}`), {
+        invalidateAll: true,
+      });
     }
   }
 </script>
