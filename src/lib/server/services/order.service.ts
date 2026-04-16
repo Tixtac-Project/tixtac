@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db';
 import { orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 /* ================= TYPE ================= */
 
@@ -122,6 +122,83 @@ export const orderService = {
 
       // 8. Xây dựng response
       return await buildOrderResponse(tx, orderId, now, order);
+    });
+  },
+
+  /**
+   * Lấy danh sách toàn bộ vé (orders đã thanh toán) của một User.
+   */
+  async getMyTickets(userId: number) {
+    /**
+     * Query database bằng drizzle relational API.
+     * Tự động JOIN 6 bảng lại với nhau.
+     */
+    const rawOrders = await db.query.orders.findMany({
+      where: and(eq(orders.userId, userId), eq(orders.status, 'paid')),
+      orderBy: [desc(orders.paidAt)],
+      with: {
+        items: {
+          with: {
+            seat: {
+              with: {
+                section: true,
+                show: {
+                  with: {
+                    event: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (rawOrders.length === 0) {
+      return [];
+    }
+
+    return rawOrders.map((order) => {
+      const firstItemSeat = order.items[0]?.seat;
+      const showInfo = firstItemSeat?.show;
+      const eventInfo = showInfo?.event;
+
+      return {
+        order_id: order.id,
+        total_amount: Number(order.totalAmount).toFixed(2),
+        paid_at: order.paidAt ? order.paidAt.toISOString() : null,
+
+        event: eventInfo
+          ? {
+              id: eventInfo.id,
+              title: eventInfo.title,
+              venue: eventInfo.venue,
+              banner_image_url: eventInfo.bannerImageUrl,
+            }
+          : null,
+
+        show: showInfo
+          ? {
+              id: showInfo.id,
+              title: showInfo.title,
+              show_date: showInfo.showDate,
+              start_time: showInfo.startTime,
+            }
+          : null,
+
+        items: order.items.map((item) => ({
+          id: item.id,
+          ticket_code: item.ticketCode,
+          seat_id: item.seatId,
+          section_name: item.seat.section.name,
+          prefix: item.seat.prefix,
+          row_label: item.seat.rowLabel,
+          col_number: item.seat.colNumber,
+          price_snapshot: Number(item.priceSnapshot).toFixed(2),
+          is_checked_in: item.isCheckedIn,
+          qr_code: null,
+        })),
+      };
     });
   },
 };
