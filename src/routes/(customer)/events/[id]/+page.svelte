@@ -10,14 +10,15 @@
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
   import {
+    ArrowRight,
     Building,
     Calendar,
     Clock,
     FileText,
     Info,
+    Lock,
     MapPin,
     Shield,
-    Star,
     Ticket,
     Users,
   } from 'lucide-svelte';
@@ -63,6 +64,34 @@
 
   function seatTypeLabel(type: 'assigned' | 'general'): string {
     return type === 'assigned' ? 'Ngồi' : 'Đứng';
+  }
+
+  function getAvailabilityLabel(available: number, total: number): { text: string; class: string } {
+    if (available === 0) return { text: 'Hết vé', class: 'text-destructive font-bold' };
+    const ratio = available / total;
+    if (ratio < 0.2) return { text: 'Sắp hết', class: 'text-tertiary font-bold' };
+    return { text: 'Còn vé', class: 'text-primary font-bold' };
+  }
+
+  /** Format show_date to short date like "T6, 16 Thg 12" */
+  function formatShortDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    return new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+      .format(d)
+      .toUpperCase();
+  }
+
+  /** Get tier border color based on index */
+  function getTierColor(idx: number, total: number): string {
+    if (total <= 1) return 'border-t-primary';
+    if (idx === 0) return 'border-t-tertiary';
+    if (idx === total - 1) return 'border-t-outline-variant';
+    return 'border-t-primary';
   }
 
   function scrollToShows() {
@@ -282,300 +311,209 @@
         {/if}
 
         <!-- ═══════════════════════════════════════════ -->
-        <!-- SHOWS                                      -->
+        <!-- SHOWS + TIMELINE + TICKETS (2-col layout)  -->
         <!-- ═══════════════════════════════════════════ -->
         {#if visibleShows.length > 0}
-          <section
+          <div
             id="shows-section"
-            class="arch-enter rounded-xl bg-surface-container p-5 sm:p-8 md:col-span-12"
+            class="arch-enter grid scroll-mt-20 grid-cols-1 gap-5 md:col-span-12 lg:grid-cols-12"
             style="animation-delay: 300ms"
           >
-            <!-- Show picker (only when multiple shows) -->
-            {#if visibleShows.length > 1}
-              <div class="mb-5">
-                <span class="label-overline mb-3 block text-primary">Chọn suất diễn</span>
+            <!-- ── Left Column: Shows + Ticket Info ── -->
+            <div class="space-y-5 lg:col-span-8">
+              <!-- Show Picker -->
+              <section class="rounded-xl bg-surface-container-low p-6 sm:p-8">
+                <div class="mb-6 flex items-end justify-between">
+                  <div>
+                    <span class="text-[0.7rem] font-bold tracking-widest text-primary uppercase">
+                      Bước 01
+                    </span>
+                    <h2 class="font-heading text-2xl font-bold text-foreground sm:text-3xl">
+                      Suất diễn
+                    </h2>
+                  </div>
+                  {#if activeShow}
+                    <span class="text-sm font-medium text-muted-foreground">
+                      <span class="font-semibold text-gray-600">Đã chọn:</span>
+                      {formatDate(activeShow.show_date)}
+                    </span>
+                  {/if}
+                </div>
+
                 <ScrollArea class="w-full whitespace-nowrap" orientation="horizontal">
-                  <div class="flex w-max gap-2 pb-2">
-                    {#each visibleShows as show, idx (show.id)}
+                  <div class="flex w-max gap-4 p-5">
+                    {#each visibleShows as show (show.id)}
                       {@const isActive = activeShow?.id === show.id}
+                      {@const available = show.sections.reduce(
+                        (sum, s) => sum + getAvailable(s),
+                        0,
+                      )}
+                      {@const total = show.sections.reduce((sum, s) => sum + getTotal(s), 0)}
+                      {@const avail = getAvailabilityLabel(available, total)}
                       <button
                         onclick={() => selectShow(show.id)}
-                        class="shrink-0 cursor-pointer rounded-lg px-4 py-2.5 text-left transition-all {isActive
-                          ? 'bg-primary text-primary-foreground shadow-md'
-                          : 'bg-surface-container-low text-foreground hover:bg-surface-container-high'}"
+                        class="flex min-w-[150px] shrink-0 cursor-pointer flex-col items-center gap-2 rounded-xl p-5 transition-all duration-300 {isActive
+                          ? 'scale-105 bg-primary-container text-white shadow-lg ring-4 ring-primary-container/20'
+                          : 'bg-surface-container text-foreground hover:bg-surface-container-high active:scale-95'}"
                       >
-                        <p class="text-xs font-bold">
-                          {show.title || `Suất ${idx + 1}`}
-                        </p>
-                        <p
-                          class="mt-0.5 text-[11px] {isActive
-                            ? 'text-primary-foreground/80'
+                        <span
+                          class="text-sm font-medium {isActive
+                            ? 'opacity-80'
                             : 'text-muted-foreground'}"
                         >
-                          {formatTime(show.start_time)}, {formatDate(show.show_date)}
-                        </p>
+                          {formatShortDate(show.show_date)}
+                        </span>
+                        <span class="font-heading text-2xl font-bold">
+                          {formatTime(show.start_time)}
+                        </span>
+                        <span
+                          class="text-[0.65rem] font-bold uppercase {isActive
+                            ? 'rounded-full bg-white/20 px-2 py-0.5'
+                            : avail.class}"
+                        >
+                          {avail.text}
+                        </span>
                       </button>
                     {/each}
                   </div>
                 </ScrollArea>
-              </div>
-            {/if}
+              </section>
 
-            <!-- Active show content -->
-            {#if activeShow}
-              {@const show = activeShow}
-              <div>
-                <!-- Show header -->
-                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                  <div>
-                    {#if visibleShows.length <= 1}
-                      <span class="label-overline mb-1 block text-primary">
-                        {show.title || 'Suất diễn'}
+              <!-- Ticket Info (Thông tin vé) — Preview only -->
+              {#if activeShow && activeShow.sections.length > 0}
+                {@const show = activeShow}
+                <section class="relative rounded-xl bg-surface-container-low p-6 sm:p-8">
+                  <div class="mb-6 flex items-center justify-between">
+                    <div>
+                      <span class="text-[0.7rem] font-bold tracking-widest text-primary uppercase">
+                        Bước 02
                       </span>
-                    {/if}
-                    <h2 class="font-heading text-xl font-bold text-foreground sm:text-3xl">
-                      {show.title || 'Lịch trình suất diễn'}
-                    </h2>
-                    {#if show.show_date}
-                      <p class="mt-0.5 text-sm text-muted-foreground">
-                        {formatTime(show.start_time)}{show.end_time
-                          ? ` — ${formatTime(show.end_time)}`
-                          : ''}, {formatDate(show.show_date)}
-                      </p>
-                    {/if}
+                      <h2 class="font-heading text-2xl font-semibold text-foreground sm:text-3xl">
+                        Thông tin vé
+                      </h2>
+                    </div>
+                    <div
+                      class="flex items-center gap-1.5 rounded-full bg-primary-light px-3 py-1 font-semibold text-accent-foreground"
+                    >
+                      <Lock class="size-4" />
+                      <span class="text-sm">Xem trước</span>
+                    </div>
                   </div>
-                </div>
 
-                <!-- Itinerary (collapsed accordion) -->
-                {#if Array.isArray(show.itinerary) && show.itinerary.length > 0}
-                  <div class="mt-4">
-                    <Accordion.Root type="multiple">
-                      <Accordion.Item value="itinerary-{show.id}" class="border-b-0">
-                        <Accordion.Trigger class="py-3">
-                          <div class="flex items-center gap-2.5">
-                            <Calendar class="h-4 w-4 text-primary" />
-                            <span class="label-overline text-primary">Lịch trình sự kiện</span>
-                          </div>
-                        </Accordion.Trigger>
-                        <Accordion.Content>
-                          <div class="pt-2 pb-2">
-                            <!-- Mobile: vertical timeline -->
-                            <div class="space-y-3 sm:hidden">
-                              {#each show.itinerary as item, i (i)}
-                                {@const highlighted = i === Math.floor(show.itinerary.length / 2)}
-                                <div class="flex gap-3">
-                                  <div class="flex flex-col items-center">
-                                    <div
-                                      class="flex h-7 w-7 items-center justify-center rounded-full {highlighted
-                                        ? 'bg-primary-container text-primary-foreground'
-                                        : 'bg-surface-container-highest text-muted-foreground'}"
-                                    >
-                                      <Clock class="h-3.5 w-3.5" />
-                                    </div>
-                                    {#if i < show.itinerary.length - 1}
-                                      <div
-                                        class="mt-1 h-full w-px bg-surface-container-highest"
-                                      ></div>
-                                    {/if}
-                                  </div>
-                                  <div class="pb-4">
-                                    <p class="text-[11px] font-bold tracking-widest text-primary">
-                                      {item.time || item.time_start || ''}{item.time_end
-                                        ? ` — ${item.time_end}`
-                                        : ''}
-                                    </p>
-                                    <h4 class="text-sm font-bold text-foreground uppercase">
-                                      {item.activity || item.title || ''}
-                                    </h4>
-                                    {#if item.description}
-                                      <p
-                                        class="mt-0.5 text-[11px] tracking-tight text-muted-foreground uppercase"
-                                      >
-                                        {item.description}
-                                      </p>
-                                    {/if}
-                                  </div>
-                                </div>
-                              {/each}
-                            </div>
-
-                            <!-- Desktop: horizontal cards -->
-                            <div class="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-                              {#each show.itinerary as item, i (i)}
-                                {@const highlighted = i === Math.floor(show.itinerary.length / 2)}
-                                {#if highlighted}
-                                  <div
-                                    class="group relative overflow-hidden rounded-lg bg-primary-container p-5 shadow-lg"
-                                  >
-                                    <div
-                                      class="absolute -right-3 -bottom-3 opacity-10 transition-transform group-hover:scale-125"
-                                    >
-                                      <Star class="h-16 w-16" />
-                                    </div>
-                                    <p
-                                      class="mb-1 text-[11px] font-bold tracking-widest text-primary-foreground"
-                                    >
-                                      {item.time || item.time_start || ''}{item.time_end
-                                        ? ` — ${item.time_end}`
-                                        : ''}
-                                    </p>
-                                    <h3 class="mb-3 text-base font-bold text-primary-foreground">
-                                      {item.activity || item.title || ''}
-                                    </h3>
-                                    {#if item.description}
-                                      <p
-                                        class="text-[11px] tracking-tight text-primary-foreground/80 uppercase"
-                                      >
-                                        {item.description}
-                                      </p>
-                                    {/if}
-                                  </div>
-                                {:else}
-                                  <div
-                                    class="rounded-lg border-l-4 border-l-primary bg-surface-container-lowest p-5 shadow-sm"
-                                  >
-                                    <p
-                                      class="mb-1 text-[11px] font-bold tracking-widest text-primary"
-                                    >
-                                      {item.time || item.time_start || ''}{item.time_end
-                                        ? ` — ${item.time_end}`
-                                        : ''}
-                                    </p>
-                                    <h3 class="mb-3 text-base font-bold text-foreground">
-                                      {item.activity || item.title || ''}
-                                    </h3>
-                                    {#if item.description}
-                                      <p
-                                        class="text-[11px] tracking-tight text-muted-foreground uppercase"
-                                      >
-                                        {item.description}
-                                      </p>
-                                    {/if}
-                                  </div>
-                                {/if}
-                              {/each}
-                            </div>
-                          </div>
-                        </Accordion.Content>
-                      </Accordion.Item>
-                    </Accordion.Root>
-                  </div>
-                {/if}
-
-                <!-- Ticket Tiers -->
-                {#if show.sections.length > 0}
-                  <div class="mt-6 grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3">
+                  <div
+                    class="pointer-events-none grid grid-cols-1 gap-5 opacity-60 sm:grid-cols-2 lg:grid-cols-3"
+                  >
                     {#each show.sections as section, sIdx (section.id)}
                       {@const available = getAvailable(section)}
                       {@const total = getTotal(section)}
                       {@const soldOut = available === 0}
-                      {@const isLast =
-                        sIdx === show.sections.length - 1 && show.sections.length > 2}
-                      {@const isPopular = sIdx === 1 && show.sections.length > 1}
+                      {@const tierColor = getTierColor(sIdx, show.sections.length)}
 
-                      {#if isLast}
-                        <div
-                          class="flex flex-col justify-between rounded-xl bg-[#2d3133] p-5 shadow-2xl sm:p-6"
-                        >
-                          <div>
-                            <h3 class="mb-1.5 text-lg font-bold text-[#eef1f3] sm:text-xl">
-                              {section.name}
-                            </h3>
-                            <p class="mb-4 text-xs text-[#eef1f3]/60">
-                              Vé {seatTypeLabel(section.type)} •
-                              {#if soldOut}Hết vé{:else}Còn {available}/{total}{/if}
-                            </p>
-                            <div class="mb-5 flex items-baseline gap-1">
-                              <span class="text-3xl font-extrabold text-[#eef1f3]">
-                                {formatPrice(section.price)}
-                              </span>
-                              {#if section.price > 0}<span class="text-xs text-[#eef1f3]/60">
-                                  / vé
-                                </span>{/if}
-                            </div>
-                          </div>
-                          <button
-                            onclick={() => handleBuyTicket(show.id)}
-                            disabled={soldOut}
-                            class="w-full cursor-pointer rounded-full bg-surface-container-lowest py-3 text-sm font-bold text-foreground transition-all hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {soldOut ? 'Hết vé' : 'Chọn vé'}
-                          </button>
+                      <div
+                        class="rounded-xl border-t-4 {tierColor} bg-surface-container p-5 sm:p-6"
+                      >
+                        <h3 class="font-heading text-lg font-bold text-foreground">
+                          {section.name}
+                        </h3>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                          Vé {seatTypeLabel(section.type)} •
+                          {#if soldOut}
+                            <span class="font-semibold text-destructive">Hết vé</span>
+                          {:else}
+                            Còn {available}/{total}
+                          {/if}
+                        </p>
+                        <div class="mt-4 flex items-baseline gap-1">
+                          <span class="text-xl font-bold text-primary">
+                            {formatPrice(section.price)}
+                          </span>
+                          {#if section.price > 0}
+                            <span class="text-xs text-muted-foreground">/ vé</span>
+                          {/if}
                         </div>
-                      {:else if isPopular}
-                        <div
-                          class="relative flex flex-col justify-between rounded-xl border-2 border-primary-container bg-surface-container-lowest p-5 sm:p-6"
-                        >
-                          <div
-                            class="absolute -top-3 right-6 rounded-full bg-primary-container px-3 py-0.5 text-[0.55rem] font-bold tracking-widest text-primary-foreground uppercase"
-                          >
-                            Phổ biến nhất
-                          </div>
-                          <div>
-                            <h3 class="mb-1.5 text-lg font-bold text-foreground sm:text-xl">
-                              {section.name}
-                            </h3>
-                            <p class="mb-4 text-xs text-muted-foreground">
-                              Vé {seatTypeLabel(section.type)} •
-                              {#if soldOut}<span class="font-semibold text-destructive">
-                                  Hết vé
-                                </span>{:else}Còn {available}/{total}{/if}
-                            </p>
-                            <div class="mb-5 flex items-baseline gap-1">
-                              <span class="text-3xl font-extrabold text-foreground">
-                                {formatPrice(section.price)}
-                              </span>
-                              {#if section.price > 0}<span class="text-xs text-muted-foreground">
-                                  / vé
-                                </span>{/if}
-                            </div>
-                          </div>
-                          <button
-                            onclick={() => handleBuyTicket(show.id)}
-                            disabled={soldOut}
-                            class="w-full cursor-pointer rounded-full bg-primary-container py-3 text-sm font-bold text-primary-foreground transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {soldOut ? 'Hết vé' : 'Chọn vé'}
-                          </button>
-                        </div>
-                      {:else}
-                        <div
-                          class="flex flex-col justify-between rounded-xl bg-surface-container-low p-5 sm:p-6"
-                        >
-                          <div>
-                            <h3 class="mb-1.5 text-lg font-bold text-foreground sm:text-xl">
-                              {section.name}
-                            </h3>
-                            <p class="mb-4 text-xs text-muted-foreground">
-                              Vé {seatTypeLabel(section.type)} •
-                              {#if soldOut}<span class="font-semibold text-destructive">
-                                  Hết vé
-                                </span>{:else}Còn {available}/{total}{/if}
-                            </p>
-                            <div class="mb-5 flex items-baseline gap-1">
-                              <span class="text-3xl font-extrabold text-foreground">
-                                {formatPrice(section.price)}
-                              </span>
-                              {#if section.price > 0}<span class="text-xs text-muted-foreground">
-                                  / vé
-                                </span>{/if}
-                            </div>
-                          </div>
-                          <button
-                            onclick={() => handleBuyTicket(show.id)}
-                            disabled={soldOut}
-                            class="w-full cursor-pointer rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground transition-all hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {soldOut ? 'Hết vé' : 'Chọn vé'}
-                          </button>
-                        </div>
-                      {/if}
+                      </div>
                     {/each}
                   </div>
+
+                  <p class="mt-4 text-center text-xs text-muted-foreground">
+                    Nhấn <span class="font-semibold text-primary">Tiếp tục chọn chỗ</span>
+                    để đặt vé
+                  </p>
+                </section>
+              {/if}
+            </div>
+
+            <!-- ── Right Column: CTA + Timeline ── -->
+            <aside class="self-start lg:col-span-4 lg:self-stretch">
+              <!-- Sticky CTA -->
+              {#if activeShow}
+                <div class="sticky top-20 z-10">
+                  <div class="rounded-xl bg-surface pb-1">
+                    <button
+                      onclick={() => handleBuyTicket(activeShow!.id)}
+                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-full bg-gradient-to-br from-primary to-primary-container px-8 py-5 text-lg font-bold text-white shadow-xl shadow-primary/20 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                    >
+                      Tiếp tục chọn chỗ
+                      <ArrowRight class="h-5 w-5" />
+                    </button>
+                    <p
+                      class="mt-3 pb-3 text-center text-xs font-medium text-muted-foreground italic"
+                    >
+                      Chọn suất diễn để tiếp tục mua vé
+                    </p>
+                  </div>
+                </div>
+              {/if}
+
+              <!-- Event Timeline -->
+              {#if activeShow}
+                {@const show = activeShow}
+                {#if Array.isArray(show.itinerary) && show.itinerary.length > 0}
+                  <div class="mt-5 rounded-xl bg-surface-container-lowest p-6 shadow-sm sm:p-8">
+                    <h3 class="mb-6 font-heading text-xl font-bold text-foreground">
+                      Lịch trình sự kiện
+                    </h3>
+                    <div class="space-y-0">
+                      {#each show.itinerary as item, i (i)}
+                        {@const isFirst = i < Math.ceil(show.itinerary.length / 2)}
+                        {@const isLast = i === show.itinerary.length - 1}
+                        <div
+                          class="relative ml-2 flex gap-6 {isLast
+                            ? ''
+                            : 'border-l-2 border-primary/20 pb-7'}"
+                        >
+                          <!-- Dot -->
+                          <div
+                            class="absolute top-0 -left-[9px] h-4 w-4 rounded-full {isFirst
+                              ? 'bg-primary'
+                              : 'bg-surface-container-highest'} ring-4 ring-background"
+                          ></div>
+                          <!-- Content -->
+                          <div class="pl-4">
+                            <span
+                              class="text-xs font-bold tracking-widest uppercase {isFirst
+                                ? 'text-primary'
+                                : 'text-muted-foreground'}"
+                            >
+                              {item.time || item.time_start || ''}{item.time_end
+                                ? ` — ${item.time_end}`
+                                : ''}
+                            </span>
+                            <h4 class="mt-0.5 font-semibold text-foreground">
+                              {item.activity || item.title || ''}
+                            </h4>
+                            {#if item.description}
+                              <p class="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                            {/if}
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
                 {/if}
-              </div>
-            {/if}
-          </section>
+              {/if}
+            </aside>
+          </div>
         {/if}
 
         <!-- ═══════════════════════════════════════════ -->

@@ -7,7 +7,7 @@
 import { db } from '$lib/server/db';
 import { eventShows, seatSections, seats } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { eq, asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
 /*
 1. Lấy sơ đồ ghế của một show
@@ -82,6 +82,7 @@ export const seatService = {
         id: sec.id,
         name: sec.name,
         type: sec.type,
+        is_seat_pickable: true, // deprecated — all assigned sections are now pickable
         capacity: sec.capacity,
         price: Number(sec.price).toFixed(2),
         sort_order: sec.sortOrder,

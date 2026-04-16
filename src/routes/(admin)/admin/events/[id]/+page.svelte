@@ -3,10 +3,7 @@
   import { resolve } from '$app/paths';
   import MarkdownViewer from '$lib/components/admin/event/MarkdownViewer.svelte';
   import SectionDetail from '$lib/components/admin/event/SectionDetail.svelte';
-  import SeatmapPreview, {
-    fromAdminSection,
-    type PreviewSection,
-  } from '$lib/components/customer/event/SeatmapPreview.svelte';
+  import SeatMap from '$lib/components/seat-map/SeatMap.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
@@ -84,9 +81,8 @@
     // Check if any section has non-default layout (i.e. was placed on the canvas)
     for (const show of shows) {
       for (const sec of show.sections) {
-        const lc = sec.layoutConfig;
+        const lc = sec.layout_config;
         if (!lc) continue;
-        // If any section was moved/resized from the default, the map was configured
         const isDefault =
           lc.x === 0 &&
           lc.y === 0 &&
@@ -131,14 +127,6 @@
     selectedShow?.stats ?? { available: 0, locked: 0, sold: 0, disabled: 0, total: 0 },
   );
   const sections = $derived(selectedShow?.sections ?? []);
-
-  // ── Seatmap preview sections (converted for the SVG preview component) ──
-  const previewSections = $derived.by((): PreviewSection[] => {
-    if (!selectedShow) return [];
-    return selectedShow.sections.map((sec) =>
-      fromAdminSection(sec as Parameters<typeof fromAdminSection>[0]),
-    );
-  });
 
   // Filtered sections for individual view
   const visibleSections = $derived.by(() => {
@@ -378,7 +366,6 @@
       <div class="flex flex-wrap gap-2">
         {#each shows as show, i (show.id)}
           {@const isActive = selectedShowIndex === i}
-          {@const badge = showStatusBadge(show.status)}
           <button
             type="button"
             class="flex flex-col items-start gap-1 rounded-2xl border px-4 py-3 text-left transition-all
@@ -552,7 +539,7 @@
       <div class="rounded-lg border bg-muted/30 p-3 text-sm">
         <span class="font-semibold">{selectedSection.name}</span>
         <span class="ml-2 text-muted-foreground">
-          — Giá: {formatPrice(selectedSection.price)}
+          — Giá: {formatPrice(Number(selectedSection.price))}
           — {selectedSection.stats.available} còn trống, {selectedSection.stats.locked} đang giữ, {selectedSection
             .stats.sold} đã bán, {selectedSection.stats.disabled} vô hiệu (Tổng: {selectedSection
             .stats.total + selectedSection.stats.disabled})
@@ -564,10 +551,11 @@
     {#if viewMode === 'seatmap' && sections.length > 0}
       <div class="bento-card space-y-3">
         <h2 class="text-base font-semibold">Sơ đồ chỗ ngồi</h2>
-        <SeatmapPreview
+        <SeatMap
           mapConfig={event.mapConfig}
-          stageLayout={event.stageLayout}
-          sections={previewSections}
+          stageLayout={Array.isArray(event.stageLayout) ? event.stageLayout : []}
+          {sections}
+          readonly={true}
           showAvailability={true}
         />
       </div>

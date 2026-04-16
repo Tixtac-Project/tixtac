@@ -5,13 +5,14 @@
 
   let status = $derived(page.status);
   let message = $derived(page.error?.message || 'Something went wrong');
+  let role = $derived(page.data?.user?.role || 'customer');
 </script>
 
 <svelte:head>
   <title>{status} - TixTac</title>
 </svelte:head>
 
-<div class="min-h-[80vh] bg-surface px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
+<div class="flex min-h-screen w-full items-center justify-center bg-surface">
   <div class="mx-auto max-w-6xl">
     <div class="grid grid-cols-1 gap-5 md:grid-cols-12">
       <!-- ── Hero message card (tall) ── -->
@@ -35,13 +36,23 @@
           {/if}
         </p>
         <div class="mt-8">
-          <a
-            href={resolve('/')}
-            class="btn-primary-gradient inline-flex items-center gap-2.5 px-8 py-4 text-sm font-bold"
-          >
-            <House class="h-4 w-4" />
-            Trở lại trang chủ
-          </a>
+          {#if role === 'customer'}
+            <a
+              href={resolve('/')}
+              class="btn-primary-gradient inline-flex items-center gap-2.5 px-8 py-4 text-sm font-bold"
+            >
+              <House class="h-4 w-4" />
+              Trở lại trang chủ
+            </a>
+          {:else}
+            <a
+              href={resolve('/admin')}
+              class="btn-primary-gradient inline-flex items-center gap-2.5 px-8 py-4 text-sm font-bold"
+            >
+              <House class="h-4 w-4" />
+              Trở lại trang quản trị
+            </a>
+          {/if}
         </div>
       </section>
 
