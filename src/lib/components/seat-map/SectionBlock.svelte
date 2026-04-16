@@ -13,8 +13,8 @@
 
   let { section, store }: Props = $props();
 
-  // Whether user can pick individual seats
-  let isPickable = $derived(section.type === 'assigned' && section.is_seat_pickable);
+  // Whether user can pick individual seats (all assigned sections are now pickable)
+  let isPickable = $derived(section.type === 'assigned');
 
   // Build seat lookup map: "rowLabel-colNumber" -> seat
   let seatLookup = $derived.by(() => {

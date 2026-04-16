@@ -3,15 +3,17 @@
   const version = __APP_VERSION__;
 </script>
 
-<footer class="border-t border-border bg-secondary">
-  <div class="mx-auto max-w-7xl px-6 py-16 pb-10">
+<footer class="rounded-none border-t border-border bg-secondary md:rounded-t-3xl lg:rounded-t-5xl">
+  <div class="mx-auto max-w-11/12 px-6 py-16 pb-10 md:max-w-7/9">
     <div class="grid gap-12 xl:grid-cols-[1.7fr_1fr_1fr_1.4fr]">
       <div class="space-y-5">
         <div class="flex items-center gap-3">
-          <span class="text-xl font-bold text-primary md:text-2xl lg:text-3xl">TIXTAC</span>
+          <span class="text-2xl font-bold text-primary md:text-3xl lg:text-4xl">TIXTAC</span>
         </div>
         <p class="max-w-md text-sm leading-6 text-muted-foreground">
-          Nền tảng đặt vé sự kiện hàng đầu Việt Nam. Nhanh chóng, bảo mật, tiện lợi.
+          Nền tảng đặt vé sự kiện hàng đầu Việt Nam.
+          <br />
+          Nhanh chóng, bảo mật, tiện lợi.
         </p>
 
         <div class="flex flex-wrap items-center gap-3">

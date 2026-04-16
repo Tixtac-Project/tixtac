@@ -247,7 +247,7 @@
           opacity,
           seatId: seat.id,
           status: seat.status,
-          isPickable: !readonly && sec.is_seat_pickable,
+          isPickable: !readonly && sec.type === 'assigned',
           label: seatLabel,
           title: `${seatLabel} (${statusText})`,
         });
@@ -268,7 +268,7 @@
     if (readonly || !store) return;
     e.stopPropagation();
     if (didDrag) return;
-    if (!sec.is_seat_pickable) return;
+    if (sec.type !== 'assigned') return;
     if (status !== 'available' && !store.isSeatSelected(seatId)) return;
     const seat = sec.seats.find((s) => s.id === seatId);
     if (!seat) return;
@@ -379,14 +379,23 @@
     </div>
 
     <!-- SVG Canvas -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       bind:this={containerEl}
       class="relative min-h-0 flex-1 cursor-grab overflow-hidden select-none active:cursor-grabbing"
       style="min-height:500px; max-height:80vh;"
       role="application"
       aria-label="Sơ đồ chỗ ngồi"
+      onwheel={handleWheel}
+      onmousedown={handleMouseDown}
+      onmousemove={handleMouseMove}
+      onmouseup={handleMouseUp}
+      onmouseleave={handleMouseUp}
+      ontouchstart={handleTouchStart}
+      ontouchmove={handleTouchMove}
+      ontouchend={handleTouchEnd}
     >
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <svg
         width="100%"
         height="100%"
@@ -394,14 +403,6 @@
         preserveAspectRatio="xMidYMid meet"
         style="transform: scale({zoom}) translate({panX / zoom}px, {panY /
           zoom}px); transform-origin: center center;"
-        onwheel={handleWheel}
-        onmousedown={handleMouseDown}
-        onmousemove={handleMouseMove}
-        onmouseup={handleMouseUp}
-        onmouseleave={handleMouseUp}
-        ontouchstart={handleTouchStart}
-        ontouchmove={handleTouchMove}
-        ontouchend={handleTouchEnd}
       >
         <!-- Background -->
         <rect

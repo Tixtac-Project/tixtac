@@ -271,6 +271,8 @@
   --radius-2xl: calc(var(--radius) * 1.75);
   --radius-3xl: calc(var(--radius) * 2.33);
   --radius-4xl: calc(var(--radius) * 3);
+  --radius-5xl: calc(var(--radius) * 4);
+  --radius-6xl: calc(var(--radius) * 5);
 
   /* ── Semantic color tokens ── */
   --color-success: var(--success);

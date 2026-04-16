@@ -96,19 +96,16 @@
   <div class="glass-nav border-b border-outline-variant/10">
     <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-6 px-4 sm:px-6">
       <!-- Brand -->
-      <div class="align-center flex items-center gap-2">
+
+      <a
+        href={resolve('/')}
+        class="align-center flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
+      >
         <span class="size-6 fill-primary">
           <Logo2 />
         </span>
-        <a
-          href={resolve('/')}
-          class="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
-        >
-          <span class="font-heading text-2xl font-extrabold tracking-tight text-primary">
-            TixTac
-          </span>
-        </a>
-      </div>
+        <span class="font-heading text-2xl font-extrabold tracking-tight text-primary">TixTac</span>
+      </a>
 
       <!-- Center nav links (desktop only) -->
       <nav class="hidden items-center gap-1 md:flex">

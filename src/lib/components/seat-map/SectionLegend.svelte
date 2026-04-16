@@ -20,7 +20,7 @@
   }
 
   function needsQuantityControl(section: SeatMapSection): boolean {
-    return section.type === 'general' || !section.is_seat_pickable;
+    return section.type === 'general';
   }
 
   function getQuantity(sectionId: number): number {
@@ -68,11 +68,7 @@
       <!-- Info row -->
       <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
         <span>
-          {section.type === 'general'
-            ? 'Vé đứng'
-            : section.is_seat_pickable
-              ? 'Chọn ghế'
-              : 'Tự động xếp'}
+          {section.type === 'general' ? 'Vé đứng' : 'Chọn ghế'}
         </span>
         <span>•</span>
         <span>{formatPrice(Number(section.price))}</span>
