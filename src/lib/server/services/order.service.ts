@@ -298,25 +298,29 @@ export const orderService = {
         });
       }
     }
-    const paidEventsMap = paidTicketsFlatList.reduce(
-      (acc, curr) => {
-        const eventId = curr.event.id;
 
-        if (!acc[eventId]) {
-          acc[eventId] = {
-            event_id: eventId,
-            title: curr.event.title,
-            venue: curr.event.venue,
-            banner_image_url: curr.event.bannerImageUrl,
-            tickets: [],
-          };
-        }
+    const paidEventsMap = new Map<number, PaidEventEntry>();
 
-        acc[eventId].tickets.push(curr.ticket);
-        return acc;
-      },
-      {} as Record<number, PaidEventEntry>,
-    );
+    for (const { event, ticket } of paidTicketsFlatList) {
+      const eventId = event.id;
+
+      if (!paidEventsMap.has(eventId)) {
+        paidEventsMap.set(eventId, {
+          event_id: eventId,
+          title: event.title,
+          venue: event.venue,
+          banner_image_url: event.bannerImageUrl,
+          tickets: [],
+        });
+      }
+
+      paidEventsMap.get(eventId)!.tickets.push(ticket);
+    }
+
+    return {
+      pending_orders: pendingOrders,
+      paid_events: Array.from(paidEventsMap.values()), 
+    };
 
     return {
       pending_orders: pendingOrders,
