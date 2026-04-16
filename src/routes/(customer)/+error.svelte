@@ -94,7 +94,7 @@
           <div class="mb-3 text-4xl leading-none opacity-20">❝</div>
           <blockquote class="text-base leading-relaxed font-medium text-foreground italic">
             Chớ bảo xuân tàn hoa rụng hết <br />
-            Đêm qua, sân trước, một cành mai"
+            Đêm qua, sân trước, một cành mai
           </blockquote>
           <p class="mt-3 text-sm text-muted-foreground">— Mãn Giác Thiền Sư</p>
           <div class="mt-5">
