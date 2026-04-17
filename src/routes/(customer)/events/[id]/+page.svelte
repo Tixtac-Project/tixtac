@@ -102,10 +102,11 @@
   }
 
   function handleBuyTicket(showId: number) {
+    const seatsPath = resolve(`/events/${event.id}/shows/${showId}/seats`);
     if (!user) {
-      goto(resolve(`/login?redirect=/events/${event.id}`));
+      goto(resolve(`/login?redirect=${encodeURIComponent(seatsPath)}`));
     } else {
-      goto(resolve(`/events/${event.id}/shows/${showId}/seats`));
+      goto(seatsPath);
     }
   }
 
@@ -345,14 +346,17 @@
                     {#each visibleShows as show (show.id)}
                       {@const isActive = activeShow?.id === show.id}
                       {@const available = show.sections.reduce(
-                        (sum, s) => sum + getAvailable(s),
+                        (sum: number, s: EventDetailSection) => sum + getAvailable(s),
                         0,
                       )}
-                      {@const total = show.sections.reduce((sum, s) => sum + getTotal(s), 0)}
+                      {@const total = show.sections.reduce(
+                        (sum: number, s: EventDetailSection) => sum + getTotal(s),
+                        0,
+                      )}
                       {@const avail = getAvailabilityLabel(available, total)}
                       <button
                         onclick={() => selectShow(show.id)}
-                        class="flex min-w-[150px] shrink-0 cursor-pointer flex-col items-center gap-2 rounded-xl p-5 transition-all duration-300 {isActive
+                        class="flex min-w-37.5 shrink-0 cursor-pointer flex-col items-center gap-2 rounded-xl p-5 transition-all duration-300 {isActive
                           ? 'scale-105 bg-primary-container text-white shadow-lg ring-4 ring-primary-container/20'
                           : 'bg-surface-container text-foreground hover:bg-surface-container-high active:scale-95'}"
                       >
@@ -451,7 +455,7 @@
                   <div class="rounded-xl bg-surface pb-1">
                     <button
                       onclick={() => handleBuyTicket(activeShow!.id)}
-                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-full bg-gradient-to-br from-primary to-primary-container px-8 py-5 text-lg font-bold text-white shadow-xl shadow-primary/20 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-full bg-linear-to-br from-primary to-primary-container px-8 py-5 text-lg font-bold text-white shadow-xl shadow-primary/20 transition-all duration-300 hover:scale-[1.02] active:scale-95"
                     >
                       Tiếp tục chọn chỗ
                       <ArrowRight class="h-5 w-5" />
@@ -484,7 +488,7 @@
                         >
                           <!-- Dot -->
                           <div
-                            class="absolute top-0 -left-[9px] h-4 w-4 rounded-full {isFirst
+                            class="absolute top-0 -left-2.25 h-4 w-4 rounded-full {isFirst
                               ? 'bg-primary'
                               : 'bg-surface-container-highest'} ring-4 ring-background"
                           ></div>

@@ -203,14 +203,10 @@
         <!-- Profile / Auth -->
         {#if user}
           <DropdownMenu bind:open={isUserMenuOpen}>
-            <DropdownMenuTrigger>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-9 w-9 cursor-pointer text-muted-foreground hover:text-foreground"
-              >
-                <CircleUserRound class="size-6" />
-              </Button>
+            <DropdownMenuTrigger
+              class="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <CircleUserRound class="size-6" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="w-48">
               <DropdownMenuItem

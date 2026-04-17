@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
@@ -58,15 +58,14 @@
 
     if (!error && data) {
       toast.success('Đăng nhập thành công!');
-      await invalidateAll();
 
       const redirectTo = page.url.searchParams.get('redirect');
       if (redirectTo && redirectTo.startsWith('/')) {
-        goto(resolve(redirectTo));
+        goto(resolve(redirectTo), { invalidateAll: true });
       } else if (data.role === 'admin') {
-        goto(resolve('/admin'));
+        goto(resolve('/admin'), { invalidateAll: true });
       } else {
-        goto(resolve('/'));
+        goto(resolve('/'), { invalidateAll: true });
       }
     }
   }
