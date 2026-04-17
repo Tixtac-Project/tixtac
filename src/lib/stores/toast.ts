@@ -9,7 +9,7 @@ export interface Toast {
   duration: number;
 }
 
-const MAX_TOASTS = 6;
+const MAX_TOASTS = 5;
 
 function createToastStore() {
   const { subscribe, update } = writable<Toast[]>([]);

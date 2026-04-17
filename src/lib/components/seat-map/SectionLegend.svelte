@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SeatSelectionStore } from '$lib/stores/seat-selection-store.svelte';
+  import { toast } from '$lib/stores/toast';
   import type { SeatMapSection } from '$lib/types/seat-map';
   import { formatPrice } from '$lib/utils/price';
   import { Minus, Plus } from 'lucide-svelte';
@@ -27,9 +28,23 @@
     return store.getGeneralQuantity(sectionId);
   }
 
+  let lastLimitToastTime = 0;
+  const LIMIT_TOAST_COOLDOWN = 2000;
+
+  function showLimitToast() {
+    const now = Date.now();
+    if (now - lastLimitToastTime < LIMIT_TOAST_COOLDOWN) return;
+    lastLimitToastTime = now;
+    toast.warning(`Bạn chỉ được chọn tối đa ${store.maxTickets} vé.`);
+  }
+
   function increment(section: SeatMapSection) {
     const qty = getQuantity(section.id);
     const avail = availableCount(section);
+    if (store.isAtLimit) {
+      showLimitToast();
+      return;
+    }
     if (qty < avail) {
       store.setGeneralQuantity(section.id, qty + 1);
     }

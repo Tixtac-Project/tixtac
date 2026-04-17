@@ -62,6 +62,12 @@ export function createSeatSelectionStore(maxTickets: number) {
       Object.values(currentCart.generalQuantities).reduce((s, qty) => s + qty, 0),
   );
 
+  /** Whether the global ticket limit has been reached */
+  const isAtLimit = $derived(maxTickets > 0 && totalCount >= maxTickets);
+
+  /** How many more tickets the user can add */
+  const remainingTickets = $derived(maxTickets > 0 ? maxTickets - totalCount : Infinity);
+
   /** Get sections for the active show */
   function getActiveSections(): SeatMapSection[] {
     return sectionsMap[activeShowId] ?? [];
@@ -313,6 +319,15 @@ export function createSeatSelectionStore(maxTickets: number) {
     },
     get carts() {
       return carts;
+    },
+    get isAtLimit() {
+      return isAtLimit;
+    },
+    get remainingTickets() {
+      return remainingTickets;
+    },
+    get maxTickets() {
+      return maxTickets;
     },
     getActiveCarts,
     getActiveSections,

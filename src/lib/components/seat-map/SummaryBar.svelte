@@ -7,6 +7,7 @@
     ChevronDown,
     ChevronsUp,
     ChevronUp,
+    ShieldAlert,
     ShoppingCart,
     Trash2,
     X,
@@ -137,6 +138,19 @@
           </div>
         </div>
 
+        <!-- Warning banner -->
+        <div
+          class="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-warning-border bg-warning-muted px-3 py-2 sm:mx-6 lg:mx-8"
+        >
+          <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+          <p class="text-[12px] leading-snug text-warning-muted-foreground md:text-sm">
+            Vé trong giỏ <span class="font-bold">chưa được giữ chỗ</span>
+            và có thể bị người khác đặt trước. Hãy nhấn
+            <span class="font-bold">Tiếp tục</span>
+            để tiến hành thanh toán sớm nhất có thể.
+          </p>
+        </div>
+
         <!-- Cart items (scrollable) -->
         <div class="flex-1 space-y-3 overflow-y-auto px-4 pb-20 sm:px-6 lg:px-8">
           {#each activeCarts as cart (cart.showId)}
@@ -156,7 +170,7 @@
                 >
                   <div class="flex items-center gap-2">
                     <Calendar class="h-3.5 w-3.5 text-primary" />
-                    <span class="text-[11px] font-bold text-primary">
+                    <span class="text-sm font-bold text-primary">
                       {cart.showLabel}
                     </span>
                   </div>
@@ -177,20 +191,20 @@
                 {#each Object.entries(groupedSeats) as [_sectionId, group] (_sectionId)}
                   <div class="px-3 py-2.5">
                     <p
-                      class="mb-1.5 text-[10px] font-semibold tracking-wide text-primary uppercase"
+                      class="mb-1.5 text-[12px] font-semibold tracking-wide text-primary uppercase"
                     >
                       {group.sectionName}
                     </p>
-                    <div class="space-y-1">
+                    <div class="mx-2 space-y-2">
                       {#each group.seats as seat (seat.id)}
-                        <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center justify-between gap-2 text-[12px]">
                           <span
-                            class="inline-flex h-5 items-center rounded bg-surface-container-highest px-1.5 text-[10px] font-semibold text-foreground"
+                            class="inline-flex h-5 items-center rounded bg-surface-container-highest px-1.5 font-semibold text-foreground"
                           >
                             {seat.label}
                           </span>
                           <div class="flex shrink-0 items-center gap-1.5">
-                            <span class="text-[11px] font-semibold text-foreground">
+                            <span class="font-semibold text-foreground">
                               {formatPrice(seat.price)}
                             </span>
                             <button
