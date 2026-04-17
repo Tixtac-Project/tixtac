@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, replaceState } from '$app/navigation';
   import { resolve } from '$app/paths';
   import SeatMap from '$lib/components/seat-map/SeatMap.svelte';
   import SummaryBar from '$lib/components/seat-map/SummaryBar.svelte';
@@ -8,6 +8,7 @@
   import { api } from '$lib/utils/api';
   import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
   import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
+  import { onDestroy } from 'svelte';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { fly } from 'svelte/transition';
 
@@ -137,9 +138,9 @@
         store.setActiveShow(showId, label);
         store.setSections(res.data.sections);
 
-        // Update URL without full navigation
-        const newUrl = `/events/${data.event.id}/shows/${showId}/seats`;
-        history.replaceState(history.state, '', newUrl);
+        // Update URL without full navigation (respects paths.base)
+        const newUrl = resolve(`/events/${data.event.id}/shows/${showId}/seats`);
+        replaceState(newUrl, {});
       }
     } catch (error) {
       // Ignore abort errors, they are expected when switching shows rapidly
@@ -156,9 +157,21 @@
     }
   }
 
+  function abortPendingRequest() {
+    if (activeAbortController) {
+      activeAbortController.abort();
+      activeAbortController = null;
+      isLoadingSeatMap = false;
+    }
+  }
+
   function goBack() {
+    abortPendingRequest();
     goto(resolve(`/events/${data.event.id}`));
   }
+
+  // Abort any in-flight request when the component is destroyed
+  onDestroy(abortPendingRequest);
 
   function handleCheckout() {
     const activeCarts = store.getActiveCarts();

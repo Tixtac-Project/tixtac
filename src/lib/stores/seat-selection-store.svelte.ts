@@ -248,10 +248,33 @@ export function createSeatSelectionStore(maxTickets: number) {
     };
   }
 
-  /** Set general admission quantity for a specific show's cart */
+  /** Set general admission quantity for a specific show's cart (with global limit enforcement) */
   function setGeneralQuantityForShow(showId: number, sectionId: number, qty: number) {
     const cart = carts[showId];
     if (!cart) return;
+
+    // Enforce global maxTickets limit (same logic as setGeneralQuantity)
+    if (maxTickets > 0 && qty > 0) {
+      const currentAssigned = cart.selectedSeats.length;
+      const otherGeneral = Object.entries(cart.generalQuantities)
+        .filter(([id]) => Number(id) !== sectionId)
+        .reduce((sum, [, q]) => sum + q, 0);
+
+      const otherShowsCount = allCarts
+        .filter((c) => c.showId !== showId)
+        .reduce(
+          (sum, c) =>
+            sum +
+            c.selectedSeats.length +
+            Object.values(c.generalQuantities).reduce((s, q) => s + q, 0),
+          0,
+        );
+
+      const available = maxTickets - otherShowsCount - currentAssigned - otherGeneral;
+      if (qty > available) {
+        qty = available;
+      }
+    }
 
     if (qty <= 0) {
       const { [sectionId]: _removed, ...rest } = cart.generalQuantities;
