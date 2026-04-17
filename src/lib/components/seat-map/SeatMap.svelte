@@ -6,6 +6,7 @@
 -->
 <script lang="ts">
   import type { SeatSelectionStore } from '$lib/stores/seat-selection-store.svelte';
+  import { toast } from '$lib/stores/toast';
   import type { MapConfig, SeatMapSeat, SeatMapSection, StageElement } from '$lib/types/seat-map';
   import { formatPrice } from '$lib/utils/price';
   import { getRowLabel } from '$lib/utils/seat-label';
@@ -264,12 +265,33 @@
   );
 
   // ── Seat click ──
+  let lastLimitToastTime = 0;
+  const LIMIT_TOAST_COOLDOWN = 2000; // ms — suppress duplicate toasts within this window
+
+  function showLimitToast() {
+    const now = Date.now();
+    if (now - lastLimitToastTime < LIMIT_TOAST_COOLDOWN) return;
+    lastLimitToastTime = now;
+    toast.warning(`Bạn chỉ được chọn tối đa ${store!.maxTickets} vé.`);
+  }
+
   function handleSeatClick(e: Event, sec: SeatMapSection, seatId: number, status: string) {
     if (readonly || !store) return;
     e.stopPropagation();
     if (didDrag) return;
     if (sec.type !== 'assigned') return;
-    if (status !== 'available' && !store.isSeatSelected(seatId)) return;
+
+    const isCurrentlySelected = store.isSeatSelected(seatId);
+
+    // Only allow clicking available seats (to select) or already-selected seats (to deselect)
+    if (status !== 'available' && !isCurrentlySelected) return;
+
+    // If user is trying to ADD a new seat while at the limit, show warning instead
+    if (!isCurrentlySelected && store.isAtLimit) {
+      showLimitToast();
+      return;
+    }
+
     const seat = sec.seats.find((s) => s.id === seatId);
     if (!seat) return;
     const prefix = seat.prefix ? `${seat.prefix}-` : '';
