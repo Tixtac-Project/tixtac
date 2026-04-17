@@ -195,6 +195,12 @@ export function createSeatSelectionStore(maxTickets: number) {
     return cart ? cart.selectedSeats.map((s) => s.id) : [];
   }
 
+  /** Look up a section name by showId + sectionId */
+  function getSectionName(showId: number, sectionId: number): string | undefined {
+    const section = findSection(showId, sectionId);
+    return section?.name;
+  }
+
   /** Get all carts that have selections */
   function getActiveCarts(): ShowCart[] {
     return allCarts.filter(
@@ -255,6 +261,7 @@ export function createSeatSelectionStore(maxTickets: number) {
     clearAll,
     clearShow,
     getSelectedSeatIds,
+    getSectionName,
     getSummaryLabels,
   };
 }

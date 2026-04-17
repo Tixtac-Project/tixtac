@@ -17,16 +17,18 @@
     store: SeatSelectionStore;
     onCheckout: () => void;
     maxTickets: number;
+    /** Whether the event has multiple shows (always show per-show grouping) */
+    multiShowEvent?: boolean;
   }
 
-  let { store, onCheckout, maxTickets }: Props = $props();
+  let { store, onCheckout, maxTickets, multiShowEvent = false }: Props = $props();
 
   let expanded = $state(false);
   let hasSelection = $derived(store.totalCount > 0);
 
   /** Get all active carts (carts with selections) */
   let activeCarts = $derived(store.getActiveCarts());
-  let isMultiShow = $derived(activeCarts.length > 1);
+  let isMultiShow = $derived(multiShowEvent || activeCarts.length > 1);
 
   /** Group selected assigned seats by section for a given cart */
   function groupSeatsBySection(cart: ShowCart) {
@@ -53,9 +55,10 @@
     for (const [sectionId, qty] of Object.entries(cart.generalQuantities)) {
       if (qty > 0) {
         const sid = Number(sectionId);
+        const name = store.getSectionName(cart.showId, sid) ?? `Khu vực #${sid}`;
         entries.push({
           sectionId: sid,
-          sectionName: `Khu vực #${sid}`,
+          sectionName: name,
           qty,
         });
       }

@@ -313,5 +313,10 @@
   {/if}
 
   <!-- Sticky summary bar -->
-  <SummaryBar {store} onCheckout={handleCheckout} maxTickets={event.max_tickets_per_user} />
+  <SummaryBar
+    {store}
+    onCheckout={handleCheckout}
+    maxTickets={event.max_tickets_per_user}
+    multiShowEvent={allShows.length > 1}
+  />
 </div>
