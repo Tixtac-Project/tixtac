@@ -91,6 +91,9 @@
       .toUpperCase();
   }
 
+  // Track active request to prevent stale responses
+  let activeAbortController: AbortController | null = null;
+
   async function switchShow(showId: number) {
     if (showId === currentShowId) {
       showPickerOpen = false;
@@ -100,10 +103,22 @@
     showPickerOpen = false;
     isLoadingSeatMap = true;
 
-    try {
-      const res = await api.get<SeatMapData>(`/events/${data.event.id}/shows/${showId}/seats`);
+    // Abort any previous request
+    if (activeAbortController) {
+      activeAbortController.abort();
+    }
 
-      if (res.data) {
+    // Create new AbortController for this request
+    const controller = new AbortController();
+    activeAbortController = controller;
+
+    try {
+      const res = await api.get<SeatMapData>(`/events/${data.event.id}/shows/${showId}/seats`, {
+        signal: controller.signal,
+      });
+
+      // Only update state if this request wasn't aborted (still the most recent)
+      if (!controller.signal.aborted && res.data) {
         currentShowId = showId;
         seatMap = res.data;
 
@@ -116,10 +131,18 @@
         const newUrl = `/events/${data.event.id}/shows/${showId}/seats`;
         history.replaceState(history.state, '', newUrl);
       }
-    } catch {
-      // Error already handled by api utility
+    } catch (error) {
+      // Ignore abort errors, they are expected when switching shows rapidly
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      // Other errors already handled by api utility
     } finally {
-      isLoadingSeatMap = false;
+      // Only clear loading state if this is still the active request
+      if (activeAbortController === controller) {
+        isLoadingSeatMap = false;
+        activeAbortController = null;
+      }
     }
   }
 
