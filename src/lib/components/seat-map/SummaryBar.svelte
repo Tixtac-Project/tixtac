@@ -224,12 +224,12 @@
 
                 <!-- General admission -->
                 {#each generalEntries as entry (entry.sectionId)}
-                  <div class="flex items-center justify-between px-3 py-2.5">
+                  <div class="flex items-center justify-between px-3 py-2.5 text-[12px]">
                     <div>
-                      <p class="text-[10px] font-semibold tracking-wide text-primary uppercase">
+                      <p class=" font-semibold tracking-wide text-primary uppercase">
                         {entry.sectionName}
                       </p>
-                      <p class="mt-0.5 text-[11px] text-muted-foreground">
+                      <p class="mx-2 mt-0.5 font-semibold">
                         Vé đứng × {entry.qty}
                       </p>
                     </div>
