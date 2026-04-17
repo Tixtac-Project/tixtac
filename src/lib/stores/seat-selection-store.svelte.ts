@@ -84,6 +84,12 @@ export function createSeatSelectionStore(maxTickets: number) {
           generalQuantities: {},
         },
       };
+    } else if (showLabel && carts[showId].showLabel !== showLabel) {
+      // Refresh the label if it changed (e.g. fallback → real formatted label)
+      carts = {
+        ...carts,
+        [showId]: { ...carts[showId], showLabel },
+      };
     }
   }
 

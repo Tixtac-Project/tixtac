@@ -93,11 +93,13 @@ export function to12Hour(h24: number): { hour: string; period: 'AM' | 'PM' } {
   return { hour: String(h24 - 12), period: 'PM' };
 }
 
+const TZ = 'Asia/Ho_Chi_Minh';
+
 /** Format a date string or Date object to "Thứ Hai, 14 tháng 4, 2025" in Vietnamese locale */
 export function formatDate(dateStr: string | Date): string {
   const d = new Date(dateStr);
   return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: TZ,
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -110,6 +112,28 @@ export const formatTime = (dateStr: string) => {
   return new Date(dateStr).toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: TZ,
   });
 };
+
+/** Format a date string to short form like "T7, 14 THG 4" pinned to Asia/Ho_Chi_Minh */
+export function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+    .format(d)
+    .toUpperCase();
+}
+
+/** Extract the day-of-month number pinned to Asia/Ho_Chi_Minh timezone */
+export function getDayInTZ(dateStr: string): string {
+  const d = new Date(dateStr);
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: TZ,
+    day: 'numeric',
+  }).format(d);
+}

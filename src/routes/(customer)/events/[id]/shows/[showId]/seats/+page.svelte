@@ -6,8 +6,8 @@
   import { createSeatSelectionStore } from '$lib/stores/seat-selection-store.svelte';
   import type { MapConfig, SeatMapData, StageElement } from '$lib/types/seat-map';
   import { api } from '$lib/utils/api';
-  import { formatDate, formatTime } from '$lib/utils/datetime';
-  import { ArrowLeft, Calendar, ChevronDown, Clock, Loader2 } from 'lucide-svelte';
+  import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
+  import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { fly } from 'svelte/transition';
 
@@ -48,7 +48,9 @@
   let seatMap = $state<SeatMapData>({ show_id: 0, sections: [] });
   let isLoadingSeatMap = $state(false);
   let showPickerOpen = $state(false);
-  let initialized = $state(false);
+
+  /** Track the last event+show combo we synced from server data */
+  let lastSyncedKey = $state('');
 
   let currentShow = $derived<ShowInfo>(
     allShows.find((s: ShowInfo) => s.id === currentShowId) ?? data.show,
@@ -58,16 +60,29 @@
   const getMaxTicketsPerUser = () => data.event.max_tickets_per_user;
   let store = createSeatSelectionStore(getMaxTicketsPerUser());
 
-  // Initialize once from server data
+  // Sync from server data whenever the route's event/show changes
+  // (handles initial load AND SvelteKit reusing this page for a different route)
   $effect(() => {
-    if (initialized) return;
+    const syncKey = `${data.event.id}-${data.show.id}`;
+    if (syncKey === lastSyncedKey) return;
+
     const showId = data.show.id;
     const mapData = data.seatMap;
     if (!showId || !mapData) return;
 
-    initialized = true;
+    lastSyncedKey = syncKey;
     currentShowId = showId;
     seatMap = mapData;
+
+    // Abort any in-flight show switch
+    if (activeAbortController) {
+      activeAbortController.abort();
+      activeAbortController = null;
+      isLoadingSeatMap = false;
+    }
+
+    // Reset the store for a fresh event
+    store.clearAll();
 
     const show = allShows.find((s: ShowInfo) => s.id === showId);
     const label = show ? getShowLabel(show) : `Suất #${showId}`;
@@ -79,24 +94,19 @@
     return show.title || `${formatTime(show.start_time)}, ${formatDate(show.show_date)}`;
   }
 
-  function formatShortDate(dateStr: string): string {
-    const d = new Date(dateStr);
-    return new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    })
-      .format(d)
-      .toUpperCase();
-  }
-
   // Track active request to prevent stale responses
   let activeAbortController: AbortController | null = null;
 
   async function switchShow(showId: number) {
     if (showId === currentShowId) {
       showPickerOpen = false;
+      // If a switch to another show is still in flight, abort it so
+      // the UI stays on the show the user just confirmed.
+      if (activeAbortController) {
+        activeAbortController.abort();
+        activeAbortController = null;
+        isLoadingSeatMap = false;
+      }
       return;
     }
 
@@ -283,7 +293,7 @@
                         {formatShortDate(show.show_date).split(',')[0]?.trim() ?? ''}
                       </span>
                       <span class="text-xs leading-tight font-bold">
-                        {new Date(show.show_date).getDate()}
+                        {getDayInTZ(show.show_date)}
                       </span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -324,7 +334,7 @@
   {#if isLoadingSeatMap}
     <div class="flex items-center justify-center py-20">
       <div class="flex flex-col items-center gap-3">
-        <Loader2 class="h-8 w-8 animate-spin text-primary" />
+        <LoaderCircle class="h-8 w-8 animate-spin text-primary" />
         <p class="text-sm text-muted-foreground">Đang tải sơ đồ ghế...</p>
       </div>
     </div>
