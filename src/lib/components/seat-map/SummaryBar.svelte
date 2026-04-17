@@ -70,8 +70,8 @@
     expanded = !expanded;
   }
 
-  function handleRemoveSeat(seatId: number) {
-    store.toggleSeat(seatId, '', 0, '', 0);
+  function handleRemoveSeat(showId: number, seatId: number) {
+    store.removeSeatFromShow(showId, seatId);
   }
 
   function handleClearAll() {
@@ -196,7 +196,7 @@
                             <button
                               type="button"
                               class="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                              onclick={() => handleRemoveSeat(seat.id)}
+                              onclick={() => handleRemoveSeat(cart.showId, seat.id)}
                               title="Xóa ghế {seat.label}"
                             >
                               <X class="h-3 w-3" />
@@ -222,7 +222,8 @@
                     <button
                       type="button"
                       class="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      onclick={() => store.setGeneralQuantity(entry.sectionId, 0)}
+                      onclick={() =>
+                        store.setGeneralQuantityForShow(cart.showId, entry.sectionId, 0)}
                       title="Xóa vé"
                     >
                       <X class="h-3 w-3" />

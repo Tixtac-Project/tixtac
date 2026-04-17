@@ -176,18 +176,40 @@ export function createSeatSelectionStore(maxTickets: number) {
   }
 
   function clearAll() {
-    carts = {};
-    sectionsMap = {};
+    // Preserve the active show's cart (empty) and sections so seat selection continues to work
+    const activeCart = carts[activeShowId];
+    const activeSections = sectionsMap[activeShowId];
+    carts = activeCart
+      ? {
+          [activeShowId]: {
+            ...activeCart,
+            selectedSeats: [],
+            generalQuantities: {},
+          },
+        }
+      : {};
+    sectionsMap = activeSections ? { [activeShowId]: activeSections } : {};
   }
 
   function clearShow(showId: number) {
-    const { [showId]: _removedCart, ...restCarts } = carts;
-    void _removedCart;
-    carts = restCarts;
+    if (showId === activeShowId) {
+      // Keep the cart entry but empty it, preserve sections for continued interaction
+      const cart = carts[showId];
+      if (cart) {
+        carts = {
+          ...carts,
+          [showId]: { ...cart, selectedSeats: [], generalQuantities: {} },
+        };
+      }
+    } else {
+      const { [showId]: _removedCart, ...restCarts } = carts;
+      void _removedCart;
+      carts = restCarts;
 
-    const { [showId]: _removedSections, ...restSections } = sectionsMap;
-    void _removedSections;
-    sectionsMap = restSections;
+      const { [showId]: _removedSections, ...restSections } = sectionsMap;
+      void _removedSections;
+      sectionsMap = restSections;
+    }
   }
 
   function getSelectedSeatIds(): number[] {
@@ -199,6 +221,42 @@ export function createSeatSelectionStore(maxTickets: number) {
   function getSectionName(showId: number, sectionId: number): string | undefined {
     const section = findSection(showId, sectionId);
     return section?.name;
+  }
+
+  /** Remove a specific seat from a specific show's cart (for cross-show removal in summary) */
+  function removeSeatFromShow(showId: number, seatId: number) {
+    const cart = carts[showId];
+    if (!cart) return;
+    carts = {
+      ...carts,
+      [showId]: {
+        ...cart,
+        selectedSeats: cart.selectedSeats.filter((s) => s.id !== seatId),
+      },
+    };
+  }
+
+  /** Set general admission quantity for a specific show's cart */
+  function setGeneralQuantityForShow(showId: number, sectionId: number, qty: number) {
+    const cart = carts[showId];
+    if (!cart) return;
+
+    if (qty <= 0) {
+      const { [sectionId]: _removed, ...rest } = cart.generalQuantities;
+      void _removed;
+      carts = {
+        ...carts,
+        [showId]: { ...cart, generalQuantities: rest },
+      };
+    } else {
+      carts = {
+        ...carts,
+        [showId]: {
+          ...cart,
+          generalQuantities: { ...cart.generalQuantities, [sectionId]: qty },
+        },
+      };
+    }
   }
 
   /** Get all carts that have selections */
@@ -262,6 +320,8 @@ export function createSeatSelectionStore(maxTickets: number) {
     clearShow,
     getSelectedSeatIds,
     getSectionName,
+    removeSeatFromShow,
+    setGeneralQuantityForShow,
     getSummaryLabels,
   };
 }
