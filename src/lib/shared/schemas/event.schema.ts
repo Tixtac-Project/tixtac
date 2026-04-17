@@ -638,3 +638,30 @@ export const eventIdSchema = z.coerce.number().int().positive('ID sự kiện kh
 
 // ── Show ID Schema (path param validation) ─────
 export const showIdSchema = z.coerce.number().int().positive('ID suất diễn không hợp lệ');
+
+export const generalAdmissionInputSchema = z.object({
+  section_id: z.number().int().positive(),
+  quantity: z.number().int().min(1),
+});
+
+export const cartItemSchema = z.object({
+  show_id: z.number().int().positive(),
+  assigned_seats: z.array(z.number().int().positive()).default([]),
+  general_admission: z.array(generalAdmissionInputSchema).default([]),
+}).superRefine((data, ctx) => {
+  if (data.assigned_seats.length === 0 && data.general_admission.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['cart_items'],
+      message: 'Mỗi suất diễn phải có ít nhất 1 vé assigned hoặc general admission',
+    });
+  }
+});
+
+export const checkoutBodySchema = z.object({
+  cart_items: z.array(cartItemSchema).min(1, 'Giỏ hàng không được trống'),
+});
+
+export type CheckoutBody = z.infer<typeof checkoutBodySchema>;
+export type CartItem = z.infer<typeof cartItemSchema>;
+export type GeneralAdmissionInput = z.infer<typeof generalAdmissionInputSchema>;

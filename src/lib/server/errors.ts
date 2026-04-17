@@ -1,5 +1,6 @@
 // src/lib/server/errors.ts
 
+
 /**
  * Base error class for all application-level (HTTP) errors.
  * Caught by route handlers and serialized into JSON responses.
@@ -61,9 +62,20 @@ export const Errors = {
   ORDER_ALREADY_PROCESSED: new AppError('ORDER_ALREADY_PROCESSED', 400, 'Đơn hàng đã được xử lý'),
   LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 410, 'Đơn hàng đã hết hạn, vui lòng đặt lại vé'),
   ORDER_EMPTY: new AppError('ORDER_EMPTY', 400, 'Đơn hàng không có vé nào'),
+  ACTIVE_ORDER_EXISTS: new AppError('ACTIVE_ORDER_EXISTS', 409),
 
   // Seats
   SEAT_NOT_AVAILABLE: new AppError('SEAT_NOT_AVAILABLE', 409, 'Một hoặc nhiều ghế đã được đặt'),
+  SALES_NOT_STARTED: new AppError('SALES_NOT_STARTED', 400, 'Chưa đến thời gian mở bán'),
+  SALES_ENDED: new AppError('SALES_ENDED', 400, 'Đã hết thời gian bán vé'),
+  MAX_TICKETS_EXCEEDED: new AppError('MAX_TICKETS_EXCEEDED', 400, 'Vượt quá số lượng vé tối đa cho phép'),
+  HOLD_FAILED: new AppError('HOLD_FAILED', 500, 'Không thể giữ ghế, vui lòng thử lại'),
+  SEATS_LIST_EMPTY: new AppError('SEATS_LIST_EMPTY', 400, 'Danh sách ghế không được để trống'),
+  MAX_SEATS_EXCEEDED: new AppError('MAX_SEATS_EXCEEDED', 400, 'Vượt quá số lượng ghế tối đa cho phép'),
+  INVALID_SECTION_TYPE: new AppError('SEAT_NOT_BELONG_SEAT_SECTION', 400, 'Ghế không thuộc đúng khu'),
+
+  // Shows
+  SHOW_NOT_AVAIABLE: new AppError('SHOW_NOT_AVAIAVLE', 409, 'Xuất diễn không hợp lệ'),
 
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
@@ -73,6 +85,9 @@ export const Errors = {
   // Validation (factory — accepts dynamic details)
   VALIDATION: (details?: Record<string, string>) =>
     new AppError('VALIDATION_ERROR', 400, 'Dữ liệu không hợp lệ', details),
+
+  CART_CONFLICT: (details?: Record<string, string>) =>
+    new AppError( 'CART_CONFLICT', 409, 'Một số vé trong giỏ hàng đã bị người khác mua hoặc không đủ số lượng', details),
 } as const;
 
 /**
@@ -103,4 +118,13 @@ export function throwError(
     message || error.message,
     details ?? error.details,
   );
+}
+
+export class CartConflictError extends Error {
+  details: unknown[];
+
+  constructor(details: unknown[]) {
+    super('CART_CONFLICT');
+    this.details = details;
+  }
 }
