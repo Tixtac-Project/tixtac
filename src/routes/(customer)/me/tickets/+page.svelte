@@ -9,7 +9,20 @@
   const pendingOrders = $derived(data.pendingOrders || []);
   const paidEvents = $derived(data.paidEvents || []);
 
-  // Trạng thái của thanh Tabs
+  // Track thời gian thực để lọc đơn hàng hết hạn
+  let now = $state(new Date());
+  $effect(() => {
+    const interval = setInterval(() => {
+      now = new Date();
+    }, 1000);
+    return () => clearInterval(interval);
+  });
+
+  // Chỉ giữ các đơn hàng chưa hết hạn
+  const livePendingOrders = $derived(
+    pendingOrders.filter((o) => new Date(o.expires_at) > now)
+  );
+
   let activeTab = $state<'all' | 'pending' | 'paid'>('all');
 </script>
 
@@ -66,20 +79,18 @@
     </div>
 
     <!-- KHU VỰC CHỜ THANH TOÁN -->
-    {#if (activeTab === 'all' || activeTab === 'pending') && pendingOrders.length > 0}
+    {#if (activeTab === 'all' || activeTab === 'pending') && livePendingOrders.length > 0}
       <div class="mb-12">
-        <!-- Tiêu đề Khu vực: Đơn hàng chờ thanh toán -->
         <div class="mb-6 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <div class="h-6 w-1.5 rounded-full bg-primary"></div>
             <h2 class="text-xl font-bold text-foreground">Đơn hàng chờ thanh toán</h2>
           </div>
           <span class="text-xs font-semibold text-muted-foreground sm:text-sm">
-            {pendingOrders.length} Đơn hàng
+            {livePendingOrders.length} Đơn hàng
           </span>
         </div>
-
-        {#each pendingOrders as order (order.order_id)}
+        {#each livePendingOrders as order (order.order_id)}
           <PendingOrderCard {order} />
         {/each}
       </div>
@@ -103,7 +114,7 @@
     {/if}
 
     <!-- TRỐNG: TẤT CẢ -->
-    {#if activeTab === 'all' && pendingOrders.length === 0 && paidEvents.length === 0}
+    {#if activeTab === 'all' && livePendingOrders.length === 0 && paidEvents.length === 0}
       <div class="mt-8 flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-surface-container-lowest py-20 px-4 text-center">
         <div class="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-low text-muted-foreground">
           <Ticket class="h-10 w-10 opacity-50" strokeWidth="1.5" />
@@ -119,7 +130,7 @@
     {/if}
 
     <!-- TRỐNG: CHỜ THANH TOÁN -->
-    {#if activeTab === 'pending' && pendingOrders.length === 0}
+    {#if activeTab === 'pending' && livePendingOrders.length === 0}
       <div class="mt-8 flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-surface-container-lowest py-16 px-4 text-center">
         <p class="text-sm font-medium text-muted-foreground">Không có đơn hàng nào đang chờ thanh toán.</p>
       </div>
