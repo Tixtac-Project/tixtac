@@ -131,19 +131,17 @@
             <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
           {/if}
         </a>
-        {#if user}
-          <a
-            href={resolve('/me/tickets')}
-            class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/me/tickets')
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'}"
-          >
-            Vé của tôi
-            {#if isActive('/me/tickets')}
-              <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
-            {/if}
-          </a>
-        {/if}
+        <a
+          href={resolve('/me/tickets')}
+          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/me/tickets')
+            ? 'text-foreground'
+            : 'text-muted-foreground hover:text-foreground'}"
+        >
+          Vé của tôi
+          {#if isActive('/me/tickets')}
+            <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+          {/if}
+        </a>
       </nav>
 
       <!-- Right side: search + profile -->
@@ -304,17 +302,15 @@
       </a>
 
       <!-- My Tickets -->
-      {#if user}
-        <a
-          href={resolve('/me/tickets')}
-          class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/tickets')
-            ? 'text-primary'
-            : 'text-muted-foreground'}"
-        >
-          <Ticket class="h-5 w-5" />
-          <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
-        </a>
-      {/if}
+      <a
+        href={resolve('/me/tickets')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/tickets')
+          ? 'text-primary'
+          : 'text-muted-foreground'}"
+      >
+        <Ticket class="h-5 w-5" />
+        <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
+      </a>
 
       <!-- Profile -->
       <a
