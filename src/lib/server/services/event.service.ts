@@ -925,7 +925,7 @@ export const eventService = {
     const body = validateInput(checkoutBodySchema, rawBody);
     const now = new Date();
 
-    // Idempotency check (giữ nguyên)
+    // Idempotency check
     if (idempotencyKey) {
       const existing = await db.query.idempotencyKeys.findFirst({
         where: eq(idempotencyKeys.key, idempotencyKey),
@@ -945,18 +945,18 @@ export const eventService = {
     }
 
     return await db.transaction(async (tx) => {
-      // 1. Validate user (giữ nguyên)
+      // 1. Validate user
       const [user] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
       if (!user) throwError(Errors.UNAUTHORIZED, 'Người dùng không tồn tại.');
       if (user.isActive !== true) throwError(Errors.USER_INACTIVE, 'Tài khoản không hoạt động.');
       if (user.role !== 'customer') throwError(Errors.FORBIDDEN, 'Chỉ khách hàng mới được đặt vé.');
 
-      // 2. Validate event (giữ nguyên)
+      // 2. Validate event
       const [event] = await tx.select().from(events).where(eq(events.id, eventId)).for('update');
       if (!event) throwError(Errors.NOT_FOUND, 'Sự kiện không tồn tại.');
       if (!['published'].includes(event.status)) throwError(Errors.EVENT_NOT_AVAILABLE, 'Sự kiện chưa mở bán hoặc đã hủy.');
 
-      // 3. Validate cart items cơ bản và thu thập dữ liệu (giữ nguyên)
+      // 3. Validate cart items và thu thập dữ liệu
       const showIdsInCart = new Set<number>();
       const allAssignedSeatIds: number[] = [];
       const gaRequests: { showId: number; sectionId: number; quantity: number }[] = [];
@@ -991,7 +991,7 @@ export const eventService = {
         }
       }
 
-      // 4. Xử lý pending orders (giữ nguyên)
+      // 4. Xử lý pending orders
       const oldPendingOrders = await tx
         .select({ id: orders.id, expiresAt: orders.expiresAt, totalAmount: orders.totalAmount })
         .from(orders)
@@ -1008,13 +1008,12 @@ export const eventService = {
         }
       }
 
-      // 5. Lấy thông tin chi tiết vé đã có trong activeOrder
-      let existingSeatsDetails: { seatId: number; sectionId: number; sectionType: string }[] = [];
+      // 5. Lấy chi tiết vé đã có trong activeOrder
       const existingSeatIds = new Set<number>();
       const existingGaCountBySection = new Map<number, number>();
 
       if (activeOrder) {
-        existingSeatsDetails = await tx
+        const seatsDetails = await tx
           .select({
             seatId: orderItems.seatId,
             sectionId: seats.sectionId,
@@ -1025,7 +1024,7 @@ export const eventService = {
           .innerJoin(seatSections, eq(seatSections.id, seats.sectionId))
           .where(eq(orderItems.orderId, activeOrder.id));
 
-        for (const s of existingSeatsDetails) {
+        for (const s of seatsDetails) {
           existingSeatIds.add(s.seatId);
           if (s.sectionType === 'general') {
             existingGaCountBySection.set(s.sectionId, (existingGaCountBySection.get(s.sectionId) || 0) + 1);
@@ -1033,7 +1032,7 @@ export const eventService = {
         }
       }
 
-      // Xử lý đơn hết hạn (giữ nguyên)
+      // Xử lý đơn hết hạn
       if (expiredOrderIds.length > 0) {
         const expiredSeats = await tx
           .select({ seatId: orderItems.seatId })
@@ -1048,7 +1047,7 @@ export const eventService = {
         await tx.update(orders).set({ status: 'cancelled' }).where(inArray(orders.id, expiredOrderIds));
       }
 
-      // 6. Kiểm tra giới hạn vé mỗi người (CHỈ TÍNH VÉ MỚI)
+      // 6. Kiểm tra giới hạn vé mỗi người (chỉ tính vé mới)
       const userExistingTickets = await tx
         .select({ count: sql<number>`count(*)` })
         .from(orders)
@@ -1079,7 +1078,7 @@ export const eventService = {
         throwError(Errors.DUPLICATE_SEAT, 'Có ghế ngồi bị trùng trong giỏ hàng.');
       }
 
-      // 8. Lock ghế (có xử lý ownership)
+      // 8. Lock ghế
       const lockedSeats: LockedSeat[] = [];
       const conflicts: ConflictDetail[] = [];
 
@@ -1136,7 +1135,6 @@ export const eventService = {
                 } else if (seat.status === 'locked') {
                   const lockExpiry = new Date(seat.lockedAt!.getTime() + 10 * 60 * 1000);
                   if (seat.lockedBy === userId && lockExpiry > now) {
-                    // Chỉ lock nếu chưa có trong active order (đã lọc ở trên nên không cần kiểm tra lại, nhưng vẫn giữ để an toàn)
                     if (!existingSeatIds.has(seat.id)) {
                       lockedSeats.push(seat);
                     }
