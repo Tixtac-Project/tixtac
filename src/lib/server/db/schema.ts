@@ -355,3 +355,10 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   seat: one(seats, { fields: [orderItems.seatId], references: [seats.id] }),
 }));
+
+export const idempotencyKeys = pgTable('idempotency_keys', {
+  key: text('key').primaryKey(),
+  status: text('status').notNull(), // 'processing' | 'completed'
+  response: jsonb('response'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
