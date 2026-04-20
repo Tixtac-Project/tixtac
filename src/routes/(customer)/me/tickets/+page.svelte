@@ -1,6 +1,8 @@
 <script lang="ts">
   import EventTicketCard from '$lib/components/customer/event/EventTicketCard.svelte';
   import PendingOrderCard from '$lib/components/customer/event/PendingOrderCard.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Ticket } from 'lucide-svelte';
 
   let { data } = $props();
 
@@ -99,9 +101,34 @@
       </div>
     {/if}
 
-    <!-- TRỐNG -->
-    {#if pendingOrders.length === 0 && paidEvents.length === 0}
-      <div class="py-20 text-center text-muted-foreground">Bạn chưa có giao dịch nào.</div>
+    <!-- TRỐNG: TẤT CẢ -->
+    {#if activeTab === 'all' && pendingOrders.length === 0 && paidEvents.length === 0}
+      <div class="mt-8 flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-surface-container-lowest py-20 px-4 text-center">
+        <div class="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-low text-muted-foreground">
+          <Ticket class="h-10 w-10 opacity-50" strokeWidth="1.5" />
+        </div>
+        <h3 class="mb-2 text-xl font-bold text-foreground">Bạn chưa có vé nào</h3>
+        <p class="mb-8 max-w-sm text-sm text-muted-foreground">
+          Bạn chưa thực hiện giao dịch nào. Hãy khám phá các sự kiện hấp dẫn đang diễn ra ngay hôm nay!
+        </p>
+        <Button href="/" class="rounded-full bg-primary px-8 py-6 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:scale-105 hover:bg-primary-container">
+          Khám phá sự kiện
+        </Button>
+      </div>
+    {/if}
+
+    <!-- TRỐNG: CHỜ THANH TOÁN -->
+    {#if activeTab === 'pending' && pendingOrders.length === 0}
+      <div class="mt-8 flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-surface-container-lowest py-16 px-4 text-center">
+        <p class="text-sm font-medium text-muted-foreground">Không có đơn hàng nào đang chờ thanh toán.</p>
+      </div>
+    {/if}
+
+    <!-- TRỐNG: ĐÃ THANH TOÁN -->
+    {#if activeTab === 'paid' && paidEvents.length === 0}
+      <div class="mt-8 flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-surface-container-lowest py-16 px-4 text-center">
+        <p class="text-sm font-medium text-muted-foreground">Bạn chưa có vé nào đã thanh toán.</p>
+      </div>
     {/if}
   </div>
 </div>
