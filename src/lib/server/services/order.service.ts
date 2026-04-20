@@ -13,6 +13,7 @@ type OrderItemWithRelations = typeof orderItems.$inferSelect & {
     section: typeof seatSections.$inferSelect;
     show: {
       title: string | null;
+      showDate: string;
       startTime: Date;
       event: {
         id: number;
@@ -26,7 +27,7 @@ type OrderItemWithRelations = typeof orderItems.$inferSelect & {
 
 type FormattedItem = {
   event: { id: number; title: string; venue: string; bannerImageUrl: string | null };
-  show: { title: string | null; startTime: Date };
+  show: { title: string | null; showDate: string; startTime: Date };
   item_id: number;
   price: string;
   ticket_code: string;
@@ -44,6 +45,8 @@ type PendingOrderEntry = {
   items: {
     event_title: string;
     show_title: string | null;
+    show_date: string;
+    start_time: string;
     section_name: string;
     seat_type: 'assigned' | 'general';
     seat_label: string | null;
@@ -56,6 +59,7 @@ type PaidTicketEntry = {
   ticket: {
     order_item_id: number;
     show_title: string | null;
+    show_date: string;
     start_time: string;
     section_name: string;
     seat_type: 'assigned' | 'general';
@@ -205,10 +209,7 @@ export const orderService = {
     const userOrders = await db.query.orders.findMany({
       where: and(
         eq(orders.userId, userId),
-        or(
-          eq(orders.status, 'paid'),
-          and(eq(orders.status, 'pending'), gt(orders.expiresAt, now)),
-        ),
+        or(eq(orders.status, 'paid'), and(eq(orders.status, 'pending'), gt(orders.expiresAt, now))),
       ),
       orderBy: [desc(orders.createdAt)],
       with: {
@@ -271,6 +272,8 @@ export const orderService = {
             return {
               event_title: formatted.event.title,
               show_title: formatted.show.title,
+              show_date: formatted.show.showDate,
+              start_time: formatted.show.startTime.toISOString(),
               section_name: formatted.section_name,
               seat_type: formatted.seat_type,
               seat_label: formatted.seat_label,
@@ -286,6 +289,7 @@ export const orderService = {
             ticket: {
               order_item_id: formatted.item_id,
               show_title: formatted.show.title,
+              show_date: formatted.show.showDate,
               start_time: formatted.show.startTime.toISOString(),
               section_name: formatted.section_name,
               seat_type: formatted.seat_type,

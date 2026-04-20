@@ -132,13 +132,13 @@
           {/if}
         </a>
         <a
-          href={resolve(user ? '/my-tickets' : '/login?redirect=/my-tickets')}
-          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/my-tickets')
+          href={resolve('/me/tickets')}
+          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/me/tickets')
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'}"
         >
           Vé của tôi
-          {#if isActive('/my-tickets')}
+          {#if isActive('/me/tickets')}
             <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
           {/if}
         </a>
@@ -221,7 +221,7 @@
               </DropdownMenuItem>
               <DropdownMenuItem
                 onclick={() => {
-                  goto(resolve('/my-tickets'));
+                  goto(resolve('/me/tickets'));
                   isUserMenuOpen = false;
                 }}
                 class="cursor-pointer"
@@ -303,8 +303,8 @@
 
       <!-- My Tickets -->
       <a
-        href={resolve(user ? '/my-tickets' : '/login?redirect=/my-tickets')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/my-tickets')
+        href={resolve('/me/tickets')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/tickets')
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
