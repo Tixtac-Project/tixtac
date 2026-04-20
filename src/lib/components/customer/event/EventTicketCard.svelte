@@ -1,5 +1,6 @@
 <script lang="ts">
   import { CalendarDays, MapPin, Ticket } from 'lucide-svelte';
+  import { formatDate, formatTime } from '$lib/utils/datetime';
 
   export interface PaidTicketEntry {
     order_item_id: number;
@@ -50,16 +51,6 @@
     );
   });
 
-  const formatDate = (isoString: string) => {
-    const d = new Date(isoString);
-    const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const date = d.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    return `${time} · ${date}`;
-  };
 </script>
 
 <div class="mb-10">
@@ -101,7 +92,7 @@
             class="flex w-fit items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-bold text-primary"
           >
             <CalendarDays class="h-3.5 w-3.5 shrink-0" />
-            {formatDate(show.start_time)}
+            {formatTime(show.start_time)} | {formatDate(show.start_time)}
           </div>
         </div>
 

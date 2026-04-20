@@ -2,6 +2,8 @@
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardFooter, CardHeader } from '$lib/components/ui/card';
   import { Calendar, Clock, Ticket } from 'lucide-svelte';
+  import { formatDate, formatTime } from '$lib/utils/datetime';
+  import { formatPrice } from '$lib/utils/price';
 
   export interface PendingOrderItem {
     event_title: string;
@@ -55,23 +57,35 @@
     return `${m}:${s}`;
   });
 
-  // QUY TẮC: Chỉ lấy 2 item đầu tiên để hiển thị, tính số lượng ẩn
-  const displayItems = $derived(order.items.slice(0, 2));
-  const hiddenItemsCount = $derived(order.items.length - 2);
+  // QUY TẮC: Chỉ lấy 3 item đầu tiên để hiển thị, tính số lượng ẩn
+  const displayItems = $derived(order.items.slice(0, 3));
+  const hiddenItemsCount = $derived(order.items.length - 3);
 
-  const formatCurrency = (amount: string) =>
-    new Intl.NumberFormat('vi-VN').format(Number(amount)) + ' đ';
+  const groupedDisplayItems = $derived.by(() => {
+    const groups: Record<
+      string,
+      {
+        event_title: string;
+        show_title: string | null;
+        start_time: string;
+        tickets: PendingOrderItem[];
+      }
+    > = {};
 
-  const formatDateTime = (timeStr: string) => {
-    const date = new Date(timeStr);
-    return date.toLocaleString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+    for (const item of displayItems) {
+      const key = `${item.event_title}_${item.start_time}`;
+      if (!groups[key]) {
+        groups[key] = {
+          event_title: item.event_title,
+          show_title: item.show_title,
+          start_time: item.start_time,
+          tickets: [],
+        };
+      }
+      groups[key].tickets.push(item);
+    }
+    return Object.values(groups);
+  });
 </script>
 
 {#if !isExpired}
@@ -101,32 +115,33 @@
 
     <CardContent class="flex-1 bg-surface-container-lowest p-4 sm:p-5">
       <div class="space-y-4">
-        {#each displayItems as item, i (i)}
-          <!-- Luôn nằm ngang: info trái, giá phải -->
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0 flex-1">
-              <p class="truncate leading-tight font-bold text-foreground">{item.event_title}</p>
-              <p class="text-sm font-medium text-muted-foreground">
-                {item.show_title || 'Suất diễn'}
+        {#each groupedDisplayItems as group, i (i)}
+          <!-- Nhóm vé cùng Event & Suất diễn -->
+          <div class="rounded-xl border border-border bg-background p-3 sm:p-4 shadow-sm">
+            <div class="mb-3 border-b border-dashed border-border pb-2">
+              <p class="truncate leading-tight font-bold text-foreground">{group.event_title}</p>
+              <p class="text-sm font-medium text-muted-foreground mt-0.5">
+                {group.show_title || 'Suất diễn'}
               </p>
-              <div
-                class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
-              >
-                <span class="flex items-center gap-1">
-                  <Calendar class="h-3 w-3 shrink-0" />
-                  {formatDateTime(item.start_time)}
-                </span>
-                <span
-                  class="rounded-full bg-surface-container-high px-2 py-0.5 font-semibold text-foreground"
-                >
-                  {item.section_name}{#if item.seat_type !== 'general'}
-                    · Ghế {item.seat_label}{/if}
-                </span>
+              <div class="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar class="h-3 w-3 shrink-0" />
+                {formatTime(group.start_time)} | {formatDate(group.start_time)}
               </div>
             </div>
-            <span class="shrink-0 text-sm font-bold text-foreground sm:text-base">
-              {formatCurrency(item.price)}
-            </span>
+            
+            <div class="space-y-2">
+              {#each group.tickets as ticket, j (j)}
+                <div class="flex items-center justify-between gap-3">
+                  <span class="rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-semibold text-foreground">
+                    {ticket.section_name}{#if ticket.seat_type !== 'general'}
+                      · Ghế {ticket.seat_label}{/if}
+                  </span>
+                  <span class="shrink-0 text-sm font-bold text-foreground">
+                    {formatPrice(Number(ticket.price))}
+                  </span>
+                </div>
+              {/each}
+            </div>
           </div>
         {/each}
 
@@ -148,7 +163,7 @@
           Tổng thanh toán
         </p>
         <p class="mt-0.5 text-2xl font-bold text-foreground">
-          {formatCurrency(order.total_amount)}
+          {formatPrice(Number(order.total_amount))}
         </p>
       </div>
       <Button
