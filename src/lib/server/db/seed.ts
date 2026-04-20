@@ -12,6 +12,7 @@ import {
 } from '$lib/server/db/schema';
 import * as argon2 from 'argon2';
 import { eq } from 'drizzle-orm';
+import { customAlphabet } from 'nanoid';
 
 // ── Types for Seed Data ────────────────────────
 import type { SectionLayoutConfig, SectionSeatConfig } from '$lib/server/db/schema';
@@ -110,7 +111,6 @@ function generateUser(index: number) {
 }
 
 // ── Section Seed Type ──────────────────────────
-
 interface SectionSeed {
   name: string;
   type: 'assigned' | 'general';
@@ -136,7 +136,6 @@ interface ShowSeed {
 }
 
 // ── Seat generation Logic ──────────────────────
-
 async function createShowWithSections(eventId: number, show: ShowSeed) {
   const [newShow] = await db
     .insert(eventShows)
@@ -173,7 +172,6 @@ async function createShowWithSections(eventId: number, show: ShowSeed) {
     const isGA = s.type === 'general';
     const seatCfg = s.seatConfig;
 
-    // GA uses capacity only — no individual seat records
     if (isGA) continue;
 
     const seatValues = [];
@@ -218,6 +216,8 @@ async function createShowWithSections(eventId: number, show: ShowSeed) {
 // MAIN SEED
 // ══════════════════════════════════════════════════
 
+const generateTicketCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ0123456789', 8);
+
 export async function seed() {
   console.log('🌱 Starting seed with new Schema…');
 
@@ -261,6 +261,12 @@ export async function seed() {
       .onConflictDoNothing({ target: users.email });
   }
   console.log('👥 10 random customers seeded');
+
+  // Lấy danh sách customer để tạo orders sau này
+  const allCustomers = await db
+    .select()
+    .from(users)
+    .where(eq(users.role, 'customer'));
 
   // ── 4. Categories ──
   console.log('📂 Seeding categories…');
@@ -398,7 +404,7 @@ export async function seed() {
     {
       name: 'Standard B',
       type: 'assigned',
-      isSeatPickable: false, // Auto-assign (no pick)
+      isSeatPickable: false,
       capacity: 0,
       price: '500000',
       sortOrder: 3,
@@ -579,8 +585,6 @@ export async function seed() {
           startRowIndex: 1,
           startColIndex: 1,
         },
-        // Cutouts around left pillar (pillar is at ~195,395 relative to section at 50,320)
-        // Pillar covers approx rows F-G, cols 10-11
         disabledSeats: ['GL-F10', 'GL-F11', 'GL-G10', 'GL-G11'],
       },
       {
@@ -600,7 +604,6 @@ export async function seed() {
           startRowIndex: 1,
           startColIndex: 1,
         },
-        // Cutouts around right pillar
         disabledSeats: ['GR-F5', 'GR-F6', 'GR-G5', 'GR-G6'],
       },
       {
@@ -764,7 +767,6 @@ export async function seed() {
     ],
   });
 
-  // Second show same night
   await createShowWithSections(ev3.id, {
     title: 'Suất 22:30 (Late Night)',
     showDate: '2026-09-05',
@@ -1025,7 +1027,7 @@ export async function seed() {
       {
         name: 'VIP (Hàng đầu)',
         type: 'assigned',
-        isSeatPickable: false, // Conference seating = no-pick
+        isSeatPickable: false,
         capacity: 0,
         price: '3000000',
         sortOrder: 0,
@@ -1189,7 +1191,6 @@ export async function seed() {
     endTime: new Date('2026-08-10T21:15:00+07:00'),
     status: 'published',
     sections: [
-      // Khán đài Đông (Main stand — bottom)
       {
         name: 'Khán đài Đông - VIP',
         type: 'assigned',
@@ -1226,7 +1227,6 @@ export async function seed() {
           startColIndex: 1,
         },
       },
-      // Khán đài Tây (opposite side — top)
       {
         name: 'Khán đài Tây',
         type: 'assigned',
@@ -1245,7 +1245,6 @@ export async function seed() {
           startColIndex: 1,
         },
       },
-      // Khán đài Nam (left end — rotated)
       {
         name: 'Khán đài Nam',
         type: 'general',
@@ -1264,7 +1263,6 @@ export async function seed() {
           startColIndex: 1,
         },
       },
-      // Khán đài Bắc (right end — rotated)
       {
         name: 'Khán đài Bắc',
         type: 'general',
@@ -1329,7 +1327,7 @@ export async function seed() {
       ],
       amenities: ['cloakroom', 'wheelchair', 'cafe'],
       organizerInfo: { name: 'Nhà hát Kịch Việt Nam', phone: '024-3825-1234' },
-      status: 'draft', // Still in draft!
+      status: 'draft',
       createdBy: admin.id,
     })
     .returning();
@@ -1358,7 +1356,6 @@ export async function seed() {
           startRowIndex: 1,
           startColIndex: 1,
         },
-        // Aisle cutouts (center aisle at col 13)
         disabledSeats: [
           'ORC-A13',
           'ORC-B13',
@@ -1385,7 +1382,7 @@ export async function seed() {
           rowFormat: 'alphabetic',
           colDirection: 'ltr',
           startRowIndex: 9,
-          startColIndex: 1, // Continues from Orchestra (I, J, K...)
+          startColIndex: 1,
         },
       },
       {
@@ -1403,9 +1400,8 @@ export async function seed() {
           rowFormat: 'alphabetic',
           colDirection: 'ltr',
           startRowIndex: 14,
-          startColIndex: 1, // N, O, P, Q
+          startColIndex: 1,
         },
-        // Corner cutouts (irregular balcony shape)
         disabledSeats: [
           'BAL-N1',
           'BAL-N2',
@@ -1436,7 +1432,7 @@ export async function seed() {
         type: 'assigned',
         isSeatPickable: true,
         capacity: 0,
-        price: '1500000', // Higher price for opening night
+        price: '1500000',
         sortOrder: 0,
         layoutConfig: { x: 100, y: 170, width: 600, height: 150, rotation: 0, color: '#8B0000' },
         seatConfig: {
@@ -1567,7 +1563,6 @@ export async function seed() {
     ],
     status: 'published',
     sections: [
-      // Ringside — 4 angled blocks surrounding the ring
       {
         name: 'Ringside - Trước',
         type: 'assigned',
@@ -1640,7 +1635,6 @@ export async function seed() {
           startColIndex: 1,
         },
       },
-      // Upper tiers — angled corner blocks
       {
         name: 'Góc Trái-Trước',
         type: 'assigned',
@@ -1658,7 +1652,6 @@ export async function seed() {
           startRowIndex: 1,
           startColIndex: 1,
         },
-        // Corner cutout (remove the far corner seat)
         disabledSeats: ['CLF-E5', 'CLF-E4', 'CLF-D5'],
       },
       {
@@ -1718,7 +1711,6 @@ export async function seed() {
         },
         disabledSeats: ['CRB-A1', 'CRB-A2', 'CRB-B1'],
       },
-      // GA standing at the very back
       {
         name: 'GA Standing',
         type: 'general',
@@ -1744,17 +1736,14 @@ export async function seed() {
 
   console.log('🧾 Seeding orders...');
 
-  const allUsers = await db.select().from(users).where(eq(users.role, 'customer'));
-
-  const allSeats = await db.select().from(seats).limit(200); // lấy 200 ghế đầu để test
-
-  let seatIndex = 0;
+  // Tạo một số đơn hàng mẫu để test
+  const allSeatsForOrders = await db.select().from(seats).limit(200);
+  let seatIdx = 0;
 
   for (let i = 0; i < 5; i++) {
-    const user = randPick(allUsers);
-
-    const pickedSeats = allSeats.slice(seatIndex, seatIndex + 3);
-    seatIndex += 3;
+    const user = randPick(allCustomers);
+    const pickedSeats = allSeatsForOrders.slice(seatIdx, seatIdx + 3);
+    seatIdx += 3;
 
     const total = pickedSeats.reduce((sum) => sum + 500000, 0);
 
@@ -1764,17 +1753,13 @@ export async function seed() {
         userId: user.id,
         totalAmount: String(total),
         status: i % 2 === 0 ? 'paid' : 'pending',
-        expiresAt:
-          i % 2 === 0
-            ? new Date(Date.now() + 24 * 60 * 60 * 1000)
-            : new Date(Date.now() + 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         paidAt: i % 2 === 0 ? new Date() : null,
       })
       .returning();
 
     for (const s of pickedSeats) {
-      const code = `TIX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-
+      const code = generateTicketCode();
       await db.insert(orderItems).values({
         orderId: order.id,
         seatId: s.id,
@@ -1785,7 +1770,6 @@ export async function seed() {
         checkedInAt: null,
       });
 
-      // mark seat sold
       await db
         .update(seats)
         .set(
@@ -1799,7 +1783,6 @@ export async function seed() {
 
   console.log('🧾 Orders seeded: 5 orders × 3 items');
 
-  // ── Summary ────────────────────────────────
   console.log('');
   console.log('══════════════════════════════════════════');
   console.log('✅ Seed completed! Summary:');

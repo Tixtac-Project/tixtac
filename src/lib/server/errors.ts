@@ -63,7 +63,7 @@ export const Errors = {
   ORDER_ALREADY_PROCESSED: new AppError('ORDER_ALREADY_PROCESSED', 400, 'Đơn hàng đã được xử lý'),
   LOCK_EXPIRED: new AppError('LOCK_EXPIRED', 410, 'Đơn hàng đã hết hạn, vui lòng đặt lại vé'),
   ORDER_EMPTY: new AppError('ORDER_EMPTY', 400, 'Đơn hàng không có vé nào'),
-  ACTIVE_ORDER_EXISTS: new AppError('ACTIVE_ORDER_EXISTS', 409),
+  ACTIVE_ORDER_EXISTS: new AppError('ACTIVE_ORDER_EXISTS', 409, 'Bạn đang có đơn hàng đang chờ xử lý'),
 
   // Seats
   SEAT_NOT_AVAILABLE: new AppError('SEAT_NOT_AVAILABLE', 409, 'Một hoặc nhiều ghế đã được đặt'),
@@ -73,7 +73,7 @@ export const Errors = {
   HOLD_FAILED: new AppError('HOLD_FAILED', 500, 'Không thể giữ ghế, vui lòng thử lại'),
   SEATS_LIST_EMPTY: new AppError('SEATS_LIST_EMPTY', 400, 'Danh sách ghế không được để trống'),
   MAX_SEATS_EXCEEDED: new AppError('MAX_SEATS_EXCEEDED', 400, 'Vượt quá số lượng ghế tối đa cho phép'),
-  INVALID_SECTION_TYPE: new AppError('SEAT_NOT_BELONG_SEAT_SECTION', 400, 'Ghế không thuộc đúng khu'),
+  INVALID_SECTION_TYPE: new AppError('INVALID_SECTION_TYPE', 400, 'Ghế không thuộc đúng khu'),
   DUPLICATE_SEAT: new AppError('DUPLICATE_SEAT', 400, 'Ghế bị trùng'),
   INVALID_QUANTITY: new AppError('INVALID_QUANTITY', 400, 'Số lượng ghế đứng không hợp lệ'),
   SECTION_NOT_AVAILABLE: new AppError('SECTION_NOT_AVAILABLE', 409, 'Khu ghế không hợp lệ'),

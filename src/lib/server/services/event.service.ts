@@ -25,7 +25,7 @@ import {
 import { validateInput } from '$lib/shared/validation';
 import { getRowLabel } from '$lib/utils/seat-label';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import { and, asc, count, eq, ilike, inArray, min, sql, type InferInsertModel } from 'drizzle-orm';
+import { and, asc, count, eq, gte, ilike, inArray, isNotNull, isNull, lte, min, or, sql, type InferInsertModel } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 
 /**
@@ -1119,11 +1119,8 @@ export const eventService = {
           if (section.type !== 'general') {
             throwError(Errors.INVALID_SECTION_TYPE, `Khu vực ${ga.section_id} không phải vé đứng.`);
           }
-          if (section.isSeatPickable !== true) {
-            throwError(Errors.INVALID_SECTION_TYPE, `Khu vực ${ga.section_id} không thể mua vé.`);
-          }
-          if (section.salesStartAt && now < section.salesStartAt) {
-            throwError(Errors.SALES_NOT_STARTED, `Khu vực ${ga.section_id} chưa mở bán.`);
+          if (!section.salesStartAt || now < section.salesStartAt) {
+            throwError(Errors.SALES_NOT_STARTED, `Khu vực ${ga.section_id} chưa được thiết lập thời gian mở bán hoặc chưa đến giờ mở bán.`);
           }
           if (section.salesEndAt && now > section.salesEndAt) {
             throwError(Errors.SALES_ENDED, `Khu vực ${ga.section_id} đã ngừng bán.`);
@@ -1143,16 +1140,15 @@ export const eventService = {
         .where(and(eq(orders.userId, userId), eq(orders.status, 'pending')))
         .for('update');
 
-      let activeOrder: (typeof oldPendingOrders)[number] | null = null;
-      const expiredOrderIds: number[] = [];
-
-      for (const order of oldPendingOrders) {
-        if (order.expiresAt > now) {
-          if (!activeOrder) activeOrder = order;
-        } else {
-          expiredOrderIds.push(order.id);
-        }
+      const activeCandidates = oldPendingOrders.filter((o) => o.expiresAt > now);
+      if (activeCandidates.length > 1) {
+        // Data invariant violated — cancel extras alongside expired ones
+        throwError(Errors.ACTIVE_ORDER_EXISTS);
       }
+      const activeOrder = activeCandidates[0] ?? null;
+      const expiredOrderIds = oldPendingOrders
+        .filter((o) => o.expiresAt <= now)
+        .map((o) => o.id);
 
       // 4a. Fetch details of current active order items
       const existingSeatIds = new Set<number>();
@@ -1379,7 +1375,7 @@ export const eventService = {
                 conflict.unavailable_assigned_seats.push(seat.id);
                 continue;
               }
-              if (seat.salesStart && now < seat.salesStart) {
+              if (!seat.salesStart || now < seat.salesStart) {
                 conflict.unavailable_assigned_seats.push(seat.id);
                 continue;
               }
@@ -1387,7 +1383,6 @@ export const eventService = {
                 conflict.unavailable_assigned_seats.push(seat.id);
                 continue;
               }
-
               if (seat.status === 'available') {
                 lockedSeats.push({
                   id: seat.id,
@@ -1396,9 +1391,9 @@ export const eventService = {
                   sectionId: seat.sectionId,
                 });
               } else if (seat.status === 'locked') {
-                const lockExpiry = new Date(seat.lockedAt!.getTime() + 10 * 60 * 1000);
-                if (seat.lockedBy === userId && lockExpiry > now) {
-                  // Already locked by this user (should be in existingSeatIds, but safe)
+                const lockedAtMs = seat.lockedAt?.getTime();
+                const lockExpiry = lockedAtMs ? new Date(lockedAtMs + 10 * 60 * 1000) : null;
+                if (seat.lockedBy === userId && lockExpiry && lockExpiry > now) {
                   if (!existingSeatIds.has(seat.id)) {
                     lockedSeats.push({
                       id: seat.id,
@@ -1437,7 +1432,13 @@ export const eventService = {
                 eq(seats.sectionId, ga.section_id),
                 eq(seats.showId, item.show_id),
                 eq(seatSections.type, 'general'),
-                eq(seats.status, 'available')
+                eq(seats.status, 'available'),
+                isNotNull(seatSections.salesStartAt),
+                lte(seatSections.salesStartAt, now),
+                or(
+                  isNull(seatSections.salesEndAt),
+                  gte(seatSections.salesEndAt, now)
+                )
               )
             )
             .limit(neededQty)
@@ -1471,17 +1472,22 @@ export const eventService = {
         throwError(Errors.CART_CONFLICT(), 'Một số vé không khả dụng.', conflicts as unknown as Record<string, string>);
       }
 
-      // 9. Update GA capacity (deduct newly locked GA seats)
+      //9. Update GA capacity (deduct ONLY newly-locked GA seats)
+      const gaSectionIds = new Set<number>(
+        gaRequests.map((g) => g.sectionId),
+      );
+       if (gaSectionIds.size > 0) {
+        await tx
+          .select()
+          .from(seatSections)
+          .where(inArray(seatSections.id, [...gaSectionIds]))
+          .for('update');
+      }
+
       const deductionMap = new Map<number, number>();
       for (const seat of lockedSeats) {
-        // Only deduct for GA sections (we can check section type, but safe to deduct for all)
+        if (!gaSectionIds.has(seat.sectionId)) continue;
         deductionMap.set(seat.sectionId, (deductionMap.get(seat.sectionId) || 0) + 1);
-      }
-      for (const [sectionId, qty] of deductionMap.entries()) {
-        await tx
-          .update(seatSections)
-          .set({ capacity: sql`${seatSections.capacity} - ${qty}` })
-          .where(eq(seatSections.id, sectionId));
       }
 
       // 10. Create or update order
