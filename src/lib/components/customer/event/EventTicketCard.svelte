@@ -53,27 +53,27 @@
 
 </script>
 
-<div class="mb-10">
+<div class="mb-8 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
   <!-- Header Sự kiện -->
-  <div class="mb-6 flex items-center gap-4">
-    <div class="h-16 w-24 shrink-0 overflow-hidden rounded-xl shadow-sm sm:h-24 sm:w-40">
+  <div class="flex items-center gap-4 border-b border-border bg-surface-container-low p-4 sm:p-5">
+    <div class="h-16 w-24 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm sm:h-20 sm:w-32">
       <img
         src={eventData.banner_image_url || 'https://picsum.photos/400/200'}
         alt={eventData.title}
         class="h-full w-full object-cover"
       />
     </div>
-    <div class="min-w-0">
+    <div class="min-w-0 flex-1">
       <h2 class="truncate text-lg font-bold text-foreground sm:text-xl">{eventData.title}</h2>
-      <div class="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-        <MapPin class="h-3.5 w-3.5 shrink-0" />
+      <div class="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+        <MapPin class="h-4 w-4 shrink-0" />
         <span class="truncate">{eventData.venue}</span>
       </div>
     </div>
   </div>
 
   <!-- Danh sách Suất diễn -->
-  <div>
+  <div class="p-4 sm:p-5">
     {#each groupedShows as show, i (i)}
       <div class="mb-10 last:mb-0">
         <!-- Tiêu đề Suất diễn — stack on mobile -->

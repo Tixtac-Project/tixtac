@@ -68,11 +68,12 @@
     <!-- KHU VỰC CHỜ THANH TOÁN -->
     {#if (activeTab === 'all' || activeTab === 'pending') && pendingOrders.length > 0}
       <div class="mb-12">
-        <!-- Tiêu đề Khu vực (Chỉ thu nhỏ chữ trên Mobile) -->
-        <div
-          class="mb-4 flex items-center justify-between rounded-lg bg-surface-container-low px-3 py-2 sm:px-4"
-        >
-          <h2 class="text-sm font-bold text-foreground sm:text-lg">Đơn hàng chờ thanh toán</h2>
+        <!-- Tiêu đề Khu vực: Đơn hàng chờ thanh toán -->
+        <div class="mb-6 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="h-6 w-1.5 rounded-full bg-primary"></div>
+            <h2 class="text-xl font-bold text-foreground">Đơn hàng chờ thanh toán</h2>
+          </div>
           <span class="text-xs font-semibold text-muted-foreground sm:text-sm">
             {pendingOrders.length} Đơn hàng
           </span>

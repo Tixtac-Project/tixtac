@@ -61,11 +61,12 @@
   const displayItems = $derived(order.items.slice(0, 3));
   const hiddenItemsCount = $derived(order.items.length - 3);
 
+  const eventTitle = $derived(order.items[0]?.event_title || 'Sự kiện');
+
   const groupedDisplayItems = $derived.by(() => {
     const groups: Record<
       string,
       {
-        event_title: string;
         show_title: string | null;
         start_time: string;
         tickets: PendingOrderItem[];
@@ -73,10 +74,9 @@
     > = {};
 
     for (const item of displayItems) {
-      const key = `${item.event_title}_${item.start_time}`;
+      const key = item.start_time;
       if (!groups[key]) {
         groups[key] = {
-          event_title: item.event_title,
           show_title: item.show_title,
           start_time: item.start_time,
           tickets: [],
@@ -114,13 +114,15 @@
     </CardHeader>
 
     <CardContent class="flex-1 bg-surface-container-lowest p-4 sm:p-5">
+      <div class="mb-4 line-clamp-2">
+        <h4 class="text-base font-bold text-foreground sm:text-lg">{eventTitle}</h4>
+      </div>
       <div class="space-y-4">
         {#each groupedDisplayItems as group, i (i)}
-          <!-- Nhóm vé cùng Event & Suất diễn -->
+          <!-- Nhóm vé cùng Suất diễn -->
           <div class="rounded-xl border border-border bg-background p-3 sm:p-4 shadow-sm">
             <div class="mb-3 border-b border-dashed border-border pb-2">
-              <p class="truncate leading-tight font-bold text-foreground">{group.event_title}</p>
-              <p class="text-sm font-medium text-muted-foreground mt-0.5">
+              <p class="text-sm font-bold text-foreground">
                 {group.show_title || 'Suất diễn'}
               </p>
               <div class="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
