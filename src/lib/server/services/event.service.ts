@@ -71,6 +71,14 @@ interface LockedSeat {
   sectionId: number;
 }
 
+interface PurchaseResponse {
+  order_id: number;
+  total_amount: string;
+  expires_at: string;
+  locked_items: number;
+  is_appended: boolean;
+}
+
 /**
  * Insert all sections + their seats in bulk for a given show.
  *
@@ -1056,10 +1064,34 @@ export const eventService = {
     eventId: number,
     body: PurchaseBody,
     idempotencyKey?: string
-  ) {
+  ): Promise<PurchaseResponse> {
     const now = new Date();
 
     return await db.transaction(async (tx) => {
+      if (idempotencyKey) {
+        const [existing] = await tx
+          .select()
+          .from(idempotencyKeys)
+          .where(eq(idempotencyKeys.key, idempotencyKey))
+          .for('update'); // khóa hàng để tránh race condition
+
+        if (existing) {
+          if (existing.status === 'completed') {
+          return existing.response as PurchaseResponse;
+        }
+          if (existing.status === 'processing') {
+            // Request khác đang xử lý cùng key → từ chối
+            throwError(Errors.IDEMPOTENCY_CONFLICT, 'Yêu cầu đang được xử lý, vui lòng thử lại sau.');
+          }
+          // Trường hợp status khác (nếu có) có thể xử lý như lỗi hoặc ghi đè
+          // Ở đây ta coi như chưa có record hợp lệ và tiếp tục
+        }
+        await tx.insert(idempotencyKeys).values({
+          key: idempotencyKey,
+          status: 'processing',
+          createdAt: now,
+        });
+      }
       // 1. Validate user
       const [user] = await tx
         .select()
@@ -1488,6 +1520,13 @@ export const eventService = {
       for (const seat of lockedSeats) {
         if (!gaSectionIds.has(seat.sectionId)) continue;
         deductionMap.set(seat.sectionId, (deductionMap.get(seat.sectionId) || 0) + 1);
+      }
+
+      for (const [sectionId, qty] of deductionMap.entries()) {
+        await tx
+          .update(seatSections)
+          .set({ capacity: sql`${seatSections.capacity} - ${qty}` })
+          .where(eq(seatSections.id, sectionId));
       }
 
       // 10. Create or update order

@@ -10,9 +10,9 @@ import {
   seatSections,
   users,
 } from '$lib/server/db/schema';
+import { generateTicketCode } from '$lib/utils/ticket-code';
 import * as argon2 from 'argon2';
 import { eq } from 'drizzle-orm';
-import { customAlphabet } from 'nanoid';
 
 // ── Types for Seed Data ────────────────────────
 import type { SectionLayoutConfig, SectionSeatConfig } from '$lib/server/db/schema';
@@ -215,9 +215,6 @@ async function createShowWithSections(eventId: number, show: ShowSeed) {
 // ══════════════════════════════════════════════════
 // MAIN SEED
 // ══════════════════════════════════════════════════
-
-const generateTicketCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ0123456789', 8);
-
 export async function seed() {
   console.log('🌱 Starting seed with new Schema…');
 

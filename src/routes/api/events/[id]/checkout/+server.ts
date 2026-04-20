@@ -1,6 +1,5 @@
 // src/routes/api/events/[id]/checkout/+server.ts
 import { requireCustomer } from '$lib/server/auth/guards';
-import { AppError, Errors, throwError } from '$lib/server/errors';
 import { apiHandler } from '$lib/server/handler';
 import { eventService } from '$lib/server/services/event.service';
 import { checkoutBodySchema, eventIdSchema } from '$lib/shared/schemas/event.schema';
@@ -24,18 +23,7 @@ export const POST = apiHandler(async ({ params, request, locals }) => {
   const rawBody = await request.json();
   const body = validateInput(checkoutBodySchema, rawBody);
 
-  // 4. Gọi service
-  try {
-    const result = await eventService.purchaseTickets(customerId, eventId, body, idempotencyKey);
-    return json({ data: result }, { status: 200 });
-  } catch (err) {
-    if (err instanceof AppError) {
-      return json(
-        { error: err.code, message: err.message, details: err.details },
-        { status: err.statusCode }
-      );
-    }
-
-    throwError(Errors.INTERNAL_ERROR);
-  }
+  // 4. Gọi service (apiHandler handles AppError serialization + unknown-error logging)
+  const result = await eventService.purchaseTickets(customerId, eventId, body, idempotencyKey);
+  return json({ data: result }, { status: 201 });
 });

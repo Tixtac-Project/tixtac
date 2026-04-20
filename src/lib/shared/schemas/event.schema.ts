@@ -666,7 +666,7 @@ export const cartItemSchema = z.object({
   if (data.assigned_seats.length === 0 && data.general_admission.length === 0) {
     ctx.addIssue({
       code: 'custom',
-      path: ['cart_items'],
+      path: ['assigned_seats'],
       message: 'Mỗi suất diễn phải có ít nhất 1 vé assigned hoặc general admission',
     });
   }
