@@ -15,13 +15,18 @@ export const POST = apiHandler(async ({ params, request, locals }) => {
   // 2. Validate eventId
   const eventId = validateInput(eventIdSchema, params.id);
 
+   const idempotencyKey =
+    request.headers.get('Idempotency-Key') ||
+    request.headers.get('X-Idempotency-Key') ||
+    undefined;
+
   // 3. Validate request body
   const rawBody = await request.json();
   const body = validateInput(checkoutBodySchema, rawBody);
 
   // 4. Gọi service
   try {
-    const result = await eventService.checkoutEvent(customerId, eventId, body);
+    const result = await eventService.checkoutEvent(customerId, eventId, body, idempotencyKey);
     return json({ data: result }, { status: 200 });
   } catch (err) {
     if (err instanceof AppError) {

@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { categories, events, eventShows, orderItems, orders, seats, seatSections, users } from '$lib/server/db/schema';
+import { categories, events, eventShows, idempotencyKeys, orderItems, orders, seats, seatSections, users } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import {
   addSeatmapSchema,
@@ -19,7 +19,7 @@ import {
 import { validateInput } from '$lib/shared/validation';
 import { getRowLabel } from '$lib/utils/seat-label';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import { and, asc, count, eq, gte, ilike, inArray, isNull, lte, min, or, sql, type InferInsertModel } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, min, sql, type InferInsertModel } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 
 /**
@@ -916,114 +916,170 @@ export const eventService = {
     });
   },
 
-  async checkoutEvent(userId: number, eventId: number, rawBody: unknown) {
+  async checkoutEvent(
+    userId: number,
+    eventId: number,
+    rawBody: unknown,
+    idempotencyKey?: string
+  ) {
     const body = validateInput(checkoutBodySchema, rawBody);
     const now = new Date();
 
-    return await db.transaction(async (tx) => {
-      // 1. Khóa User (Tránh Race Condition/Double-click)
-      await tx.select().from(users).where(eq(users.id, userId)).for('update');
-
-      // 2. Lấy dữ liệu sự kiện & Kiểm tra giới hạn vé (Anti-scalping)
-      const [event] = await tx.select().from(events).where(eq(events.id, eventId));
-      if (!event) throwError(Errors.NOT_FOUND);
-
-      const existingOrders = await tx.select().from(orders)
-        .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
-        .innerJoin(seats, eq(seats.id, orderItems.seatId))
-        .innerJoin(eventShows, eq(eventShows.id, seats.showId))
-        .where(
-          and(
-            eq(orders.userId, userId),
-            inArray(orders.status, ['pending', 'paid']),
-            eq(eventShows.eventId, eventId) // <--- Gộp chung điều kiện vào đây
-          )
-        );
-
-      const totalOwned = existingOrders.length;
-      const requested = body.cart_items.reduce((sum, item) =>
-        sum + item.assigned_seats.length + item.general_admission.reduce((s, g) => s + g.quantity, 0), 0);
-
-      if (totalOwned + requested > event.maxTicketsPerUser) {
-        throwError(Errors.MAX_TICKETS_EXCEEDED, `Tối đa ${event.maxTicketsPerUser} vé/người.`);
+    // Idempotency check (giữ nguyên)
+    if (idempotencyKey) {
+      const existing = await db.query.idempotencyKeys.findFirst({
+        where: eq(idempotencyKeys.key, idempotencyKey),
+      });
+      if (existing) {
+        if (existing.status === 'completed') {
+          return existing.response;
+        } else {
+          throwError(Errors.IDEMPOTENCY_CONFLICT, 'Yêu cầu đang được xử lý, vui lòng thử lại sau.');
+        }
       }
+      await db.insert(idempotencyKeys).values({
+        key: idempotencyKey,
+        status: 'processing',
+        createdAt: now,
+      });
+    }
 
-      // 3. Kiểm tra Show, Ghế và Thời gian (Sales Timing)
+    return await db.transaction(async (tx) => {
+      // 1. Validate user (giữ nguyên)
+      const [user] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
+      if (!user) throwError(Errors.UNAUTHORIZED, 'Người dùng không tồn tại.');
+      if (user.isActive !== true) throwError(Errors.USER_INACTIVE, 'Tài khoản không hoạt động.');
+      if (user.role !== 'customer') throwError(Errors.FORBIDDEN, 'Chỉ khách hàng mới được đặt vé.');
+
+      // 2. Validate event (giữ nguyên)
+      const [event] = await tx.select().from(events).where(eq(events.id, eventId)).for('update');
+      if (!event) throwError(Errors.NOT_FOUND, 'Sự kiện không tồn tại.');
+      if (!['published'].includes(event.status)) throwError(Errors.EVENT_NOT_AVAILABLE, 'Sự kiện chưa mở bán hoặc đã hủy.');
+
+      // 3. Validate cart items cơ bản và thu thập dữ liệu (giữ nguyên)
+      const showIdsInCart = new Set<number>();
+      const allAssignedSeatIds: number[] = [];
+      const gaRequests: { showId: number; sectionId: number; quantity: number }[] = [];
+
       for (const item of body.cart_items) {
-        // 1. Kiểm tra Show & Event
-        const [show] = await tx.select().from(eventShows).where(eq(eventShows.id, item.show_id));
-        if (!show || show.eventId !== eventId) throwError(Errors.SHOW_NOT_AVAIABLE, "Suất diễn không hợp lệ.");
+        if (showIdsInCart.has(item.show_id)) {
+          throwError(Errors.DUPLICATE_SHOW, `Suất diễn ${item.show_id} bị trùng trong giỏ hàng.`);
+        }
+        showIdsInCart.add(item.show_id);
 
-        // 2. Kiểm tra Section thuộc về Show (Dành cho GA)
+        const [show] = await tx
+          .select()
+          .from(eventShows)
+          .where(and(eq(eventShows.id, item.show_id), eq(eventShows.eventId, eventId)))
+          .for('update');
+        if (!show) throwError(Errors.SHOW_NOT_AVAILABLE, `Suất diễn ${item.show_id} không thuộc sự kiện.`);
+
+        allAssignedSeatIds.push(...item.assigned_seats);
+
         for (const ga of item.general_admission) {
           const [section] = await tx
-            .select({ id: seatSections.id, type: seatSections.type }) // Giả sử bạn có cột type ở đây
+            .select()
             .from(seatSections)
-            .where(and(eq(seatSections.id, ga.section_id), eq(seatSections.showId, item.show_id)));
-
-          if (!section || section.type !== 'general') {
-            throwError(Errors.INVALID_SECTION_TYPE, "Khu vực này không phải dành cho vé General Admission.");
-          }
-        }
-
-        // 3. Kiểm tra Ghế cụ thể (Assigned Seats)
-        if (item.assigned_seats.length > 0) {
-          const seatsData = await tx.select({
-              id: seats.id, showId: seats.showId,
-              start: seatSections.salesStartAt, end: seatSections.salesEndAt
-            })
-            .from(seats)
-            .innerJoin(seatSections, eq(seats.sectionId, seatSections.id))
-            .where(inArray(seats.id, item.assigned_seats));
-
-          for (const s of seatsData) {
-            if (s.showId !== item.show_id) throwError(Errors.SEAT_NOT_AVAILABLE, "Ghế không thuộc suất diễn này.");
-            if (s.start && now < new Date(s.start)) throwError(Errors.SALES_NOT_STARTED);
-            if (s.end && now > new Date(s.end)) throwError(Errors.SALES_ENDED);
-          }
+            .where(and(eq(seatSections.id, ga.section_id), eq(seatSections.showId, item.show_id)))
+            .for('update');
+          if (!section) throwError(Errors.SECTION_NOT_AVAILABLE, `Khu vực ${ga.section_id} không thuộc suất diễn.`);
+          if (section.type !== 'general') throwError(Errors.INVALID_SECTION_TYPE, `Khu vực ${ga.section_id} không phải vé đứng.`);
+          if (section.isSeatPickable !== true) throwError(Errors.INVALID_SECTION_TYPE, `Khu vực ${ga.section_id} không thể mua vé.`);
+          if (section.salesStartAt && now < section.salesStartAt) throwError(Errors.SALES_NOT_STARTED, `Khu vực ${ga.section_id} chưa mở bán.`);
+          if (section.salesEndAt && now > section.salesEndAt) throwError(Errors.SALES_ENDED, `Khu vực ${ga.section_id} đã ngừng bán.`);
+          gaRequests.push({ showId: item.show_id, sectionId: ga.section_id, quantity: ga.quantity });
         }
       }
 
-      // ── 4. DỌN DẸP ĐƠN HẾT HẠN & TÌM ĐƠN CÒN HẠN (APPEND) ──
+      // 4. Xử lý pending orders (giữ nguyên)
       const oldPendingOrders = await tx
         .select({ id: orders.id, expiresAt: orders.expiresAt, totalAmount: orders.totalAmount })
         .from(orders)
         .where(and(eq(orders.userId, userId), eq(orders.status, 'pending')))
         .for('update');
 
-      let activeOrder = null;
+      let activeOrder: typeof oldPendingOrders[0] | null = null;
       const expiredOrderIds: number[] = [];
-
       for (const order of oldPendingOrders) {
         if (order.expiresAt > now) {
-          // Lấy đơn còn hạn đầu tiên làm đơn để Append vé mới vào
           if (!activeOrder) activeOrder = order;
         } else {
           expiredOrderIds.push(order.id);
         }
       }
 
-      // Dọn dẹp đơn hết hạn (Nhả ghế) - PHẦN NÀY BẠN LÀM ĐÚNG RỒI
+      // 5. Lấy thông tin chi tiết vé đã có trong activeOrder
+      let existingSeatsDetails: { seatId: number; sectionId: number; sectionType: string }[] = [];
+      const existingSeatIds = new Set<number>();
+      const existingGaCountBySection = new Map<number, number>();
+
+      if (activeOrder) {
+        existingSeatsDetails = await tx
+          .select({
+            seatId: orderItems.seatId,
+            sectionId: seats.sectionId,
+            sectionType: seatSections.type,
+          })
+          .from(orderItems)
+          .innerJoin(seats, eq(seats.id, orderItems.seatId))
+          .innerJoin(seatSections, eq(seatSections.id, seats.sectionId))
+          .where(eq(orderItems.orderId, activeOrder.id));
+
+        for (const s of existingSeatsDetails) {
+          existingSeatIds.add(s.seatId);
+          if (s.sectionType === 'general') {
+            existingGaCountBySection.set(s.sectionId, (existingGaCountBySection.get(s.sectionId) || 0) + 1);
+          }
+        }
+      }
+
+      // Xử lý đơn hết hạn (giữ nguyên)
       if (expiredOrderIds.length > 0) {
-        const oldSeats = await tx
+        const expiredSeats = await tx
           .select({ seatId: orderItems.seatId })
           .from(orderItems)
           .where(inArray(orderItems.orderId, expiredOrderIds));
-
-        if (oldSeats.length > 0) {
+        if (expiredSeats.length > 0) {
           await tx
             .update(seats)
             .set({ status: 'available', lockedBy: null, lockedAt: null })
-            .where(inArray(seats.id, oldSeats.map((s) => s.seatId)));
+            .where(inArray(seats.id, expiredSeats.map(s => s.seatId)));
         }
-
-        await tx
-          .update(orders)
-          .set({ status: 'cancelled' })
-          .where(inArray(orders.id, expiredOrderIds));
+        await tx.update(orders).set({ status: 'cancelled' }).where(inArray(orders.id, expiredOrderIds));
       }
 
-      // ── 4. LOCK SEATS (FIX DEADLOCK & LOGIC THỜI GIAN) ──
+      // 6. Kiểm tra giới hạn vé mỗi người (CHỈ TÍNH VÉ MỚI)
+      const userExistingTickets = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(orders)
+        .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+        .innerJoin(seats, eq(seats.id, orderItems.seatId))
+        .innerJoin(eventShows, eq(eventShows.id, seats.showId))
+        .where(and(eq(orders.userId, userId), inArray(orders.status, ['pending', 'paid']), eq(eventShows.eventId, eventId)));
+
+      const totalOwned = Number(userExistingTickets[0]?.count ?? 0);
+
+      // Tính vé mới: assigned chưa có, GA vượt quá số đã có
+      const newAssignedSeatIds = allAssignedSeatIds.filter(id => !existingSeatIds.has(id));
+      let newGaTotalQty = 0;
+      for (const ga of gaRequests) {
+        const existingQty = existingGaCountBySection.get(ga.sectionId) || 0;
+        const additionalQty = Math.max(0, ga.quantity - existingQty);
+        newGaTotalQty += additionalQty;
+      }
+      const requestedNew = newAssignedSeatIds.length + newGaTotalQty;
+
+      if (totalOwned + requestedNew > event.maxTicketsPerUser) {
+        throwError(Errors.MAX_TICKETS_EXCEEDED, `Tối đa ${event.maxTicketsPerUser} vé/người.`);
+      }
+
+      // 7. Kiểm tra trùng ghế mới trong cùng request
+      const uniqueNewAssigned = new Set(newAssignedSeatIds);
+      if (uniqueNewAssigned.size !== newAssignedSeatIds.length) {
+        throwError(Errors.DUPLICATE_SEAT, 'Có ghế ngồi bị trùng trong giỏ hàng.');
+      }
+
+      // 8. Lock ghế (có xử lý ownership)
       const lockedSeats: LockedSeat[] = [];
       const conflicts: ConflictDetail[] = [];
 
@@ -1034,77 +1090,101 @@ export const eventService = {
           unavailable_ga_sections: [],
         };
 
-        // ── Khóa vé Assigned Seats ──
+        // --- Lock assigned seats ---
         if (item.assigned_seats.length > 0) {
-          const rows = await tx
-            .select({
-              id: seats.id,
-              price: seatSections.price,
-              showId: seats.showId,
-            })
-            .from(seats)
-            .innerJoin(seatSections, eq(seats.sectionId, seatSections.id))
-            .innerJoin(eventShows, eq(seats.showId, eventShows.id))
-            .where(
-              and(
-                inArray(seats.id, item.assigned_seats),
-                eq(seats.status, 'available'),
-                eq(seatSections.type, 'assigned'),
-                eq(seats.showId, item.show_id),
-                eq(eventShows.eventId, eventId),
-                // Thuần túy dùng SQL checking cho Timing
-                or(isNull(seatSections.salesStartAt), lte(seatSections.salesStartAt, sql`NOW()`)),
-                or(isNull(seatSections.salesEndAt), gte(seatSections.salesEndAt, sql`NOW()`))
-              )
-            )
-            .orderBy(asc(seats.id)) // <=== RẤT QUAN TRỌNG: Sắp xếp theo ID để tránh Deadlock
-            .for('update');
+          const newAssignedForItem = item.assigned_seats.filter(id => !existingSeatIds.has(id));
+          if (newAssignedForItem.length > 0) {
+            const seatRows = await tx
+              .select({
+                id: seats.id,
+                status: seats.status,
+                lockedBy: seats.lockedBy,
+                lockedAt: seats.lockedAt,
+                price: seatSections.price,
+                showId: seats.showId,
+                sectionType: seatSections.type,
+                salesStart: seatSections.salesStartAt,
+                salesEnd: seatSections.salesEndAt,
+              })
+              .from(seats)
+              .innerJoin(seatSections, eq(seats.sectionId, seatSections.id))
+              .where(and(inArray(seats.id, item.assigned_seats), eq(seats.showId, item.show_id)))
+              .orderBy(asc(seats.id))
+              .for('update');
 
-          const foundIds = rows.map((r) => r.id);
-          const missing = item.assigned_seats.filter((id) => !foundIds.includes(id));
+            const foundIds = seatRows.map(r => r.id);
+            const missing = item.assigned_seats.filter(id => !foundIds.includes(id));
+            if (missing.length > 0) {
+              conflict.unavailable_assigned_seats.push(...missing);
+            } else {
+              for (const seat of seatRows) {
+                if (seat.sectionType !== 'assigned') {
+                  conflict.unavailable_assigned_seats.push(seat.id);
+                  continue;
+                }
+                if (seat.salesStart && now < seat.salesStart) {
+                  conflict.unavailable_assigned_seats.push(seat.id);
+                  continue;
+                }
+                if (seat.salesEnd && now > seat.salesEnd) {
+                  conflict.unavailable_assigned_seats.push(seat.id);
+                  continue;
+                }
 
-          if (missing.length > 0) {
-            conflict.unavailable_assigned_seats = missing;
-          } else {
-            lockedSeats.push(...rows);
+                if (seat.status === 'available') {
+                  lockedSeats.push(seat);
+                } else if (seat.status === 'locked') {
+                  const lockExpiry = new Date(seat.lockedAt!.getTime() + 10 * 60 * 1000);
+                  if (seat.lockedBy === userId && lockExpiry > now) {
+                    // Chỉ lock nếu chưa có trong active order (đã lọc ở trên nên không cần kiểm tra lại, nhưng vẫn giữ để an toàn)
+                    if (!existingSeatIds.has(seat.id)) {
+                      lockedSeats.push(seat);
+                    }
+                  } else {
+                    conflict.unavailable_assigned_seats.push(seat.id);
+                  }
+                } else {
+                  conflict.unavailable_assigned_seats.push(seat.id);
+                }
+              }
+            }
           }
         }
 
-        // ── Khóa vé General Admission (GA) ──
+        // --- Lock GA seats ---
         for (const ga of item.general_admission) {
-          // Lưu ý: Zod bắt buộc phải validate ga.quantity > 0 ở tầng Request.
-          const rows = await tx
+          const allSeatsInSection = await tx
             .select({
               id: seats.id,
+              status: seats.status,
+              lockedBy: seats.lockedBy,
+              lockedAt: seats.lockedAt,
               price: seatSections.price,
               showId: seats.showId,
             })
             .from(seats)
             .innerJoin(seatSections, eq(seats.sectionId, seatSections.id))
-            .innerJoin(eventShows, eq(seats.showId, eventShows.id))
-            .where(
-              and(
-                eq(seats.sectionId, ga.section_id),
-                eq(seats.status, 'available'),
-                eq(seats.showId, item.show_id),
-                eq(seatSections.type, 'general'),
-                eq(eventShows.eventId, eventId),
-                or(isNull(seatSections.salesStartAt), lte(seatSections.salesStartAt, sql`NOW()`)),
-                or(isNull(seatSections.salesEndAt), gte(seatSections.salesEndAt, sql`NOW()`))
-              )
-            )
-            .orderBy(asc(seats.id)) // Tránh deadlock khi tranh nhau vé GA
-            .limit(ga.quantity)
-            .for('update', { skipLocked: true });
+            .where(and(eq(seats.sectionId, ga.section_id), eq(seats.showId, item.show_id), eq(seatSections.type, 'general')))
+            .orderBy(asc(seats.id));
 
-          if (rows.length < ga.quantity) {
+          const validSeats = allSeatsInSection.filter(seat => {
+            if (existingSeatIds.has(seat.id)) return false;
+            if (seat.status === 'available') return true;
+            if (seat.status === 'locked') {
+              const lockExpiry = new Date(seat.lockedAt!.getTime() + 10 * 60 * 1000);
+              return seat.lockedBy === userId && lockExpiry > now;
+            }
+            return false;
+          });
+
+          if (validSeats.length < ga.quantity) {
             conflict.unavailable_ga_sections.push({
               section_id: ga.section_id,
               requested: ga.quantity,
-              available: rows.length, // Trả về số lượng thực tế còn lại
+              available: validSeats.length,
             });
           } else {
-            lockedSeats.push(...rows);
+            lockedSeats.push(...validSeats.slice(0, ga.quantity));
           }
         }
 
@@ -1113,73 +1193,82 @@ export const eventService = {
         }
       }
 
-      // ── 5. NẾU CÓ CONFLICT -> ROLLBACK TOÀN BỘ ──
       if (conflicts.length > 0) {
-        throwError(
-          Errors.CART_CONFLICT(),
-          'Một số vé đã bị người khác mua hoặc chưa tới giờ mở bán.',
-          conflicts as unknown as Record<string, string>
-        );
+        throwError(Errors.CART_CONFLICT(), 'Một số vé không khả dụng.', conflicts as unknown as Record<string, string>);
       }
-// ── 6. TẠO MỚI HOẶC CẬP NHẬT ORDER (APPEND LOGIC) ──
-      const newItemsTotalAmount = lockedSeats.reduce((sum, s) => sum + Number(s.price), 0);
 
+      // 9. Cập nhật capacity GA (chỉ trừ phần mới)
+      const gaDeductionMap = new Map<number, number>();
+      for (const ga of gaRequests) {
+        const existingQty = existingGaCountBySection.get(ga.sectionId) || 0;
+        const additionalQty = Math.max(0, ga.quantity - existingQty);
+        if (additionalQty > 0) {
+          const current = gaDeductionMap.get(ga.sectionId) || 0;
+          gaDeductionMap.set(ga.sectionId, current + additionalQty);
+        }
+      }
+      for (const [sectionId, qty] of gaDeductionMap.entries()) {
+        await tx
+          .update(seatSections)
+          .set({ capacity: sql`${seatSections.capacity} - ${qty}` })
+          .where(eq(seatSections.id, sectionId));
+      }
+
+      // 10. Tạo/cập nhật order
+      const newItemsTotal = lockedSeats.reduce((sum, s) => sum + Number(s.price), 0);
       let finalOrderId: number;
       let finalTotal: number;
       let finalExpiresAt: Date;
 
       if (activeOrder) {
-        // CÓ ĐƠN CŨ -> CỘNG DỒN TIỀN
-        finalTotal = Number(activeOrder.totalAmount) + newItemsTotalAmount;
-        finalExpiresAt = activeOrder.expiresAt; // Giữ nguyên hạn thanh toán của đơn cũ
-
-        await tx
-          .update(orders)
-          .set({ totalAmount: finalTotal.toString() })
-          .where(eq(orders.id, activeOrder.id));
-
+        finalTotal = Number(activeOrder.totalAmount) + newItemsTotal;
+        finalExpiresAt = activeOrder.expiresAt;
+        await tx.update(orders).set({ totalAmount: finalTotal.toString() }).where(eq(orders.id, activeOrder.id));
         finalOrderId = activeOrder.id;
       } else {
-        // KHÔNG CÓ ĐƠN CŨ -> TẠO MỚI
-        finalTotal = newItemsTotalAmount;
-        finalExpiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 phút
-
+        finalTotal = newItemsTotal;
+        finalExpiresAt = new Date(now.getTime() + 10 * 60 * 1000);
         const [newOrder] = await tx
           .insert(orders)
-          .values({
-            userId,
-            totalAmount: finalTotal.toString(),
-            status: 'pending',
-            expiresAt: finalExpiresAt,
-          })
+          .values({ userId, totalAmount: finalTotal.toString(), status: 'pending', expiresAt: finalExpiresAt })
           .returning({ id: orders.id });
-
         finalOrderId = newOrder.id;
       }
 
-      // Khóa vé lại
-      await tx
-        .update(seats)
-        .set({ status: 'locked', lockedBy: userId, lockedAt: new Date() })
-        .where(inArray(seats.id, lockedSeats.map((s) => s.id)));
+      // 11. Cập nhật trạng thái ghế và tạo order items
+      if (lockedSeats.length > 0) {
+        await tx
+          .update(seats)
+          .set({ status: 'locked', lockedBy: userId, lockedAt: now })
+          .where(inArray(seats.id, lockedSeats.map(s => s.id)));
 
-      // Tạo chi tiết vé (Gắn vào finalOrderId)
-      await tx.insert(orderItems).values(
-        lockedSeats.map((s) => ({
-          orderId: finalOrderId, // Dùng ID đơn mới hoặc cũ tùy luồng
-          seatId: s.id,
-          priceSnapshot: s.price,
-          ticketCode: generateTicketCode(),
-        })),
-      );
+        await tx.insert(orderItems).values(
+          lockedSeats.map(s => ({
+            orderId: finalOrderId,
+            seatId: s.id,
+            priceSnapshot: s.price,
+            ticketCode: generateTicketCode(),
+          }))
+        );
+      }
 
-      return {
+      // 12. Response & Idempotency
+      const responseData = {
         order_id: finalOrderId,
         total_amount: finalTotal.toFixed(2),
         expires_at: finalExpiresAt.toISOString(),
         locked_items: lockedSeats.length,
-        is_appended: !!activeOrder // Trả về cờ này để Client biết đường render UI
+        is_appended: !!activeOrder,
       };
+
+      if (idempotencyKey) {
+        await db
+          .update(idempotencyKeys)
+          .set({ status: 'completed', response: responseData })
+          .where(eq(idempotencyKeys.key, idempotencyKey));
+      }
+
+      return responseData;
     });
   }
 };

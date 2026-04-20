@@ -1,6 +1,7 @@
 // src/lib/server/errors.ts
 
 
+
 /**
  * Base error class for all application-level (HTTP) errors.
  * Caught by route handlers and serialized into JSON responses.
@@ -46,11 +47,13 @@ export const Errors = {
   FORBIDDEN: new AppError('FORBIDDEN', 403, 'Không có quyền truy cập'),
   EMAIL_EXISTS: new AppError('EMAIL_EXISTS', 409, 'Email đã được sử dụng'),
   INVALID_CREDENTIALS: new AppError('INVALID_CREDENTIALS', 401, 'Email hoặc mật khẩu không đúng'),
+  USER_INACTIVE: new AppError('USER_INACTIVE', 404, 'Không tìm thấy user'),
 
   // Events
   ALREADY_PUBLISHED: new AppError('ALREADY_PUBLISHED', 400, 'Sự kiện đã xuất bản'),
   NO_SEATS: new AppError('NO_SEATS', 400, 'Không có ghế trống để xuất bản'),
   EVENT_NOT_DRAFT: new AppError('EVENT_NOT_DRAFT', 409, 'Chỉ được sửa khi ở trạng thái Draft'),
+  EVENT_NOT_AVAILABLE: new AppError('EVENT_NOT_AVAILABLE', 409, 'Sự kiện không hợp lệ'),
 
   // Orders
   ORDER_NOT_OWNED: new AppError('ORDER_NOT_OWNED', 403, 'Không có quyền với đơn hàng này'),
@@ -73,14 +76,21 @@ export const Errors = {
   SEATS_LIST_EMPTY: new AppError('SEATS_LIST_EMPTY', 400, 'Danh sách ghế không được để trống'),
   MAX_SEATS_EXCEEDED: new AppError('MAX_SEATS_EXCEEDED', 400, 'Vượt quá số lượng ghế tối đa cho phép'),
   INVALID_SECTION_TYPE: new AppError('SEAT_NOT_BELONG_SEAT_SECTION', 400, 'Ghế không thuộc đúng khu'),
+  DUPLICATE_SEAT: new AppError('DUPLICATE_SEAT', 404, 'Ghế bị duplicate'),
+  INVALID_QUANTITY: new AppError('INVALID_QUANTITY', 404, 'Số lượng ghế đứng không hợp lệ'),
+  SECTION_NOT_AVAILABLE: new AppError('SECTION_NOT_AVAILABLE', 409, 'Khu ghế không hợp lệ'),
 
   // Shows
-  SHOW_NOT_AVAIABLE: new AppError('SHOW_NOT_AVAIAVLE', 409, 'Xuất diễn không hợp lệ'),
+  SHOW_NOT_AVAILABLE: new AppError('SHOW_NOT_AVAIAVLE', 409, 'Xuất diễn không hợp lệ'),
+  DUPLICATE_SHOW: new AppError('DUPLICATE_SHOW', 404, 'Show bị duplicate'),
 
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
   INTERNAL_ERROR: new AppError('INTERNAL_ERROR', 500, 'Đã có lỗi xảy ra, vui lòng thử lại'),
   INVALID_ID: new AppError('INVALID_ID', 400, 'ID không hợp lệ'),
+
+  // Imdepotency
+  IDEMPOTENCY_CONFLICT: new AppError('IMDEPOTENCY_CONFLICT', 400, 'Lỗi imdempotency'),
 
   // Validation (factory — accepts dynamic details)
   VALIDATION: (details?: Record<string, string>) =>
