@@ -131,17 +131,19 @@
             <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
           {/if}
         </a>
-        <a
-          href={resolve(user ? '/my-tickets' : '/login?redirect=/my-tickets')}
-          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/my-tickets')
-            ? 'text-foreground'
-            : 'text-muted-foreground hover:text-foreground'}"
-        >
-          Vé của tôi
-          {#if isActive('/my-tickets')}
-            <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
-          {/if}
-        </a>
+        {#if user}
+          <a
+            href={resolve('/me/tickets')}
+            class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/me/tickets')
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground'}"
+          >
+            Vé của tôi
+            {#if isActive('/me/tickets')}
+              <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+            {/if}
+          </a>
+        {/if}
       </nav>
 
       <!-- Right side: search + profile -->
@@ -221,7 +223,7 @@
               </DropdownMenuItem>
               <DropdownMenuItem
                 onclick={() => {
-                  goto(resolve('/my-tickets'));
+                  goto(resolve('/me/tickets'));
                   isUserMenuOpen = false;
                 }}
                 class="cursor-pointer"
@@ -302,15 +304,17 @@
       </a>
 
       <!-- My Tickets -->
-      <a
-        href={resolve(user ? '/my-tickets' : '/login?redirect=/my-tickets')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/my-tickets')
-          ? 'text-primary'
-          : 'text-muted-foreground'}"
-      >
-        <Ticket class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
-      </a>
+      {#if user}
+        <a
+          href={resolve('/me/tickets')}
+          class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/tickets')
+            ? 'text-primary'
+            : 'text-muted-foreground'}"
+        >
+          <Ticket class="h-5 w-5" />
+          <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
+        </a>
+      {/if}
 
       <!-- Profile -->
       <a

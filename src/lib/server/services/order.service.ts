@@ -209,10 +209,7 @@ export const orderService = {
     const userOrders = await db.query.orders.findMany({
       where: and(
         eq(orders.userId, userId),
-        or(
-          eq(orders.status, 'paid'),
-          and(eq(orders.status, 'pending'), gt(orders.expiresAt, now)),
-        ),
+        or(eq(orders.status, 'paid'), and(eq(orders.status, 'pending'), gt(orders.expiresAt, now))),
       ),
       orderBy: [desc(orders.createdAt)],
       with: {
