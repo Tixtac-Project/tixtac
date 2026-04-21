@@ -31,7 +31,6 @@ export interface SeatMapSection {
   id: number;
   name: string;
   type: 'assigned' | 'general';
-  is_seat_pickable: boolean;
   capacity: number;
   price: string;
   sort_order: number;

@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db';
 import { orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { and, gt, eq, inArray, or, desc } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, or } from 'drizzle-orm';
 
 /* ================= TYPE ================= */
 
@@ -115,14 +115,16 @@ async function buildOrderResponse(tx: Tx, orderId: number, paidAt: Date, order: 
 
 export const orderService = {
   async checkout(orderId: number, customerId: number) {
-    // Bắt đầu transaction
     return await db.transaction(async (tx) => {
       const now = new Date();
 
-      // 1. Lấy order và kiểm tra tồn tại
-      const order = await tx.query.orders.findFirst({
-        where: eq(orders.id, orderId),
-      });
+      // 1. Lấy order với FOR UPDATE lock để tránh race condition
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1)
+        .for('update');
 
       if (!order) {
         throwError(Errors.NOT_FOUND);
@@ -133,7 +135,11 @@ export const orderService = {
         throwError(Errors.ORDER_NOT_OWNED);
       }
 
-      // 3. Kiểm tra trạng thái pending
+      // 3. Kiểm tra trạng thái — trả lại kết quả cũ nếu đã paid (idempotent)
+      if (order.status === 'paid') {
+        return await buildOrderResponse(tx, orderId, order.paidAt!, order);
+      }
+
       if (order.status !== 'pending') {
         throwError(Errors.ORDER_NOT_PENDING);
       }
@@ -143,17 +149,16 @@ export const orderService = {
         throwError(Errors.LOCK_EXPIRED);
       }
 
-      // 5. Lấy danh sách order items của đơn hàng này
+      // 5. Lấy danh sách order items
       const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
 
-      // Kiểm tra đơn hàng có vé không (nếu yêu cầu, có thể bỏ qua)
       if (items.length === 0) {
         throwError(Errors.ORDER_EMPTY);
       }
 
       const seatIds = items.map((i) => i.seatId);
 
-      // 6. Cập nhật trạng thái các ghế thành 'sold' (chỉ cập nhật những ghế đang bị khóa bởi customer này)
+      // 6. Cập nhật trạng thái ghế -> sold (chỉ ghế đang locked bởi customer này)
       if (seatIds.length > 0) {
         const updatedSeats = await tx
           .update(seats)
@@ -171,13 +176,12 @@ export const orderService = {
           )
           .returning({ id: seats.id });
 
-        // Nếu số ghế cập nhật không khớp với số ghế trong order, có nghĩa có ghế đã bị thay đổi trạng thái bất thường
         if (updatedSeats.length !== seatIds.length) {
           throwError(Errors.SEAT_NOT_AVAILABLE);
         }
       }
 
-      // 7. Cập nhật order thành paid
+      // 7. Cập nhật order -> paid
       await tx
         .update(orders)
         .set({
@@ -205,10 +209,7 @@ export const orderService = {
     const userOrders = await db.query.orders.findMany({
       where: and(
         eq(orders.userId, userId),
-        or(
-          eq(orders.status, 'paid'),
-          and(eq(orders.status, 'pending'), gt(orders.expiresAt, now)),
-        ),
+        or(eq(orders.status, 'paid'), and(eq(orders.status, 'pending'), gt(orders.expiresAt, now))),
       ),
       orderBy: [desc(orders.createdAt)],
       with: {

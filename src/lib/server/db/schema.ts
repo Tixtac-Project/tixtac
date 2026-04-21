@@ -193,7 +193,7 @@ export const seatSections = pgTable(
       .references(() => eventShows.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 50 }).notNull(),
     type: seatTypeEnum('type').notNull().default('assigned'), // assigned: vé ngồi, general: vé đứng
-    isSeatPickable: boolean('is_pickable').notNull().default(true), // Will not be implemented now
+    // isSeatPickable: boolean('is_pickable').notNull().default(true), // Will not be implemented now
     price: decimal('price', { precision: 12, scale: 2 }).notNull(),
     capacity: integer('capacity').notNull().default(0), // Bắt buộc cho vé đứng (general)
     sortOrder: integer('sort_order').notNull().default(0),
@@ -310,6 +310,18 @@ export const orderItems = pgTable(
   ],
 );
 
+// ── Idempotency Keys for Payment Processing ────────────────────────────────
+export const idempotencyKeys = pgTable(
+  'idempotency_keys',
+  {
+    key: text('key').primaryKey(),
+    status: text('status').notNull(), // 'processing' | 'completed'
+    response: jsonb('response'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('idx_idempotency_keys_created_at').on(table.createdAt)],
+);
+
 // ══════════════════════════════════════════════════
 // RELATIONS
 // ══════════════════════════════════════════════════
@@ -355,10 +367,3 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   seat: one(seats, { fields: [orderItems.seatId], references: [seats.id] }),
 }));
-
-export const idempotencyKeys = pgTable('idempotency_keys', {
-  key: text('key').primaryKey(),
-  status: text('status').notNull(), // 'processing' | 'completed'
-  response: jsonb('response'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [index('idx_idempotency_keys_created_at').on(table.createdAt)]);

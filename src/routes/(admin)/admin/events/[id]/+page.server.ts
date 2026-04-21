@@ -174,7 +174,6 @@ export const load: PageServerLoad = async ({ params }) => {
       id: s.id,
       name: s.name,
       type: s.type,
-      is_seat_pickable: s.isSeatPickable,
       price: String(Number(s.price)),
       capacity: s.capacity,
       sort_order: s.sortOrder,

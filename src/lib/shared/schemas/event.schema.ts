@@ -524,8 +524,6 @@ export type MapConfigInput = z.infer<typeof mapConfigSchema>;
 /** Form-side section type: disabled_seats is a comma-separated string instead of string[] */
 export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & {
   disabled_seats: string;
-  /** @deprecated kept for backward compat with existing drafts; ignored by server */
-  is_seat_pickable?: boolean;
 };
 
 /** Form-side show type: includes picker state for date/time selectors */
@@ -658,19 +656,21 @@ export const generalAdmissionInputSchema = z.object({
   quantity: z.number().int().min(1),
 });
 
-export const cartItemSchema = z.object({
-  show_id: z.number().int().positive(),
-  assigned_seats: z.array(z.number().int().positive()).default([]),
-  general_admission: z.array(generalAdmissionInputSchema).default([]),
-}).superRefine((data, ctx) => {
-  if (data.assigned_seats.length === 0 && data.general_admission.length === 0) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['assigned_seats'],
-      message: 'Mỗi suất diễn phải có ít nhất 1 vé assigned hoặc general admission',
-    });
-  }
-});
+export const cartItemSchema = z
+  .object({
+    show_id: z.number().int().positive(),
+    assigned_seats: z.array(z.number().int().positive()).default([]),
+    general_admission: z.array(generalAdmissionInputSchema).default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.assigned_seats.length === 0 && data.general_admission.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['assigned_seats'],
+        message: 'Mỗi suất diễn phải có ít nhất 1 vé assigned hoặc general admission',
+      });
+    }
+  });
 
 export const checkoutBodySchema = z.object({
   cart_items: z.array(cartItemSchema).min(1, 'Giỏ hàng không được trống'),
