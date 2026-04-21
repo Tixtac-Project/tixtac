@@ -173,7 +173,8 @@ async function createShowWithSections(eventId: number, show: ShowSeed) {
               ? seatCfg.startColIndex + c
               : seatCfg.startColIndex + (seatCfg.cols - 1 - c);
 
-          const label = `${prefixStr}${rowLabel}${colNumber}`;
+          const rowColSep = seatCfg.rowFormat === 'numeric' ? '-' : '';
+          const label = `${prefixStr}${rowLabel}${rowColSep}${colNumber}`;
 
           seatValues.push({
             sectionId: section.id,

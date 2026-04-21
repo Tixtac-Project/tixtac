@@ -315,6 +315,9 @@ export const idempotencyKeys = pgTable(
   'idempotency_keys',
   {
     key: text('key').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     status: text('status').notNull(), // 'processing' | 'completed'
     response: jsonb('response'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

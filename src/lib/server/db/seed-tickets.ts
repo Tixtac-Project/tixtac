@@ -1,9 +1,9 @@
 // src/lib/server/db/seed-tickets.ts
 import { db } from '$lib/server/db';
-import { users, orders, orderItems, seats, eventShows, events } from '$lib/server/db/schema';
+import { eventShows, events, orderItems, orders, seats, users } from '$lib/server/db/schema';
 import { generateTicketCode } from '$lib/utils/ticket-code';
 import * as argon2 from 'argon2';
-import { eq, and, like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 
 async function hashPassword(password: string): Promise<string> {
   return await argon2.hash(password, { type: argon2.argon2id });
@@ -129,7 +129,7 @@ async function seedTickets() {
       userId,
       totalAmount: '1600000',
       status: 'pending',
-      expiresAt: new Date(Date.now() + 1500 * 60 * 1000), // 15 minutes left
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes left
     })
     .returning();
 
@@ -155,8 +155,8 @@ async function seedTickets() {
 
   console.log('\n✨ Seed Tickets Completed!');
   console.log('---------------------------');
-  console.log('Email: customer@tixtac.io.vn');
-  console.log('Pass: 12345678');
+  console.log(`Email: ${testEmail}`);
+  console.log('Pass:  12345678');
   console.log('---------------------------');
 }
 

@@ -3,6 +3,7 @@ import { events, eventShows, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { addSeatmapSchema, updateShowSectionsSchema, type SectionInput } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
+import type { DbTransaction } from '$lib/types/db';
 import { getRowLabel } from '$lib/utils/seat-label';
 import { eq, type InferInsertModel } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
@@ -13,8 +14,6 @@ import { validateEventRequirements } from '../validators/seat-overlap.validator'
  * We use 5000 as a safe, performant batch size.
  */
 export const SEAT_INSERT_BATCH_SIZE = 5000;
-
-export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Insert all sections + their seats in bulk for a given show.
@@ -109,7 +108,8 @@ export async function insertSectionsWithSeats(
           seatCfg.colDirection === 'ltr' ? startCol + c : startCol + (seatCfg.cols - 1 - c);
 
         const prefixStr = prefix ? `${prefix}-` : '';
-        const seatKey = `${prefixStr}${rowLabel}${colNumber}`;
+        const rowColSep = seatCfg.rowFormat === 'numeric' ? '-' : '';
+        const seatKey = `${prefixStr}${rowLabel}${rowColSep}${colNumber}`;
         const isDisabled = disabledSet.has(seatKey);
         if (isDisabled) disabled_count++;
 

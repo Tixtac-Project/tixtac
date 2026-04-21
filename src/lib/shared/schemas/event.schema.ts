@@ -409,6 +409,8 @@ export const createBasicInfoSchema = z.object({
 // Show without sections (sections added in Step 3)
 const showWithoutSectionsSchema = z
   .object({
+    id: z.number().int().positive().optional(), // existing show ID for updates
+
     title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
 
     show_date: z.iso.date('Ngày diễn không hợp lệ'),

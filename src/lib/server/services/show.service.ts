@@ -13,14 +13,19 @@ export const showService = {
   async addShows(adminId: number, data: unknown) {
     const { event_id, shows } = validateInput(addShowsSchema, data);
 
-    // Verify event exists, belongs to admin, and is draft
-    const [event] = await db.select().from(events).where(eq(events.id, event_id)).limit(1);
-
-    if (!event) throwError(Errors.NOT_FOUND);
-    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
-    if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
-
     return await db.transaction(async (tx) => {
+      // Verify event exists, belongs to admin, and is draft (inside tx to prevent TOCTOU)
+      const [event] = await tx
+        .select()
+        .from(events)
+        .where(eq(events.id, event_id))
+        .limit(1)
+        .for('update');
+
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+      if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
       // For fresh creation, delete any stale shows first
       const existingShows = await tx
         .select({ id: eventShows.id })
@@ -82,18 +87,26 @@ export const showService = {
   async updateShows(adminId: number, data: unknown) {
     const { event_id, shows } = validateInput(addShowsSchema, data);
 
-    const [event] = await db.select().from(events).where(eq(events.id, event_id)).limit(1);
-
-    if (!event) throwError(Errors.NOT_FOUND);
-    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
-    if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
-
     return await db.transaction(async (tx) => {
+      // Event lookup inside the transaction to prevent TOCTOU race
+      const [event] = await tx
+        .select()
+        .from(events)
+        .where(eq(events.id, event_id))
+        .limit(1)
+        .for('update');
+
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+      if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+
       const existingShows = await tx
         .select()
         .from(eventShows)
         .where(eq(eventShows.eventId, event_id))
         .orderBy(eventShows.id);
+
+      const existingShowMap = new Map(existingShows.map((s) => [s.id, s]));
 
       const resultShows: {
         id: number;
@@ -106,13 +119,10 @@ export const showService = {
 
       const keptShowIds = new Set<number>();
 
-      for (let i = 0; i < shows.length; i++) {
-        const show = shows[i];
-
-        if (i < existingShows.length) {
+      for (const show of shows) {
+        if (show.id && existingShowMap.has(show.id)) {
           // Update existing show in-place — preserves its sections/seats
-          const existing = existingShows[i];
-          keptShowIds.add(existing.id);
+          keptShowIds.add(show.id);
 
           const [updated] = await tx
             .update(eventShows)
@@ -123,7 +133,7 @@ export const showService = {
               endTime: show.end_time ? new Date(show.end_time) : null,
               itinerary: show.itinerary ?? [],
             })
-            .where(eq(eventShows.id, existing.id))
+            .where(eq(eventShows.id, show.id))
             .returning();
 
           resultShows.push({
@@ -135,7 +145,7 @@ export const showService = {
             status: updated.status,
           });
         } else {
-          // New show — insert
+          // New show — insert (no id provided, or id not found in existing shows)
           const [inserted] = await tx
             .insert(eventShows)
             .values({
@@ -160,7 +170,7 @@ export const showService = {
         }
       }
 
-      // Delete excess shows the user removed
+      // Delete shows whose id is not in the incoming payload
       const showsToDelete = existingShows.filter((s) => !keptShowIds.has(s.id));
       if (showsToDelete.length > 0) {
         const deleteIds = showsToDelete.map((s) => s.id);

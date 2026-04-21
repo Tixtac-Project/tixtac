@@ -10,55 +10,25 @@ import {
   users,
 } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import type { DbTransaction } from '$lib/types/db';
+import type {
+  CartConflictDetail,
+  CartItemInput,
+  PurchaseBody,
+  PurchaseResponse,
+} from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 
-import type { DbTransaction } from './seatmap.service';
-
 // ══════════════════════════════════════════════════
-// TYPES
+// INTERNAL TYPES
 // ══════════════════════════════════════════════════
-
-export interface GACartItem {
-  section_id: number;
-  quantity: number;
-}
-
-export interface CartItemInput {
-  show_id: number;
-  assigned_seats: number[];
-  general_admission: GACartItem[];
-}
-
-export interface PurchaseBody {
-  cart_items: CartItemInput[];
-}
-
-export interface GAConflictDetail {
-  section_id: number;
-  requested: number;
-  available: number;
-}
-
-export interface CartConflictDetail {
-  show_id: number;
-  unavailable_assigned_seats: number[];
-  unavailable_ga_sections: GAConflictDetail[];
-}
 
 interface LockedSeat {
   id: number;
   price: number;
   showId: number;
   sectionId: number;
-}
-
-interface PurchaseResponse {
-  order_id: number;
-  total_amount: string;
-  expires_at: string;
-  locked_items: number;
-  is_appended: boolean;
 }
 
 // ══════════════════════════════════════════════════
@@ -144,7 +114,22 @@ async function validateCartItems(
     }
   }
 
-  return { allAssignedSeatIds, gaRequests };
+  // Aggregate GA requests by (showId, sectionId) to handle duplicate entries
+  const aggregatedGaMap = new Map<
+    string,
+    { showId: number; sectionId: number; quantity: number }
+  >();
+  for (const ga of gaRequests) {
+    const key = `${ga.showId}-${ga.sectionId}`;
+    const existing = aggregatedGaMap.get(key);
+    if (existing) {
+      existing.quantity += ga.quantity;
+    } else {
+      aggregatedGaMap.set(key, { ...ga });
+    }
+  }
+
+  return { allAssignedSeatIds, gaRequests: [...aggregatedGaMap.values()] };
 }
 
 /**
@@ -513,10 +498,15 @@ async function deductGACapacity(
   }
 
   for (const [sectionId, qty] of deductionMap.entries()) {
-    await tx
+    const [updatedSection] = await tx
       .update(seatSections)
       .set({ capacity: sql`${seatSections.capacity} - ${qty}` })
-      .where(eq(seatSections.id, sectionId));
+      .where(and(eq(seatSections.id, sectionId), gte(seatSections.capacity, qty)))
+      .returning({ id: seatSections.id });
+
+    if (!updatedSection) {
+      throwError(Errors.CART_CONFLICT(), 'Một số vé không khả dụng.');
+    }
   }
 }
 
@@ -603,30 +593,40 @@ export const purchaseService = {
     const now = new Date();
 
     return await db.transaction(async (tx) => {
-      // ── Idempotency check ──
+      // ── Idempotency check (scoped to user, race-safe via INSERT ON CONFLICT) ──
       if (idempotencyKey) {
-        const [existing] = await tx
-          .select()
-          .from(idempotencyKeys)
-          .where(eq(idempotencyKeys.key, idempotencyKey))
-          .for('update');
+        const [inserted] = await tx
+          .insert(idempotencyKeys)
+          .values({
+            key: idempotencyKey,
+            userId,
+            status: 'processing',
+            createdAt: now,
+          })
+          .onConflictDoNothing({ target: idempotencyKeys.key })
+          .returning();
 
-        if (existing) {
-          if (existing.status === 'completed') {
+        if (!inserted) {
+          // Key already exists — lock and validate ownership
+          const [existing] = await tx
+            .select()
+            .from(idempotencyKeys)
+            .where(eq(idempotencyKeys.key, idempotencyKey))
+            .for('update');
+
+          if (existing && existing.userId !== userId) {
+            throwError(Errors.FORBIDDEN, 'Khóa idempotency không thuộc về người dùng này.');
+          }
+          if (existing?.status === 'completed') {
             return existing.response as PurchaseResponse;
           }
-          if (existing.status === 'processing') {
+          if (existing?.status === 'processing') {
             throwError(
               Errors.IDEMPOTENCY_CONFLICT,
               'Yêu cầu đang được xử lý, vui lòng thử lại sau.',
             );
           }
         }
-        await tx.insert(idempotencyKeys).values({
-          key: idempotencyKey,
-          status: 'processing',
-          createdAt: now,
-        });
       }
 
       // ── 1. Validate user & event ──
