@@ -13,6 +13,7 @@ import { Errors, throwError } from '$lib/server/errors';
 import type { DbTransaction } from '$lib/types/db';
 import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
+import { createHash } from 'crypto';
 import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
 // ══════════════════════════════════════════════════
@@ -58,27 +59,31 @@ async function processAssignedSeats(
       and(
         inArray(seats.id, seatIds),
         eq(seats.status, 'available'),
+        eq(seatSections.type, 'assigned'),
         or(isNull(seatSections.salesStartAt), lte(seatSections.salesStartAt, now)),
         or(isNull(seatSections.salesEndAt), gte(seatSections.salesEndAt, now)),
-      )
+      ),
     )
     .for('update');
 
   // Nếu số lượng ghế tìm được ít hơn số lượng yêu cầu -> Có ghế bị người khác lấy hoặc không mở bán
   if (availableAssignedSeats.length < seatIds.length) {
-    throwError(Errors.CART_CONFLICT(), 'Một số ghế ngồi đã có người đặt trước, chưa mở bán hoặc đã ngừng bán.');
+    throwError(
+      Errors.CART_CONFLICT(),
+      'Một số ghế ngồi đã có người đặt trước, chưa mở bán hoặc không phải loại ghế ngồi.',
+    );
   }
 
   // Kiểm tra xem ghế có thuộc đúng show không
   for (const seat of availableAssignedSeats) {
-    const request = assignedSeatRequests.find(r => r.seatId === seat.id);
+    const request = assignedSeatRequests.find((r) => r.seatId === seat.id);
     if (request && request.showId !== seat.showId) {
       throwError(Errors.CART_CONFLICT(), `Ghế ${seat.id} không thuộc suất diễn ${request.showId}.`);
     }
   }
 
   let total = 0;
-  const lockedSeats = availableAssignedSeats.map(seat => {
+  const lockedSeats = availableAssignedSeats.map((seat) => {
     total += Number(seat.price);
     return { id: seat.id, price: Number(seat.price) };
   });
@@ -144,6 +149,9 @@ export const purchaseService = {
     idempotencyKey?: string,
   ): Promise<PurchaseResponse> {
     const now = new Date();
+    const payloadHash = createHash('sha256')
+      .update(JSON.stringify({ eventId, body }))
+      .digest('hex');
 
     // ══════════════════════════════════════════════════
     // PHASE 1: READ & VALIDATE (NO TRANSACTION)
@@ -156,6 +164,7 @@ export const purchaseService = {
         .values({
           key: idempotencyKey,
           userId,
+          payloadHash,
           status: 'processing',
           createdAt: now,
         })
@@ -171,6 +180,12 @@ export const purchaseService = {
         if (existing) {
           if (existing.userId !== userId) {
             throwError(Errors.FORBIDDEN, 'Khóa idempotency không thuộc về người dùng này.');
+          }
+          if (existing.payloadHash !== payloadHash) {
+            throwError(
+              Errors.IDEMPOTENCY_CONFLICT,
+              'Khóa idempotency đã được sử dụng với nội dung khác.',
+            );
           }
           if (existing.status === 'completed') {
             return existing.response as PurchaseResponse;
@@ -234,7 +249,51 @@ export const purchaseService = {
       // ══════════════════════════════════════════════════
 
       const responseData = await db.transaction(async (tx) => {
+        // 1. Check for existing pending orders for this event and user
+        const existingOrders = await tx
+          .select({ id: orders.id })
+          .from(orders)
+          .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+          .innerJoin(seats, eq(seats.id, orderItems.seatId))
+          .innerJoin(eventShows, eq(eventShows.id, seats.showId))
+          .where(
+            and(
+              eq(orders.userId, userId),
+              eq(orders.status, 'pending'),
+              eq(eventShows.eventId, eventId),
+            ),
+          )
+          .limit(1)
+          .for('update');
+
+        const pendingOrderId: number | null = existingOrders[0]?.id ?? null;
+
+        // If a pending order exists, release its seats
+        if (pendingOrderId) {
+          const itemsToRelease = await tx
+            .select({ seatId: orderItems.seatId })
+            .from(orderItems)
+            .where(eq(orderItems.orderId, pendingOrderId));
+
+          if (itemsToRelease.length > 0) {
+            await tx
+              .update(seats)
+              .set({ status: 'available', lockedBy: null, lockedAt: null })
+              .where(
+                inArray(
+                  seats.id,
+                  itemsToRelease.map((i) => i.seatId),
+                ),
+              );
+          }
+
+          // Clean up old items, we will recreate them or update the order
+          await tx.delete(orderItems).where(eq(orderItems.orderId, pendingOrderId));
+        }
+
         // Check per-user ticket limit
+        // We count 'paid' tickets + the 'new' requested tickets.
+        // The old 'pending' tickets were released above, so they don't count anymore.
         const userExistingTickets = await tx
           .select({ count: sql<number>`count(*)` })
           .from(orders)
@@ -244,7 +303,7 @@ export const purchaseService = {
           .where(
             and(
               eq(orders.userId, userId),
-              inArray(orders.status, ['pending', 'paid']),
+              eq(orders.status, 'paid'),
               eq(eventShows.eventId, eventId),
             ),
           );
@@ -287,20 +346,33 @@ export const purchaseService = {
             ),
           );
 
-        const [newOrder] = await tx
-          .insert(orders)
-          .values({
-            userId,
-            totalAmount: calculatedTotal.toString(),
-            status: 'pending',
-            expiresAt,
-          })
-          .returning({ id: orders.id });
+        let finalOrderId = pendingOrderId;
+        if (pendingOrderId) {
+          await tx
+            .update(orders)
+            .set({
+              totalAmount: calculatedTotal.toString(),
+              expiresAt,
+              updatedAt: now,
+            })
+            .where(eq(orders.id, pendingOrderId));
+        } else {
+          const [newOrder] = await tx
+            .insert(orders)
+            .values({
+              userId,
+              totalAmount: calculatedTotal.toString(),
+              status: 'pending',
+              expiresAt,
+            })
+            .returning({ id: orders.id });
+          finalOrderId = newOrder.id;
+        }
 
         // PHASE 3: Generate Ticket Codes
         await tx.insert(orderItems).values(
           lockedSeatsToProcess.map((s) => ({
-            orderId: newOrder.id,
+            orderId: finalOrderId!,
             seatId: s.id,
             priceSnapshot: s.price.toString(),
             ticketCode: generateTicketCode(),
@@ -308,11 +380,11 @@ export const purchaseService = {
         );
 
         const finalResponse: PurchaseResponse = {
-          order_id: newOrder.id,
+          order_id: finalOrderId!,
           total_amount: calculatedTotal.toFixed(2),
           expires_at: expiresAt.toISOString(),
           locked_items: lockedSeatsToProcess.length,
-          is_appended: false,
+          is_appended: !!pendingOrderId,
         };
 
         if (idempotencyKey) {

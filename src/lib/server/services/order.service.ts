@@ -141,7 +141,9 @@ export const orderService = {
 
       // 3. Kiểm tra trạng thái — trả lại kết quả cũ nếu đã paid (idempotent)
       if (order.status === 'paid') {
-        return await buildOrderResponse(tx, orderId, order.paidAt!, order);
+        // Fallback to order.updatedAt if paidAt is unexpectedly null
+        const effectivePaidAt = order.paidAt ?? order.updatedAt;
+        return await buildOrderResponse(tx, orderId, effectivePaidAt, order);
       }
 
       if (order.status !== 'pending') {
