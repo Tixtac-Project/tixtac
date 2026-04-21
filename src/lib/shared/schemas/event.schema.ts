@@ -7,7 +7,8 @@ const req = (msg: string) => ({
   error: (issue: { input: unknown }) => (issue.input === undefined ? msg : undefined),
 });
 
-const seatLabelRegex = /^[A-Z0-9]+-[A-Z]+[1-9]\d*$/; // VIP-A1, STD-B12, V1-AA3...
+// Matches both alphabetic-row (VIP-A1, STD-AB12) and numeric-row (VIP-1-11, KA-10-25) formats
+const seatLabelRegex = /^[A-Z0-9]+-(?:[A-Z]+[1-9]\d*|\d+-[1-9]\d*)$/;
 const prefixRegex = /^[A-Z0-9]+$/; // Only uppercase letters and digits, no hyphens
 
 // ── Map Config Schema (Canvas dimensions) ──────
