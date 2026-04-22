@@ -1,8 +1,9 @@
 // src/lib/server/db/seed-tickets.ts
 import { db } from '$lib/server/db';
-import { users, orders, orderItems, seats, eventShows, events } from '$lib/server/db/schema';
+import { eventShows, events, orderItems, orders, seats, users } from '$lib/server/db/schema';
+import { generateTicketCode } from '$lib/utils/ticket-code';
 import * as argon2 from 'argon2';
-import { eq, and, like } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 
 async function hashPassword(password: string): Promise<string> {
   return await argon2.hash(password, { type: argon2.argon2id });
@@ -78,8 +79,8 @@ async function seedTickets() {
     .from(seats)
     .where(and(eq(seats.showId, night1.id), eq(seats.status, 'available')))
     .limit(2);
-  for (const [idx, s] of night1Seats.entries()) {
-    const code = `ROCK1-VIP-${idx}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  for (const s of night1Seats) {
+    const code = generateTicketCode();
     await db.insert(orderItems).values({
       orderId: paidOrder1.id,
       seatId: s.id,
@@ -109,7 +110,7 @@ async function seedTickets() {
     .where(and(eq(seats.showId, night2.id), eq(seats.status, 'available')))
     .limit(1);
   for (const s of night2Seats) {
-    const code = `ROCK2-VIP-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const code = generateTicketCode();
     await db.insert(orderItems).values({
       orderId: paidOrder2.id,
       seatId: s.id,
@@ -128,7 +129,7 @@ async function seedTickets() {
       userId,
       totalAmount: '1600000',
       status: 'pending',
-      expiresAt: new Date(Date.now() + 1500 * 60 * 1000), // 15 minutes left
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes left
     })
     .returning();
 
@@ -138,7 +139,7 @@ async function seedTickets() {
     .where(and(eq(seats.showId, night1.id), eq(seats.status, 'available')))
     .limit(2);
   for (const s of pendingSeats) {
-    const code = `PEND-STD-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const code = generateTicketCode();
     await db.insert(orderItems).values({
       orderId: pendingOrder.id,
       seatId: s.id,
@@ -154,8 +155,8 @@ async function seedTickets() {
 
   console.log('\n✨ Seed Tickets Completed!');
   console.log('---------------------------');
-  console.log('Email: customer@tixtac.io.vn');
-  console.log('Pass: 12345678');
+  console.log(`Email: ${testEmail}`);
+  console.log('Pass:  12345678');
   console.log('---------------------------');
 }
 

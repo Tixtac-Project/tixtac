@@ -31,11 +31,18 @@ describe('seat-label utils', () => {
   });
 
   describe('parseSeatLabel', () => {
-    it('parses valid seat labels with prefix', () => {
+    it('parses valid alphabetic-row seat labels', () => {
       expect(parseSeatLabel('VIP-A1')).toEqual({ prefix: 'VIP', rowLabel: 'A', colNumber: 1 });
       expect(parseSeatLabel('STD-C10')).toEqual({ prefix: 'STD', rowLabel: 'C', colNumber: 10 });
       expect(parseSeatLabel('V1-AA25')).toEqual({ prefix: 'V1', rowLabel: 'AA', colNumber: 25 });
       expect(parseSeatLabel('DIA-B8')).toEqual({ prefix: 'DIA', rowLabel: 'B', colNumber: 8 });
+    });
+
+    it('parses valid numeric-row seat labels', () => {
+      expect(parseSeatLabel('VIP-1-11')).toEqual({ prefix: 'VIP', rowLabel: '1', colNumber: 11 });
+      expect(parseSeatLabel('KA-10-25')).toEqual({ prefix: 'KA', rowLabel: '10', colNumber: 25 });
+      expect(parseSeatLabel('STB-1-1')).toEqual({ prefix: 'STB', rowLabel: '1', colNumber: 1 });
+      expect(parseSeatLabel('KC-5-50')).toEqual({ prefix: 'KC', rowLabel: '5', colNumber: 50 });
     });
 
     it('returns null for invalid seat labels', () => {
@@ -46,16 +53,29 @@ describe('seat-label utils', () => {
       expect(parseSeatLabel('-A1')).toBeNull(); // empty prefix
       expect(parseSeatLabel('VIP-')).toBeNull(); // no row/col
       expect(parseSeatLabel('vip-A1')).toBeNull(); // lowercase prefix
-      expect(parseSeatLabel('V-1-A1')).toBeNull(); // hyphen in prefix
       expect(parseSeatLabel('')).toBeNull();
     });
   });
 
   describe('buildSeatLabel', () => {
-    it('builds a full seat label from parts', () => {
+    it('builds alphabetic-row seat labels', () => {
       expect(buildSeatLabel('VIP', 'A', 1)).toBe('VIP-A1');
       expect(buildSeatLabel('STD', 'C', 10)).toBe('STD-C10');
       expect(buildSeatLabel('V1', 'AA', 25)).toBe('V1-AA25');
+    });
+
+    it('builds numeric-row seat labels with separator', () => {
+      expect(buildSeatLabel('VIP', '1', 11)).toBe('VIP-1-11');
+      expect(buildSeatLabel('KA', '10', 25)).toBe('KA-10-25');
+      expect(buildSeatLabel('STB', '1', 1)).toBe('STB-1-1');
+    });
+
+    it('roundtrips with parseSeatLabel for both formats', () => {
+      const alphaLabel = buildSeatLabel('VIP', 'A', 1);
+      expect(parseSeatLabel(alphaLabel)).toEqual({ prefix: 'VIP', rowLabel: 'A', colNumber: 1 });
+
+      const numericLabel = buildSeatLabel('KA', '10', 25);
+      expect(parseSeatLabel(numericLabel)).toEqual({ prefix: 'KA', rowLabel: '10', colNumber: 25 });
     });
   });
 });

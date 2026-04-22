@@ -7,7 +7,8 @@ const req = (msg: string) => ({
   error: (issue: { input: unknown }) => (issue.input === undefined ? msg : undefined),
 });
 
-const seatLabelRegex = /^[A-Z0-9]+-[A-Z]+[1-9]\d*$/; // VIP-A1, STD-B12, V1-AA3...
+// Matches both alphabetic-row (VIP-A1, STD-AB12) and numeric-row (VIP-1-11, KA-10-25) formats
+const seatLabelRegex = /^[A-Z0-9]+-(?:[A-Z]+[1-9]\d*|\d+-[1-9]\d*)$/;
 const prefixRegex = /^[A-Z0-9]+$/; // Only uppercase letters and digits, no hyphens
 
 // ── Map Config Schema (Canvas dimensions) ──────
@@ -409,6 +410,8 @@ export const createBasicInfoSchema = z.object({
 // Show without sections (sections added in Step 3)
 const showWithoutSectionsSchema = z
   .object({
+    id: z.number().int().positive().optional(), // existing show ID for updates
+
     title: z.string().max(200, 'Tên suất diễn tối đa 200 ký tự').optional().or(z.literal('')),
 
     show_date: z.iso.date('Ngày diễn không hợp lệ'),
@@ -524,8 +527,6 @@ export type MapConfigInput = z.infer<typeof mapConfigSchema>;
 /** Form-side section type: disabled_seats is a comma-separated string instead of string[] */
 export type SectionFormData = Omit<SectionInput, 'disabled_seats'> & {
   disabled_seats: string;
-  /** @deprecated kept for backward compat with existing drafts; ignored by server */
-  is_seat_pickable?: boolean;
 };
 
 /** Form-side show type: includes picker state for date/time selectors */
@@ -652,3 +653,32 @@ export const eventIdSchema = z.coerce.number().int().positive('ID sự kiện kh
 
 // ── Show ID Schema (path param validation) ─────
 export const showIdSchema = z.coerce.number().int().positive('ID suất diễn không hợp lệ');
+
+export const generalAdmissionInputSchema = z.object({
+  section_id: z.number().int().positive(),
+  quantity: z.number().int().min(1),
+});
+
+export const cartItemSchema = z
+  .object({
+    show_id: z.number().int().positive(),
+    assigned_seats: z.array(z.number().int().positive()).default([]),
+    general_admission: z.array(generalAdmissionInputSchema).default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.assigned_seats.length === 0 && data.general_admission.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['assigned_seats'],
+        message: 'Mỗi suất diễn phải có ít nhất 1 vé assigned hoặc general admission',
+      });
+    }
+  });
+
+export const checkoutBodySchema = z.object({
+  cart_items: z.array(cartItemSchema).min(1, 'Giỏ hàng không được trống'),
+});
+
+export type CheckoutBody = z.infer<typeof checkoutBodySchema>;
+export type CartItem = z.infer<typeof cartItemSchema>;
+export type GeneralAdmissionInput = z.infer<typeof generalAdmissionInputSchema>;

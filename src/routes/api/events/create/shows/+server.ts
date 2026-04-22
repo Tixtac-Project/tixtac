@@ -1,6 +1,6 @@
 import { requireAdmin } from '$lib/server/auth/guards';
 import { apiHandler } from '$lib/server/handler';
-import { eventService } from '$lib/server/services/event.service';
+import { showService } from '$lib/server/services/show.service';
 import { json } from '@sveltejs/kit';
 
 /**
@@ -11,7 +11,7 @@ import { json } from '@sveltejs/kit';
 export const POST = apiHandler(async ({ request, locals }) => {
   const admin = requireAdmin(locals);
   const body = await request.json();
-  const data = await eventService.addShows(admin.id, body);
+  const data = await showService.addShows(admin.id, body);
   return json({ data }, { status: 201 });
 });
 
@@ -23,6 +23,6 @@ export const POST = apiHandler(async ({ request, locals }) => {
 export const PUT = apiHandler(async ({ request, locals }) => {
   const admin = requireAdmin(locals);
   const body = await request.json();
-  const data = await eventService.updateShows(admin.id, body);
+  const data = await showService.updateShows(admin.id, body);
   return json({ data });
 });
