@@ -9,7 +9,7 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "htmlWhitespaceSensitivity": "ignore",
-  "plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss"],
+  "plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss", "@prettier/plugin-oxc"],
   "tailwindStylesheet": "./src/routes/layout.css",
   "overrides": [
     {

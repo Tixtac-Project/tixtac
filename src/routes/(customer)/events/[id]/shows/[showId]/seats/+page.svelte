@@ -1,17 +1,17 @@
 <script lang="ts">
   import { goto, replaceState } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import ConflictModal from '$lib/components/ConflictModal.svelte';
   import SeatMap from '$lib/components/seat-map/SeatMap.svelte';
   import SummaryBar from '$lib/components/seat-map/SummaryBar.svelte';
-  import ConflictModal from '$lib/components/ConflictModal.svelte';
   import { createSeatSelectionStore } from '$lib/stores/cart-store.svelte';
+  import { toast } from '$lib/stores/toast';
   import type { MapConfig, SeatMapData, StageElement } from '$lib/types/seat-map';
   import { api } from '$lib/utils/api';
   import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
   import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
   import { onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
-  import { toast } from '$lib/stores/toast';
 
   interface ShowInfo {
     id: number;
@@ -194,7 +194,7 @@
       show_id: cart.showId,
       assigned_seats: cart.selectedSeats.map((s) => s.id),
       general_admission: Object.entries(cart.generalQuantities)
-        .filter(([_, qty]) => (qty as number) > 0)
+        .filter(([, qty]) => (qty as number) > 0)
         .map(([sectionId, qty]) => ({
           section_id: Number(sectionId),
           quantity: qty as number,
@@ -240,7 +240,8 @@
       if (missingGaSection) {
         const cart = activeCarts.find((c) => c.showId === missingShowId);
         if (cart) {
-          const sectionName = store.getSectionName(missingShowId, Number(missingGaSection)) || 'Khu vực đứng';
+          const sectionName =
+            store.getSectionName(missingShowId, Number(missingGaSection)) || 'Khu vực đứng';
           newConflicts.push({
             label: sectionName,
             showName: cart.showLabel,

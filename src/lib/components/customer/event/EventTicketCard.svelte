@@ -50,13 +50,14 @@
       (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
     );
   });
-
 </script>
 
 <div class="mb-8 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
   <!-- Header Sự kiện -->
   <div class="flex items-center gap-4 border-b border-border bg-surface-container-low p-4 sm:p-5">
-    <div class="h-16 w-24 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm sm:h-20 sm:w-32">
+    <div
+      class="h-16 w-24 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm sm:h-20 sm:w-32"
+    >
       <img
         src={eventData.banner_image_url || 'https://picsum.photos/400/200'}
         alt={eventData.title}
@@ -65,7 +66,9 @@
     </div>
     <div class="min-w-0 flex-1">
       <h2 class="truncate text-lg font-bold text-foreground sm:text-xl">{eventData.title}</h2>
-      <div class="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm">
+      <div
+        class="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm"
+      >
         <MapPin class="h-4 w-4 shrink-0" />
         <span class="truncate">{eventData.venue}</span>
       </div>
