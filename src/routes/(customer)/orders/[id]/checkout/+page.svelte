@@ -1,7 +1,9 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import CheckoutTimer from '$lib/components/customer/order/CheckoutTimer.svelte';
   import { Badge } from '$lib/components/ui/badge';
+  import Button from '$lib/components/ui/button/button.svelte';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Separator } from '$lib/components/ui/separator';
   import { toast } from '$lib/stores/toast';
@@ -10,64 +12,29 @@
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
   import {
-    AlertCircle,
     ArrowRight,
     Calendar,
     ChevronLeft,
+    CircleAlert,
     Clock,
     CreditCard,
-    Hourglass,
-    Loader2,
+    LoaderCircle,
     MapPin,
     Ticket,
   } from 'lucide-svelte';
-  import { onDestroy, onMount } from 'svelte';
 
   let { data } = $props();
   const order = $derived(data.order);
   const firstEventId = $derived(order.items[0]?.event.id);
 
   let isSubmitting = $state(false);
-  let timeLeft = $state('00:00');
-  let isExpired = $state(false);
-  let timerInterval: NodeJS.Timeout | undefined;
-  let showExpiredModal = $state(false);
+  let isExpired = $derived(data.isExpired);
+  let showExpiredModal = $derived(data.isExpired);
 
-  function updateTimer() {
-    const expiresAt = new Date(order.expires_at).getTime();
-    const now = new Date().getTime();
-    const diff = expiresAt - now;
-
-    if (diff <= 0) {
-      timeLeft = '00:00';
-      isExpired = true;
-      showExpiredModal = true;
-      clearInterval(timerInterval);
-      return;
-    }
-
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    timeLeft = `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  function handleExpire() {
+    isExpired = true;
+    showExpiredModal = true;
   }
-
-  onMount(() => {
-    // Initial check if already expired
-    const expiresAt = new Date(order.expires_at).getTime();
-    const now = new Date().getTime();
-    if (expiresAt <= now) {
-      isExpired = true;
-      showExpiredModal = true;
-      timeLeft = '00:00';
-    } else {
-      updateTimer();
-      timerInterval = setInterval(updateTimer, 1000);
-    }
-  });
-
-  onDestroy(() => {
-    if (timerInterval) clearInterval(timerInterval);
-  });
 
   async function handleCheckout() {
     if (isSubmitting || isExpired) return;
@@ -146,49 +113,17 @@
   </button>
 
   <!-- Timer Block -->
-  <div
-    class={cn(
-      'arch-card arch-enter mb-8 flex flex-col items-center justify-between gap-6 !rounded-[2.5rem] border-2 p-5 transition-colors sm:flex-row sm:p-6 sm:px-8',
-      isExpired ? 'border-destructive bg-destructive/5' : 'border-transparent',
-    )}
-  >
-    <div class="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-      <div
-        class={cn(
-          'flex size-12 shrink-0 items-center justify-center rounded-full md:size-14',
-          isExpired ? 'bg-destructive/10 text-destructive' : 'bg-info-muted text-primary',
-        )}
-      >
-        <Hourglass class={cn('size-4 md:size-6', isExpired && 'animate-pulse')} />
-      </div>
-      <div>
-        <h2 class="font-heading text-base font-bold text-foreground md:text-xl">
-          {isExpired ? 'Hết thời gian giữ vé' : 'Đang giữ chỗ cho bạn'}
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground md:text-sm">
-          {isExpired
-            ? 'Đơn hàng đã hết hạn. Vé đã được giải phóng cho người khác.'
-            : 'Vui lòng hoàn tất thanh toán trước khi thời gian kết thúc.'}
-        </p>
-      </div>
-    </div>
-    <div class="flex shrink-0 flex-col items-center sm:items-end">
-      <span
-        class={cn(
-          'font-heading text-2xl leading-none font-black tracking-tight tabular-nums md:text-3xl',
-          isExpired ? 'text-destructive' : 'text-primary',
-        )}
-      >
-        {timeLeft}
-      </span>
-      <span class="label-overline mt-2">Còn lại</span>
-    </div>
-  </div>
+  <CheckoutTimer expiresAt={order.expires_at} onExpire={handleExpire} />
 
   <h1 class="arch-enter mb-4 font-heading text-2xl font-bold tracking-tight">Chi tiết đơn hàng</h1>
   <div class="grid grid-cols-1 items-start gap-8 lg:grid-cols-14">
     <!-- Left Column: Order Details -->
-    <div class="space-y-6 lg:col-span-9">
+    <div
+      class={cn(
+        'space-y-6 lg:col-span-9',
+        isExpired && 'pointer-events-none opacity-60 grayscale-[0.5]',
+      )}
+    >
       {#each shows as { show, event, items }, i (show.id)}
         <div class="arch-card arch-enter" style="animation-delay: {100 + i * 50}ms">
           <div class="flex flex-col gap-5 sm:flex-row">
@@ -283,7 +218,7 @@
     </div>
 
     <!-- Right Column: Summary & CTA -->
-    <div class="space-y-6 lg:col-span-5">
+    <div class={cn('space-y-6 lg:col-span-5', isExpired && 'pointer-events-none opacity-60')}>
       <div class="arch-card arch-enter sticky top-6" style="animation-delay: 200ms">
         <h3 class="mb-6 font-heading text-xl font-bold">Tổng kết đơn hàng</h3>
 
@@ -312,9 +247,9 @@
         </div>
 
         <div class="mt-8 flex flex-col gap-3">
-          <button
+          <Button
             class={cn(
-              'flex h-14 w-full items-center justify-center rounded-2xl font-heading text-lg font-bold shadow-xl transition-all',
+              'flex h-14 w-full rounded-xl font-heading text-lg font-bold',
               isExpired
                 ? 'cursor-not-allowed bg-muted text-muted-foreground'
                 : 'bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98]',
@@ -323,14 +258,14 @@
             disabled={isSubmitting || isExpired}
           >
             {#if isSubmitting}
-              <Loader2 class="mr-2 h-5 w-5 animate-spin" />
+              <LoaderCircle class="mr-2 h-5 w-5 animate-spin" />
               Đang xử lý...
             {:else if isExpired}
               Đã hết hạn
             {:else}
               Thanh toán ngay
             {/if}
-          </button>
+          </Button>
           <p class="text-center text-xs text-muted-foreground">
             Bằng việc nhấn "Thanh toán", bạn đồng ý với
             <a
@@ -359,7 +294,7 @@
       <div
         class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive"
       >
-        <AlertCircle class="h-10 w-10" />
+        <CircleAlert class="h-10 w-10" />
       </div>
       <Dialog.Title class="font-heading text-2xl font-bold">Hết thời gian giữ vé</Dialog.Title>
       <Dialog.Description class="pt-2 text-base">
@@ -368,13 +303,10 @@
       </Dialog.Description>
     </Dialog.Header>
     <Dialog.Footer class="mt-6 sm:justify-center">
-      <button
-        class="btn-primary-gradient flex h-12 w-full items-center justify-center gap-2 rounded-xl px-6 font-heading font-bold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
-        onclick={() => goto(resolve(`/events/${firstEventId}`))}
-      >
-        Quay lại Sự kiện
+      <Button class="h-12 w-full" onclick={() => goto(resolve(`/events/${firstEventId}`))}>
+        Quay lại sự kiện
         <ArrowRight class="h-4 w-4" />
-      </button>
+      </Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>

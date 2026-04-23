@@ -29,8 +29,8 @@
       <div class="space-y-4 leading-relaxed text-muted-foreground">
         <p>
           Chào mừng bạn đến với <strong>Tixtac</strong>
-          . Bằng cách truy cập và sử dụng nền tảng của chúng tôi, bạn đồng ý tuân thủ các điều khoản
-          và điều kiện được nêu dưới đây.
+          . Bằng cách truy cập và sử dụng nền tảng của chúng tôi, bạn đồng ý tuân thủ các điều khoản và
+          điều kiện được nêu dưới đây.
         </p>
         <p>
           Tixtac là nền tảng trung gian kết nối giữa Ban tổ chức sự kiện (BTC) và Người mua vé.
@@ -60,13 +60,13 @@
           </li>
           <li>
             <strong>Giới hạn số lượng:</strong>
-             Mỗi sự kiện có thể có quy định về số lượng vé tối đa mà một tài khoản được phép mua. Tixtac
+            Mỗi sự kiện có thể có quy định về số lượng vé tối đa mà một tài khoản được phép mua. Tixtac
             có quyền hủy các đơn hàng cố tình lách luật để đầu cơ vé.
           </li>
           <li>
             <strong>Thông tin vé:</strong>
-             Sau khi thanh toán thành công, vé điện tử (E-ticket) kèm QR Code sẽ được gửi vào mục "Vé
-            của tôi". Bạn có trách nhiệm bảo mật mã QR này.
+            Sau khi thanh toán thành công, vé điện tử (E-ticket) kèm QR Code sẽ được gửi vào mục "Vé của
+            tôi". Bạn có trách nhiệm bảo mật mã QR này.
           </li>
         </ul>
       </div>
@@ -94,7 +94,7 @@
             Tất cả các giao dịch mua vé trên Tixtac là <strong>
               không thể hoàn trả hoặc thay đổi
             </strong>
-             trừ trường hợp sự kiện bị hủy bỏ bởi Ban tổ chức. Trong trường hợp sự kiện bị hủy, Tixtac
+            trừ trường hợp sự kiện bị hủy bỏ bởi Ban tổ chức. Trong trường hợp sự kiện bị hủy, Tixtac
             sẽ phối hợp với BTC để thực hiện quy trình hoàn tiền theo quy định của từng sự kiện.
           </p>
         </div>

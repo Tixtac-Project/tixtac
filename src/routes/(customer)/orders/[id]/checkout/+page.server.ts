@@ -21,13 +21,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     }
 
     // Check if order expired
-    if (new Date() > new Date(order.expires_at)) {
-      // In a real app, we might want to show an "Expired" state instead of just 404
-      error(410, 'Đơn hàng đã hết hạn thanh toán');
-    }
+    const isExpired = new Date() > new Date(order.expires_at);
 
     return {
       order,
+      isExpired,
     };
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'status' in err && err.status === 302) {
