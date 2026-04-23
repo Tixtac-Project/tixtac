@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SeatSelectionStore, ShowCart } from '$lib/stores/seat-selection-store.svelte';
+  import type { SeatSelectionStore, ShowCart } from '$lib/stores/cart-store.svelte';
   import { formatPrice } from '$lib/utils/price';
   import {
     ArrowRight,
@@ -7,6 +7,7 @@
     ChevronDown,
     ChevronsUp,
     ChevronUp,
+    LoaderCircle,
     ShieldAlert,
     ShoppingCart,
     Trash2,
@@ -20,9 +21,16 @@
     maxTickets: number;
     /** Whether the event has multiple shows (always show per-show grouping) */
     multiShowEvent?: boolean;
+    isLoading?: boolean;
   }
 
-  let { store, onCheckout, maxTickets, multiShowEvent = false }: Props = $props();
+  let {
+    store,
+    onCheckout,
+    maxTickets,
+    multiShowEvent = false,
+    isLoading = false,
+  }: Props = $props();
 
   let expanded = $state(false);
   let hasSelection = $derived(store.totalCount > 0);
@@ -340,11 +348,17 @@
         <!-- Right: checkout button -->
         <button
           type="button"
-          class="btn-primary-gradient flex shrink-0 items-center gap-2 px-6 py-3 text-sm font-bold"
+          class="btn-primary-gradient flex shrink-0 items-center gap-2 px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
           onclick={onCheckout}
+          disabled={isLoading || (store.totalCount > maxTickets && maxTickets > 0)}
         >
-          Tiếp tục
-          <ArrowRight class="h-4 w-4" />
+          {#if isLoading}
+            <LoaderCircle class="h-4 w-4 animate-spin" />
+            Đang xử lý...
+          {:else}
+            Tiếp tục
+            <ArrowRight class="h-4 w-4" />
+          {/if}
         </button>
       </div>
     </div>

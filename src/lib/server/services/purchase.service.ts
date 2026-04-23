@@ -68,10 +68,11 @@ async function processAssignedSeats(
 
   // Nếu số lượng ghế tìm được ít hơn số lượng yêu cầu -> Có ghế bị người khác lấy hoặc không mở bán
   if (availableAssignedSeats.length < seatIds.length) {
-    throwError(
-      Errors.CART_CONFLICT(),
-      'Một số ghế ngồi đã có người đặt trước, chưa mở bán hoặc không phải loại ghế ngồi.',
-    );
+    const foundIds = availableAssignedSeats.map((s) => s.id);
+    const missingIds = seatIds.filter((id) => !foundIds.includes(id));
+    throw Errors.CART_CONFLICT({
+      missing_seats: missingIds.join(','),
+    });
   }
 
   // Kiểm tra xem ghế có thuộc đúng show không
@@ -122,10 +123,10 @@ async function processGaSeats(
       .for('update', { skipLocked: true });
 
     if (availableGaSeats.length < ga.quantity) {
-      throwError(
-        Errors.CART_CONFLICT(),
-        `Khu vực vé đứng ${ga.sectionId} không đủ số lượng vé trống hoặc chưa mở bán.`,
-      );
+      throw Errors.CART_CONFLICT({
+        missing_ga_section: String(ga.sectionId),
+        show_id: String(ga.showId),
+      });
     }
 
     for (const seat of availableGaSeats) {

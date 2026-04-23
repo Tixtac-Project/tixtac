@@ -5,7 +5,7 @@
   - Readonly mode: preview for admin detail / customer event detail pages
 -->
 <script lang="ts">
-  import type { SeatSelectionStore } from '$lib/stores/seat-selection-store.svelte';
+  import type { SeatSelectionStore } from '$lib/stores/cart-store.svelte';
   import { toast } from '$lib/stores/toast';
   import type { MapConfig, SeatMapSeat, SeatMapSection, StageElement } from '$lib/types/seat-map';
   import { formatPrice } from '$lib/utils/price';
