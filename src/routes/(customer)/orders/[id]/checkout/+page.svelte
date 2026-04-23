@@ -40,7 +40,7 @@
     if (isSubmitting || isExpired) return;
     isSubmitting = true;
 
-    const res = await api.post(`/orders/${order.id}/checkout`, {});
+    const res = await api.post(`/orders/${order.id}/checkout`, {}, { silent: true });
 
     if (res.status === 200 || res.status === 201) {
       toast.success('Thanh toán thành công!');
