@@ -118,6 +118,75 @@ async function buildOrderResponse(tx: Tx, orderId: number, paidAt: Date, order: 
 /* ================= SERVICE ================= */
 
 export const orderService = {
+  async getOrderDetails(orderId: number, userId: number) {
+    const order = await db.query.orders.findFirst({
+      where: and(eq(orders.id, orderId), eq(orders.userId, userId)),
+      with: {
+        items: {
+          with: {
+            seat: {
+              with: {
+                section: true,
+                show: {
+                  with: {
+                    event: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throwError(Errors.NOT_FOUND, 'Không tìm thấy đơn hàng.');
+    }
+
+    // Format items similar to getMyOrdersAndTickets
+    const formattedItems = order.items.map((item) => {
+      const seat = item.seat;
+      const section = seat.section;
+      const isGeneral = section.type === 'general';
+
+      let seatLabel: string | null = null;
+      if (!isGeneral) {
+        const rowCol = `${seat.rowLabel}${seat.colNumber}`;
+        seatLabel = seat.prefix ? `${seat.prefix}-${rowCol}` : rowCol;
+      }
+
+      return {
+        id: item.id,
+        event: {
+          id: seat.show.event.id,
+          title: seat.show.event.title,
+          venue: seat.show.event.venue,
+          banner_image_url: seat.show.event.bannerImageUrl,
+        },
+        show: {
+          id: seat.show.id,
+          title: seat.show.title,
+          show_date: seat.show.showDate,
+          start_time: seat.show.startTime.toISOString(),
+        },
+        section_name: section.name,
+        seat_type: section.type,
+        seat_label: seatLabel,
+        price: Number(item.priceSnapshot).toFixed(2),
+      };
+    });
+
+    // Group items by event/show for display
+    return {
+      id: order.id,
+      status: order.status,
+      total_amount: Number(order.totalAmount).toFixed(2),
+      expires_at: order.expiresAt.toISOString(),
+      created_at: order.createdAt.toISOString(),
+      items: formattedItems,
+    };
+  },
+
   async checkout(orderId: number, customerId: number) {
     return await db.transaction(async (tx) => {
       const now = new Date();

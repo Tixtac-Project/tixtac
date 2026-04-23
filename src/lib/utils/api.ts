@@ -70,9 +70,9 @@ async function fetchWrapper<T>(
         json.message ||
         'Có lỗi xảy ra từ hệ thống';
 
-      // Extract field-level details from VALIDATION_ERROR responses
+      // Extract field-level details from error responses (VALIDATION_ERROR, CART_CONFLICT, etc.)
       const details: Record<string, string> | undefined =
-        errorObj?.code === 'VALIDATION_ERROR' && errorObj?.details ? errorObj.details : undefined;
+        errorObj?.details && typeof errorObj.details === 'object' ? errorObj.details : undefined;
 
       // 401 — Hết hạn session
       if (res.status === 401 && browser && !isRedirectingToLogin) {

@@ -150,8 +150,8 @@
         <div class="relative flex items-center">
           <form action={resolve('/')} method="GET" class="flex items-center">
             <div
-              class="flex h-10 items-center overflow-hidden rounded-xl transition-all duration-300 ease-[var(--ease-architectural)] {isSearchOpen
-                ? 'w-56 bg-surface-container-low px-3 sm:w-72'
+              class="flex h-10 items-center overflow-hidden rounded-xl transition-all duration-300 ease-(--ease-architectural) {isSearchOpen
+                ? 'w-56 bg-white px-3 sm:w-72'
                 : 'w-0 px-0'}"
             >
               <Search
