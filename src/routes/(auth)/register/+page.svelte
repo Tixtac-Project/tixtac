@@ -61,18 +61,26 @@
     errors = {};
 
     loading = true;
-    const { error, details } = await api.post('/auth/register', result.data);
+    const res = await api.post('/auth/register', result.data, { silent: true });
     loading = false;
 
-    if (details) {
-      errors = details;
+    if (res.details) {
+      errors = res.details;
       return;
     }
 
-    if (!error) {
-      toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
-      goto(resolve('/login'));
+    if (res.error) {
+      // Show inline error on email field for duplicate email
+      if (res.status === 409) {
+        errors = { email: res.error };
+      } else {
+        toast.error(res.error);
+      }
+      return;
     }
+
+    toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
+    goto(resolve('/login'));
   }
 
   function handleKeydown(e: KeyboardEvent) {

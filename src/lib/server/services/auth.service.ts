@@ -15,6 +15,17 @@ export const authService = {
       data,
     );
 
+    // 2. CHECK EMAIL TỒN TẠI
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (existing) {
+      throwError(Errors.EMAIL_EXISTS);
+    }
+
     // 3. BĂM MẬT KHẨU
     const passwordHash = await hashPassword(password);
 
@@ -47,9 +58,9 @@ export const authService = {
 
       return newUser;
     } catch (e: unknown) {
-      const error = e as { code?: string };
+      // Fallback: catch unique constraint violation from DB (race condition)
+      const error = e as { code?: string; constraint_name?: string };
       if (error.code === '23505') {
-        // Dùng helper throwError để clone lỗi EMAIL_EXISTS
         throwError(Errors.EMAIL_EXISTS);
       }
       throw e;
