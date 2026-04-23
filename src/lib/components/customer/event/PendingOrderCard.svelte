@@ -171,7 +171,7 @@
         </p>
       </div>
       <Button
-        href="/checkout/{order.order_id}"
+        href="/orders/{order.order_id}/checkout"
         class="w-full rounded-xl bg-primary px-8 py-6 font-bold text-primary-foreground shadow-md transition-transform hover:bg-primary-container sm:w-auto sm:py-5 sm:hover:scale-105"
       >
         Thanh toán ngay <span class="ml-2">›</span>
