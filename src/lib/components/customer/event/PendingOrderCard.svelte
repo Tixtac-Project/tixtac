@@ -120,7 +120,7 @@
       <div class="space-y-4">
         {#each groupedDisplayItems as group, i (i)}
           <!-- Nhóm vé cùng Suất diễn -->
-          <div class="rounded-xl border border-border bg-background p-3 sm:p-4 shadow-sm">
+          <div class="rounded-xl border border-border bg-background p-3 shadow-sm sm:p-4">
             <div class="mb-3 border-b border-dashed border-border pb-2">
               <p class="text-sm font-bold text-foreground">
                 {group.show_title || 'Suất diễn'}
@@ -130,11 +130,13 @@
                 {formatTime(group.start_time)} | {formatDate(group.start_time)}
               </div>
             </div>
-            
+
             <div class="space-y-2">
               {#each group.tickets as ticket, j (j)}
                 <div class="flex items-center justify-between gap-3">
-                  <span class="rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-semibold text-foreground">
+                  <span
+                    class="rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-semibold text-foreground"
+                  >
                     {ticket.section_name}{#if ticket.seat_type !== 'general'}
                       · Ghế {ticket.seat_label}{/if}
                   </span>

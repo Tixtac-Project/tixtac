@@ -1,15 +1,16 @@
 <script lang="ts">
   import { goto, replaceState } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import ConflictModal from '$lib/components/ConflictModal.svelte';
   import SeatMap from '$lib/components/seat-map/SeatMap.svelte';
   import SummaryBar from '$lib/components/seat-map/SummaryBar.svelte';
-  import { createSeatSelectionStore } from '$lib/stores/seat-selection-store.svelte';
+  import { createSeatSelectionStore } from '$lib/stores/cart-store.svelte';
+  import { toast } from '$lib/stores/toast';
   import type { MapConfig, SeatMapData, StageElement } from '$lib/types/seat-map';
   import { api } from '$lib/utils/api';
   import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
   import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
   import { onDestroy } from 'svelte';
-  import { SvelteURLSearchParams } from 'svelte/reactivity';
   import { fly } from 'svelte/transition';
 
   interface ShowInfo {
@@ -52,6 +53,7 @@
 
   /** Track the last event+show combo we synced from server data */
   let lastSyncedKey = $state('');
+  let lastEventId = $state<number | null>(null);
 
   let currentShow = $derived<ShowInfo>(
     allShows.find((s: ShowInfo) => s.id === currentShowId) ?? data.show,
@@ -68,6 +70,7 @@
     if (syncKey === lastSyncedKey) return;
 
     const showId = data.show.id;
+    const eventId = data.event.id;
     const mapData = data.seatMap;
     if (!showId || !mapData) return;
 
@@ -82,8 +85,11 @@
       isLoadingSeatMap = false;
     }
 
-    // Reset the store for a fresh event
-    store.clearAll();
+    // Reset the store only if we switched to a DIFFERENT event
+    if (lastEventId !== null && lastEventId !== eventId) {
+      store.clearAll();
+    }
+    lastEventId = eventId;
 
     const show = allShows.find((s: ShowInfo) => s.id === showId);
     const label = show ? getShowLabel(show) : `Suất #${showId}`;
@@ -173,29 +179,87 @@
   // Abort any in-flight request when the component is destroyed
   onDestroy(abortPendingRequest);
 
-  function handleCheckout() {
+  let isSubmitting = $state(false);
+  let showConflictModal = $state(false);
+  let conflicts = $state<{ label: string; showName: string; type: 'seat' | 'section' }[]>([]);
+
+  async function handleCheckout() {
     const activeCarts = store.getActiveCarts();
-    if (activeCarts.length === 0) return;
+    if (activeCarts.length === 0 || isSubmitting) return;
 
-    const params = new SvelteURLSearchParams();
+    isSubmitting = true;
 
-    // Build params for each show's cart
-    for (const cart of activeCarts) {
-      const seatIds = cart.selectedSeats.map((s: { id: number }) => s.id);
-      if (seatIds.length > 0) {
-        params.set(`seats_${cart.showId}`, seatIds.join(','));
-      }
-      for (const [sectionId, qty] of Object.entries(cart.generalQuantities)) {
-        if ((qty as number) > 0) {
-          params.set(`ga_${cart.showId}_${sectionId}`, String(qty));
-        }
-      }
+    // Build payload
+    const cart_items = activeCarts.map((cart) => ({
+      show_id: cart.showId,
+      assigned_seats: cart.selectedSeats.map((s) => s.id),
+      general_admission: Object.entries(cart.generalQuantities)
+        .filter(([, qty]) => (qty as number) > 0)
+        .map(([sectionId, qty]) => ({
+          section_id: Number(sectionId),
+          quantity: qty as number,
+        })),
+    }));
+
+    const res = await api.post<{ order_id: number }>(`/events/${data.event.id}/checkout`, {
+      cart_items,
+    });
+
+    if (res.status === 201 && res.data) {
+      // Success: Clear cart and redirect
+      const orderId = res.data.order_id;
+      store.clearAll();
+      goto(resolve(`/orders/${orderId}/checkout`));
+      return;
     }
 
-    const showIds = activeCarts.map((c: { showId: number }) => c.showId).join(',');
-    params.set('shows', showIds);
+    if (res.status === 409 && res.details) {
+      // Conflict handling
+      const missingSeats = res.details.missing_seats?.split(',').map(Number) || [];
+      const missingGaSection = res.details.missing_ga_section;
+      const missingShowId = Number(res.details.show_id);
 
-    goto(resolve(`/events/${data.event.id}/checkout?${params.toString()}`));
+      const newConflicts: typeof conflicts = [];
+
+      // Process missing assigned seats
+      for (const seatId of missingSeats) {
+        for (const cart of activeCarts) {
+          const seat = cart.selectedSeats.find((s) => s.id === seatId);
+          if (seat) {
+            newConflicts.push({
+              label: `Ghế ${seat.label}`,
+              showName: cart.showLabel,
+              type: 'seat',
+            });
+            store.removeSeatFromShow(cart.showId, seatId);
+          }
+        }
+      }
+
+      // Process missing GA section
+      if (missingGaSection) {
+        const cart = activeCarts.find((c) => c.showId === missingShowId);
+        if (cart) {
+          const sectionName =
+            store.getSectionName(missingShowId, Number(missingGaSection)) || 'Khu vực đứng';
+          newConflicts.push({
+            label: sectionName,
+            showName: cart.showLabel,
+            type: 'section',
+          });
+          store.setGeneralQuantityForShow(missingShowId, Number(missingGaSection), 0);
+        }
+      }
+
+      if (newConflicts.length > 0) {
+        conflicts = newConflicts;
+        showConflictModal = true;
+      }
+    } else if (res.status === 400 && res.error === 'MAX_TICKETS_EXCEEDED') {
+      toast.error('Vượt quá giới hạn vé của sự kiện');
+    }
+
+    isSubmitting = false;
   }
 
   let showTitle = $derived(getShowLabel(currentShow));
@@ -364,5 +428,16 @@
     onCheckout={handleCheckout}
     maxTickets={event.max_tickets_per_user}
     multiShowEvent={allShows.length > 1}
+    isLoading={isSubmitting}
+  />
+
+  <ConflictModal
+    open={showConflictModal}
+    {conflicts}
+    onConfirm={() => {
+      showConflictModal = false;
+      handleCheckout();
+    }}
+    onClose={() => (showConflictModal = false)}
   />
 </div>

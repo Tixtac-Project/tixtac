@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SeatSelectionStore } from '$lib/stores/seat-selection-store.svelte';
+  import type { SeatSelectionStore } from '$lib/stores/cart-store.svelte';
   import type { SeatMapSeat, SeatMapSection } from '$lib/types/seat-map';
   import { formatPrice } from '$lib/utils/price';
   import { getRowLabel } from '$lib/utils/seat-label';
