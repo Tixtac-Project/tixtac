@@ -39,9 +39,11 @@ export const GET = apiHandler(async (event) => {
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let listener: (data: unknown) => void;
   let cleaned = false;
+  let streamController: ReadableStreamDefaultController | undefined;
 
   const stream = new ReadableStream({
     start(controller) {
+      streamController = controller;
       if (request.signal.aborted) {
         cleanup();
         return;
@@ -79,6 +81,13 @@ export const GET = apiHandler(async (event) => {
     if (listener) eventBus.off(eventName, listener);
     if (intervalId) clearInterval(intervalId);
     intervalId = undefined;
+
+    try {
+      streamController?.close();
+    } catch (error) {
+      console.log(error);
+    }
+
   }
 
   request.signal.addEventListener('abort', cleanup, { once: true });
