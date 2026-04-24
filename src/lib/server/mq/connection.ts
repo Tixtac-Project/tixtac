@@ -2,7 +2,7 @@ import { config } from '$lib/server/config';
 import type { Channel, ChannelModel } from 'amqplib';
 import * as amqp from 'amqplib';
 
-let connection: ChannelModel  | null = null;
+let connection: ChannelModel | null = null;
 let channel: Channel | null = null;
 let connecting: Promise<Channel> | null = null;
 
@@ -31,6 +31,15 @@ async function createChannel(): Promise<Channel> {
   }
 
   const ch = await connection.createChannel();
+
+  ch.on('error', (err) => {
+    console.error('[MQ] Channel error:', err);
+  });
+  ch.on('close', () => {
+    console.warn('[MQ] Channel closed → resetting...');
+    channel = null;
+    connecting = null;
+  });
 
   channel = ch;
   console.log('[MQ] Channel created');
@@ -66,18 +75,12 @@ export async function closeMQ() {
 
 const shutdown = async (signal: string) => {
   console.log(`[MQ] ${signal} received`);
-
   await closeMQ();
-
   console.log('[MQ] shutdown complete');
-  process.exit(0);
 };
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('exit', () => {
-  console.log('[MQ] process exit event fired');
-});
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.once('SIGTERM', () => shutdown('SIGTERM'));
 
 // export async function publishTestMessage(queueName: string, message: object) {
 //   let connection;

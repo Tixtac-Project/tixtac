@@ -14,22 +14,18 @@ export async function initMQ() {
     arguments: {
       'x-message-ttl': config.seatLockDuration * 1000,
       'x-dead-letter-exchange': 'tixtac.release-dlx',
-      'x-dead-letter-routing-key': 'release-task'
-    }
+      'x-dead-letter-routing-key': 'release-task',
+    },
   });
 
   // Process Queue
   await ch.assertQueue('tixtac.order.release-process', {
-    durable: true
+    durable: true,
   });
 
   // Bindings
   await ch.bindQueue('tixtac.order.delay', 'tixtac.main', 'order-hold');
-  await ch.bindQueue(
-    'tixtac.order.release-process',
-    'tixtac.release-dlx',
-    'release-task'
-  );
+  await ch.bindQueue('tixtac.order.release-process', 'tixtac.release-dlx', 'release-task');
 
   console.log('[MQ] Topology initialized');
 }
@@ -45,5 +41,7 @@ export async function initMQWithRetry(retries = 5) {
     }
   }
 
-  console.error('[MQ] Failed to initialize after retries');
+  const msg = `[MQ] Failed to initialize after ${retries} retries`;
+  console.error(msg);
+  throw new Error(msg);
 }
