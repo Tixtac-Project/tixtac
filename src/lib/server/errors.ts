@@ -148,12 +148,3 @@ export function throwError(
     details ?? error.details,
   );
 }
-
-export class CartConflictError extends Error {
-  details: unknown[];
-
-  constructor(details: unknown[]) {
-    super('CART_CONFLICT');
-    this.details = details;
-  }
-}

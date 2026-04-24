@@ -1,6 +1,7 @@
 import { eventService } from '$lib/server/services/event.service';
 import { seatService } from '$lib/server/services/seat.service';
 import { error, redirect } from '@sveltejs/kit';
+import { handlePageError } from '$lib/server/utils/page-error';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -10,14 +11,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     redirect(302, `/login?redirect=/events/${params.id}/shows/${params.showId}/seats`);
   }
 
+  const eventId = Number(params.id);
+  const showId = Number(params.showId);
+
+  if (isNaN(eventId) || isNaN(showId)) {
+    error(400, 'ID không hợp lệ');
+  }
+
   try {
-    const eventId = Number(params.id);
-    const showId = Number(params.showId);
-
-    if (isNaN(eventId) || isNaN(showId)) {
-      error(400, 'ID không hợp lệ');
-    }
-
     const [event, seatMap] = await Promise.all([
       eventService.getEventDetail(eventId, user.role, user.id),
       seatService.getSeatMap(eventId, showId, user.role),
@@ -28,7 +29,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       error(404, 'Không tìm thấy suất diễn');
     }
 
-    // Build list of all published shows for the show switcher
     const allShows = event.shows
       .filter((s) => s.status === 'published' || user.role === 'admin')
       .map((s) => ({
@@ -59,15 +59,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       seatMap,
     };
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'statusCode' in err) {
-      const appErr = err as { statusCode: number; message: string };
-      if (appErr.statusCode === 404) {
-        error(404, 'Không tìm thấy suất diễn');
-      }
-      if (appErr.statusCode === 401) {
-        redirect(302, `/login?redirect=/events/${params.id}/shows/${params.showId}/seats`);
-      }
-    }
-    error(404, 'Không tìm thấy suất diễn');
+    handlePageError(err, {
+      redirectUrl: `/login?redirect=/events/${params.id}/shows/${params.showId}/seats`,
+      notFoundMessage: 'Không tìm thấy suất diễn',
+    });
   }
 };

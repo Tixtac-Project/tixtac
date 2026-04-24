@@ -1,7 +1,7 @@
 import { requireCustomer } from '$lib/server/auth/guards';
-import { AppError } from '$lib/server/errors';
 import { orderService } from '$lib/server/services/order.service';
 import { error, redirect } from '@sveltejs/kit';
+import { handlePageError } from '$lib/server/utils/page-error';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -15,12 +15,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   try {
     const order = await orderService.getOrderDetails(orderId, user.id);
 
-    // If order is already paid, redirect to tickets page
     if (order.status === 'paid') {
       redirect(302, '/me/tickets');
     }
 
-    // Check if order expired
     const isExpired = new Date() > new Date(order.expires_at);
 
     return {
@@ -28,15 +26,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       isExpired,
     };
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'status' in err && err.status === 302) {
-      throw err;
-    }
-    if (err instanceof AppError) {
-      if (err.statusCode === 404) {
-        error(404, 'Không tìm thấy đơn hàng');
-      }
-      error(err.statusCode, err.message);
-    }
-    throw err;
+    handlePageError(err, {
+      notFoundMessage: 'Không tìm thấy đơn hàng',
+    });
   }
 };
