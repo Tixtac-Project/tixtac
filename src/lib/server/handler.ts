@@ -3,25 +3,27 @@ import type { RequestEvent, RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { AppError } from './errors';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 /**
  * Wraps an API route handler with standardized error handling.
  *
  * Eliminates the need for repetitive try/catch in every +server.ts file.
  * Errors are caught and converted to consistent JSON responses:
  *
- * | Error Type    | HTTP | Response code      |
+ * | Error Type | HTTP | Response code |
  * |---------------|------|--------------------|
- * | SyntaxError   | 400  | VALIDATION_ERROR   |
- * | AppError      | *    | (from error catalog)|
- * | Unknown       | 500  | INTERNAL_ERROR     |
+ * | SyntaxError | 400 | VALIDATION_ERROR |
+ * | AppError | * | (from error catalog) |
+ * | Unknown | 500 | INTERNAL_ERROR |
  *
  * Usage:
  * ```ts
  * export const POST = apiHandler(async ({ request, locals }) => {
- *   const admin = requireAdmin(locals);
- *   const body = await request.json();
- *   const data = await someService.doSomething(body);
- *   return json({ data }, { status: 201 });
+ * const admin = requireAdmin(locals);
+ * const body = await request.json();
+ * const data = await someService.doSomething(body);
+ * return json({ data }, { status: 201 });
  * });
  * ```
  */
@@ -38,6 +40,17 @@ export function apiHandler(fn: (event: RequestEvent) => Promise<Response>): Requ
       }
 
       if (e instanceof AppError) {
+        if (!isProduction) {
+          console.error(
+            '[API AppError]',
+            event.request.method,
+            event.url.pathname,
+            e.code,
+            e.statusCode,
+            e.message,
+            e.details,
+          );
+        }
         return json(
           {
             error: {
