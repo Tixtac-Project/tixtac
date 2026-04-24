@@ -1,16 +1,14 @@
 import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import { apiHandler } from '$lib/server/handler';
+import { Errors, throwError } from '$lib/server/errors';
 import { eventIdSchema, showIdSchema } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
 
 export const GET = apiHandler(async (event) => {
   const { params, locals, request } = event;
-  /*
   if (!locals.user) {
     throwError(Errors.UNAUTHORIZED, 'Vui lòng đăng nhập để xem trạng thái ghế');
   }
-  */
-
   // Validate the inputs just like the normal seat endpoint
   validateInput(eventIdSchema, params.id);
   const showId = validateInput(showIdSchema, params.showId);
