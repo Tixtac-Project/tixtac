@@ -41,9 +41,9 @@
       ]}"
       in:fly={{ x: 300, duration: 300 }}
       out:fade={{ duration: 200 }}
-      role="alert"
-      aria-live={liveRegion[t.type]}
-      aria-atomic="true"
+      role={t.type === 'error' ? 'alert' : 'status'}
+      aria-live={t.type === 'error' ? undefined : 'polite'}
+      aria-atomic={t.type === 'error' ? undefined : 'true'}
     >
       <span
         class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {iconStyles[
