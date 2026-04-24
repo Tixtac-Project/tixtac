@@ -1,15 +1,15 @@
 import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import { apiHandler } from '$lib/server/handler';
-import { Errors, throwError } from '$lib/server/errors';
-import { validateInput } from '$lib/shared/validation';
 import { eventIdSchema, showIdSchema } from '$lib/shared/schemas';
+import { validateInput } from '$lib/shared/validation';
 
-export const GET = apiHandler(async ({ params, locals }) => {
-/*
+export const GET = apiHandler(async (event) => {
+  const { params, locals, request } = event;
+  /*
   if (!locals.user) {
     throwError(Errors.UNAUTHORIZED, 'Vui lòng đăng nhập để xem trạng thái ghế');
   }
-*/
+  */
 
   // Validate the inputs just like the normal seat endpoint
   validateInput(eventIdSchema, params.id);
@@ -17,41 +17,48 @@ export const GET = apiHandler(async ({ params, locals }) => {
 
   const eventName = SSE_EVENTS.SEAT_UPDATE(showId);
 
-  let intervalId: ReturnType<typeof setInterval>;
+  let intervalId: ReturnType<typeof setInterval> | undefined;
   let listener: (data: unknown) => void;
 
   const stream = new ReadableStream({
     start(controller) {
       console.log(`[SSE] Client connected to show ${showId}`);
 
-      // 1. Định nghĩa listener đẩy data vào stream
       listener = (data) => {
         try {
-          // Chuẩn SSE bắt buộc phải bắt đầu bằng 'data: ' và kết thúc bằng 2 ký tự xuống dòng
           controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
-        } catch (err) {
-          console.error('[SSE] Lỗi khi enqueue data:', err);
+        } catch {
+          cleanup();
         }
       };
 
-      // 2. Đăng ký lắng nghe sự kiện
       eventBus.on(eventName, listener);
 
-      // 3. Cơ chế Heartbeat (Keep-alive)
       intervalId = setInterval(() => {
         try {
           controller.enqueue(`:\n\n`);
-        } catch (err) {
-          console.error('[SSE] Heartbeat error:', err);
+        } catch {
+          cleanup();
         }
       }, 8000);
     },
     cancel() {
-      // 4. Xóa rác, chống rò rỉ bộ nhớ
-      console.log(`[SSE] Client disconnected from show ${showId}`);
+      cleanup();
+    }
+  });
+
+  function cleanup() {
+    if (intervalId) {
+      console.log(`[SSE] Cleaning up resources for show ${showId}`);
       eventBus.off(eventName, listener);
       clearInterval(intervalId);
+      intervalId = undefined;
     }
+  }
+
+  // Lắng nghe sự kiện đóng kết nối từ Request Signal
+  request.signal.addEventListener('abort', () => {
+    cleanup();
   });
 
   return new Response(stream, {
