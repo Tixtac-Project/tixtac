@@ -1,20 +1,10 @@
-import { error, redirect, type Redirect } from '@sveltejs/kit';
+import { error, isHttpError, isRedirect, redirect } from '@sveltejs/kit';
 import { AppError } from '../errors';
 
 export interface PageErrorContext {
   redirectUrl?: string;
   notFoundMessage?: string;
   defaultMessage?: string;
-}
-
-function isRedirect(err: unknown): err is Redirect {
-  return (
-    err !== null &&
-    typeof err === 'object' &&
-    'status' in err &&
-    typeof (err as Record<string, unknown>).status === 'number' &&
-    (err as Redirect).status < 400
-  );
 }
 
 export function handlePageError(err: unknown, context: PageErrorContext = {}): never {
@@ -25,6 +15,10 @@ export function handlePageError(err: unknown, context: PageErrorContext = {}): n
   } = context;
 
   if (isRedirect(err)) {
+    throw err;
+  }
+
+  if (isHttpError(err)) {
     throw err;
   }
 
