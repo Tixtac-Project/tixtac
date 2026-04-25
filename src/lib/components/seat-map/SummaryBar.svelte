@@ -19,6 +19,7 @@
     store: SeatSelectionStore;
     onCheckout: () => void;
     maxTickets: number;
+    boughtCount?: number;
     /** Whether the event has multiple shows (always show per-show grouping) */
     multiShowEvent?: boolean;
     isLoading?: boolean;
@@ -28,9 +29,13 @@
     store,
     onCheckout,
     maxTickets,
+    boughtCount = 0,
     multiShowEvent = false,
     isLoading = false,
   }: Props = $props();
+
+  /** Effective remaining = max - bought (non-negative) */
+  let effectiveRemaining = $derived(maxTickets > 0 ? Math.max(0, maxTickets - boughtCount) : -1);
 
   let expanded = $state(false);
   let hasSelection = $derived(store.totalCount > 0);
@@ -322,7 +327,11 @@
             <span class="text-xs font-semibold text-foreground sm:text-sm">
               {store.totalCount} vé đã chọn
               {#if maxTickets > 0}
-                <span class="text-muted-foreground">/ tối đa {maxTickets}</span>
+                {#if boughtCount > 0}
+                  <span class="text-muted-foreground">/ còn {effectiveRemaining}</span>
+                {:else}
+                  <span class="text-muted-foreground">/ tối đa {maxTickets}</span>
+                {/if}
               {/if}
             </span>
             <p class="mt-0.5 truncate text-[11px] text-muted-foreground sm:text-xs">
@@ -350,7 +359,7 @@
           type="button"
           class="btn-primary-gradient flex shrink-0 items-center gap-2 px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
           onclick={onCheckout}
-          disabled={isLoading || (store.totalCount > maxTickets && maxTickets > 0)}
+          disabled={isLoading || (effectiveRemaining >= 0 && store.totalCount > effectiveRemaining)}
         >
           {#if isLoading}
             <LoaderCircle class="h-4 w-4 animate-spin" />

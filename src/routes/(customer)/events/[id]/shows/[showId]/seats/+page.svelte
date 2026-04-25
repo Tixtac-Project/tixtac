@@ -27,6 +27,7 @@
       title: string;
       venue: string;
       max_tickets_per_user: number;
+      bought_count: number;
       map_config: MapConfig;
       stage_layout: StageElement[];
     };
@@ -59,9 +60,14 @@
     allShows.find((s: ShowInfo) => s.id === currentShowId) ?? data.show,
   );
 
-  // ── Store ──
-  const getMaxTicketsPerUser = () => data.event.max_tickets_per_user;
-  let store = createSeatSelectionStore(getMaxTicketsPerUser());
+  // ── Store: limit enforced inside the store using raw max + bought count ──
+  let store = $state(
+    createSeatSelectionStore(data.event.max_tickets_per_user, data.event.bought_count),
+  );
+
+  $effect(() => {
+    store.updateLimits(data.event.max_tickets_per_user, data.event.bought_count);
+  });
 
   // Sync from server data whenever the route's event/show changes
   // (handles initial load AND SvelteKit reusing this page for a different route)
@@ -426,7 +432,8 @@
   <SummaryBar
     {store}
     onCheckout={handleCheckout}
-    maxTickets={event.max_tickets_per_user}
+    maxTickets={data.event.max_tickets_per_user}
+    boughtCount={data.event.bought_count}
     multiShowEvent={allShows.length > 1}
     isLoading={isSubmitting}
   />

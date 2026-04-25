@@ -1,5 +1,13 @@
 import { db } from '$lib/server/db';
-import { categories, events, eventShows, seats, seatSections } from '$lib/server/db/schema';
+import {
+  categories,
+  events,
+  eventShows,
+  orderItems,
+  orders,
+  seats,
+  seatSections,
+} from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import {
   createBasicInfoSchema,
@@ -119,6 +127,25 @@ export const eventService = {
   async getEventDetail(rawEventId: string | number, role?: string, userId?: number) {
     const eventId = validateInput(eventIdSchema, rawEventId);
 
+    // 0. Count already-bought (paid) tickets for this user+event
+    let boughtCount = 0;
+    if (userId) {
+      const [bought] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(orders)
+        .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+        .innerJoin(seats, eq(seats.id, orderItems.seatId))
+        .innerJoin(eventShows, eq(eventShows.id, seats.showId))
+        .where(
+          and(
+            eq(orders.userId, userId),
+            eq(orders.status, 'paid'),
+            eq(eventShows.eventId, eventId),
+          ),
+        );
+      boughtCount = Number(bought?.count ?? 0);
+    }
+
     // 1. Get event basic info with category
     const [eventRow] = await db
       .select({
@@ -227,6 +254,7 @@ export const eventService = {
 
     return {
       id: event.id,
+      bought_count: boughtCount,
       category_id: event.categoryId,
       category_name: event.categoryName,
       category_slug: event.categorySlug,

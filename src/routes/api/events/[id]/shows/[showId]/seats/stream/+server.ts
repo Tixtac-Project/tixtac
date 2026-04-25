@@ -71,7 +71,7 @@ export const GET = apiHandler(async (event) => {
     },
     cancel() {
       cleanup();
-    }
+    },
   });
 
   function cleanup() {
@@ -87,7 +87,6 @@ export const GET = apiHandler(async (event) => {
     } catch (error) {
       console.log(error);
     }
-
   }
 
   request.signal.addEventListener('abort', cleanup, { once: true });
@@ -96,7 +95,7 @@ export const GET = apiHandler(async (event) => {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    }
+      Connection: 'keep-alive',
+    },
   });
 });
