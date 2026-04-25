@@ -1,7 +1,7 @@
 import { eventService } from '$lib/server/services/event.service';
 import { seatService } from '$lib/server/services/seat.service';
-import { error, redirect } from '@sveltejs/kit';
 import { handlePageError } from '$lib/server/utils/page-error';
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -45,6 +45,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
         title: event.title,
         venue: event.venue,
         max_tickets_per_user: event.max_tickets_per_user,
+        bought_count: event.bought_count,
         map_config: event.map_config,
         stage_layout: event.stage_layout,
       },
