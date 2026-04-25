@@ -60,14 +60,13 @@
     allShows.find((s: ShowInfo) => s.id === currentShowId) ?? data.show,
   );
 
-  // ── Store: effective max = event limit minus already-bought tickets ──
-  let store = $state(createSeatSelectionStore(0));
+  // ── Store: limit enforced inside the store using raw max + bought count ──
+  let store = $state(
+    createSeatSelectionStore(data.event.max_tickets_per_user, data.event.bought_count),
+  );
 
   $effect(() => {
-    const limit = data.event.max_tickets_per_user;
-    const bought = data.event.bought_count;
-    const max = limit > 0 ? Math.max(0, limit - bought) : 0;
-    store = createSeatSelectionStore(max);
+    store.updateLimits(data.event.max_tickets_per_user, data.event.bought_count);
   });
 
   // Sync from server data whenever the route's event/show changes

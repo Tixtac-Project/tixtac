@@ -8,7 +8,17 @@ export interface ShowCart {
   generalQuantities: Record<number, number>;
 }
 
-export function createSeatSelectionStore(maxTickets: number) {
+export function createSeatSelectionStore(rawMaxTickets: number, boughtCount = 0) {
+  /** Raw admin-configured max (0 = unlimited) */
+  let maxTickets = $state(rawMaxTickets);
+  /** Tickets this user already bought for this event */
+  let bought = $state(boughtCount);
+
+  /** Effective limit: raw max minus bought. Infinity when no limit. */
+  const effectiveLimit = $derived(maxTickets > 0 ? Math.max(0, maxTickets - bought) : Infinity);
+  /** Whether a limit is active (false only when admin chose unlimited) */
+  const isLimitActive = $derived(effectiveLimit < Infinity);
+
   /** All carts keyed by showId */
   let carts = $state<Record<number, ShowCart>>({});
 
@@ -63,10 +73,10 @@ export function createSeatSelectionStore(maxTickets: number) {
   );
 
   /** Whether the global ticket limit has been reached */
-  const isAtLimit = $derived(maxTickets > 0 && totalCount >= maxTickets);
+  const isAtLimit = $derived(isLimitActive && totalCount >= effectiveLimit);
 
   /** How many more tickets the user can add */
-  const remainingTickets = $derived(maxTickets > 0 ? maxTickets - totalCount : Infinity);
+  const remainingTickets = $derived(isLimitActive ? effectiveLimit - totalCount : Infinity);
 
   /** Get sections for the active show */
   function getActiveSections(): SeatMapSection[] {
@@ -120,7 +130,7 @@ export function createSeatSelectionStore(maxTickets: number) {
         },
       };
     } else {
-      if (maxTickets > 0 && totalCount >= maxTickets) return false;
+      if (isLimitActive && totalCount >= effectiveLimit) return false;
       carts = {
         ...carts,
         [activeShowId]: {
@@ -160,8 +170,8 @@ export function createSeatSelectionStore(maxTickets: number) {
         0,
       );
 
-    if (maxTickets > 0 && otherShowsCount + currentAssigned + otherGeneral + qty > maxTickets) {
-      qty = maxTickets - otherShowsCount - currentAssigned - otherGeneral;
+    if (isLimitActive && otherShowsCount + currentAssigned + otherGeneral + qty > effectiveLimit) {
+      qty = effectiveLimit - otherShowsCount - currentAssigned - otherGeneral;
     }
 
     if (qty <= 0) {
@@ -253,8 +263,8 @@ export function createSeatSelectionStore(maxTickets: number) {
     const cart = carts[showId];
     if (!cart) return;
 
-    // Enforce global maxTickets limit (same logic as setGeneralQuantity)
-    if (maxTickets > 0 && qty > 0) {
+    // Enforce global effectiveLimit (same logic as setGeneralQuantity)
+    if (isLimitActive && qty > 0) {
       const currentAssigned = cart.selectedSeats.length;
       const otherGeneral = Object.entries(cart.generalQuantities)
         .filter(([id]) => Number(id) !== sectionId)
@@ -270,7 +280,7 @@ export function createSeatSelectionStore(maxTickets: number) {
           0,
         );
 
-      const available = maxTickets - otherShowsCount - currentAssigned - otherGeneral;
+      const available = effectiveLimit - otherShowsCount - currentAssigned - otherGeneral;
       if (qty > available) {
         qty = available;
       }
@@ -321,6 +331,12 @@ export function createSeatSelectionStore(maxTickets: number) {
     return labels.join(' | ');
   }
 
+  /** Update the limits without recreating the store (preserves cart state) */
+  function updateLimits(rawMax: number, newBought: number) {
+    maxTickets = rawMax;
+    bought = newBought;
+  }
+
   return {
     get selectedSeats() {
       return currentCart.selectedSeats;
@@ -367,6 +383,7 @@ export function createSeatSelectionStore(maxTickets: number) {
     removeSeatFromShow,
     setGeneralQuantityForShow,
     getSummaryLabels,
+    updateLimits,
   };
 }
 
