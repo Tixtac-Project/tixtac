@@ -1,13 +1,9 @@
 // src/lib/server/db/seed-tickets.ts
+import { hashPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db';
 import { eventShows, events, orderItems, orders, seats, users } from '$lib/server/db/schema';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import * as argon2 from 'argon2';
 import { and, eq, like } from 'drizzle-orm';
-
-async function hashPassword(password: string): Promise<string> {
-  return await argon2.hash(password, { type: argon2.argon2id });
-}
 
 async function seedTickets() {
   console.log('🎫 Starting Ticketing Test Seed...');

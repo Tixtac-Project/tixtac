@@ -1,16 +1,7 @@
 // src/lib/server/db/seed-admin.ts
+import { hashPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
-import * as argon2 from 'argon2';
-
-// ── Helpers ────────────────────────────────────
-
-/**
- * Hash a plaintext password using argon2id.
- */
-export async function hashPassword(password: string): Promise<string> {
-  return await argon2.hash(password, { type: argon2.argon2id });
-}
 
 // ── Seed ───────────────────────────────────────
 

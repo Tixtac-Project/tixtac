@@ -1,4 +1,5 @@
 // src/lib/server/db/seed.ts
+import { hashPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db';
 import {
   categories,
@@ -12,13 +13,7 @@ import {
 } from '$lib/server/db/schema';
 import { getEventSeeds, type ShowSeed } from '$lib/server/db/seed-data';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import * as argon2 from 'argon2';
 import { eq } from 'drizzle-orm';
-
-// ── Password Hashing ───────────────────────────
-export async function hashPassword(password: string): Promise<string> {
-  return await argon2.hash(password, { type: argon2.argon2id });
-}
 
 // ── Row Label Helper ───────────────────────────
 function getRowLabel(index: number): string {
