@@ -10,6 +10,7 @@ import {
   users,
 } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import { publishOrderTimeout } from '$lib/server/mq/publisher';
 import type { DbTransaction } from '$lib/types/db';
 import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
@@ -395,8 +396,15 @@ export const purchaseService = {
             .where(eq(idempotencyKeys.key, idempotencyKey));
         }
 
-        return finalResponse;
+        return {
+          ...finalResponse,
+          isNewOrder: !pendingOrderId,
+        };
       });
+
+      if (responseData.isNewOrder) {
+        await publishOrderTimeout(responseData.order_id);
+      }
 
       return responseData;
     } catch (error) {

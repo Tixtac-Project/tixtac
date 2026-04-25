@@ -19,3 +19,18 @@ export async function publishOrderHold(payload: OrderHoldMessage) {
     console.warn('[MQ] Publish buffer full');
   }
 }
+
+export async function publishOrderTimeout(orderId: number) {
+  const ch = await getChannel();
+
+  const payload = JSON.stringify({ orderId });
+
+  const ok = ch.publish('tixtac.main', 'order-hold', Buffer.from(payload), {
+    persistent: true,
+    expiration: String(config.seatLockDuration * 1000),
+  });
+
+  if (!ok) {
+    console.warn('[MQ] Publish buffer full');
+  }
+}
