@@ -1,3 +1,4 @@
+import { config } from '$lib/server/config';
 import type { CheckoutBody } from '$lib/shared/schemas';
 import { getChannel } from './connection';
 
@@ -11,9 +12,11 @@ export async function publishOrderTimeout(orderId: number, ttl?: number) {
 
   const payload = JSON.stringify({ orderId });
 
+  const expiration = ttl ?? config.seatLockDuration * 1000;
+
   const ok = ch.publish('tixtac.main', 'order-hold', Buffer.from(payload), {
     persistent: true,
-    expiration: ttl ? String(ttl) : undefined, // optional
+    expiration: String(expiration), // optional
   });
 
   if (!ok) {

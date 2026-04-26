@@ -435,16 +435,23 @@ export const orderService = {
 
       const seatIds = items.map((i) => i.seatId);
 
-      // Giải phóng ghế về trạng thái available
-      await tx
+      // Chỉ release ghế đang thật sự locked bởi chính user của đơn này.
+      const released = await tx
         .update(seats)
         .set({ status: 'available', lockedBy: null, lockedAt: null })
-        .where(inArray(seats.id, seatIds));
+        .where(
+          and(
+            inArray(seats.id, seatIds),
+            eq(seats.status, 'locked'),
+            eq(seats.lockedBy, order.userId),
+          ),
+        )
+        .returning({ id: seats.id });
 
       // Hủy đơn hàng
       await tx.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, orderId));
 
-      return { releasedSeatIds: seatIds };
+      return { releasedSeatIds: released.map((r) => r.id) };
     });
   },
 };
