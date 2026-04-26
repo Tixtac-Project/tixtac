@@ -7,7 +7,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   JWT_EXPIRES_IN: z.string().default('24h'),
-  SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(60),
+  SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
   MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
   AMQP_URL: z.string().min(1, 'AMQP_URL is required'),
