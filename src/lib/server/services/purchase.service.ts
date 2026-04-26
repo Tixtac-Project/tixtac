@@ -10,6 +10,7 @@ import {
   users,
 } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import { config } from '$lib/server/config';
 import { publishOrderTimeout } from '$lib/server/mq/publisher';
 import type { DbTransaction } from '$lib/types/db';
 import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
@@ -336,7 +337,7 @@ export const purchaseService = {
         }
 
         // 3. Cập nhật State
-        const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+        const expiresAt = new Date(now.getTime() + config.seatLockDuration * 1000);
 
         await tx
           .update(seats)
