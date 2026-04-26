@@ -101,6 +101,9 @@ export const Errors = {
     'Yêu cầu idempotency đang xung đột',
   ),
 
+  // MQ
+  MQ_UNAVAILABLE: new AppError('MQ_UNAVAILABLE', 503, 'Hệ thống tạm thời bận, vui lòng thử lại.'),
+
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
   INTERNAL_ERROR: new AppError('INTERNAL_ERROR', 500, 'Đã có lỗi xảy ra, vui lòng thử lại'),

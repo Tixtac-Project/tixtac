@@ -1,11 +1,12 @@
 import { verifyAuthToken } from '$lib/server/auth/jwt';
+import { startWorker } from '$lib/server/mq/consumer';
 import { initMQWithRetry } from '$lib/server/mq/initMQ';
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
 const mqInitPromise = initMQWithRetry();
-
 await mqInitPromise;
+await startWorker();
 
 // ── Security headers (CSP + common hardening) ──
 const securityHeaders: Handle = async ({ event, resolve }) => {

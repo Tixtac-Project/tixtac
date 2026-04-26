@@ -401,4 +401,57 @@ export const orderService = {
       paid_events: Array.from(paidEventsMap.values()),
     };
   },
+
+  async releaseExpiredOrder(orderId: number): Promise<{ releasedSeatIds: number[] }> {
+    return db.transaction(async (tx) => {
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update');
+
+      if (!order) {
+        // Không có đơn hàng → coi như không có gì để giải phóng
+        return { releasedSeatIds: [] };
+      }
+
+      if (order.status !== 'pending') {
+        // Đã xử lý rồi (paid/cancelled/…) → không làm gì
+        return { releasedSeatIds: [] };
+      }
+
+      const now = new Date();
+      if (order.expiresAt > now) {
+        // Chưa hết hạn → giữ nguyên
+        return { releasedSeatIds: [] };
+      }
+
+      const items = await tx
+        .select({ seatId: orderItems.seatId })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, orderId));
+
+      if (items.length === 0) {
+        // Không có items vẫn cần hủy order để đồng bộ trạng thái
+        await tx.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, orderId));
+        return { releasedSeatIds: [] };
+      }
+
+      const seatIds = items.map((i) => i.seatId);
+
+      // Chỉ release ghế đang thật sự locked bởi chính user của đơn này.
+      const released = await tx
+        .update(seats)
+        .set({ status: 'available', lockedBy: null, lockedAt: null })
+        .where(
+          and(
+            inArray(seats.id, seatIds),
+            eq(seats.status, 'locked'),
+            eq(seats.lockedBy, order.userId),
+          ),
+        )
+        .returning({ id: seats.id });
+
+      // Hủy đơn hàng
+      await tx.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, orderId));
+
+      return { releasedSeatIds: released.map((r) => r.id) };
+    });
+  },
 };
