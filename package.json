@@ -13,7 +13,9 @@
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write . --experimental-cli",
     "db:push": "drizzle-kit push",
-    "db:seed": "bun src/lib/server/db/seed.ts"
+    "db:seed": "bun src/lib/server/db/seed.ts",
+    "test:race": "bun run scripts/reset-db.ts && bun run tests/race-condition.test.ts",
+    "db:reset": "bun run scripts/reset-db.ts"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.61.5",
