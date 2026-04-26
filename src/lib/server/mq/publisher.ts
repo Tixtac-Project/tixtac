@@ -1,11 +1,5 @@
 import { config } from '$lib/server/config';
-import type { CheckoutBody } from '$lib/shared/schemas';
 import { getChannel } from './connection';
-
-export type OrderHoldMessage = {
-  payload: CheckoutBody;
-  ttl?: number;
-};
 
 export async function publishOrderTimeout(orderId: number, ttl?: number) {
   const ch = await getChannel();
