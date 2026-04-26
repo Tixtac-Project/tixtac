@@ -23,6 +23,19 @@ export async function initMQ() {
     durable: true,
   });
 
+  await ch.assertQueue('tixtac.order.release-process.retry', {
+    durable: true,
+    arguments: {
+      'x-dead-letter-exchange': '',
+      'x-dead-letter-routing-key': 'tixtac.order.release-process',
+      'x-message-ttl': 10000, // delay 10s
+    },
+  });
+
+  await ch.assertQueue('tixtac.order.release-process.dlq', {
+    durable: true,
+  });
+
   // Bindings
   await ch.bindQueue('tixtac.order.delay', 'tixtac.main', 'order-hold');
   await ch.bindQueue('tixtac.order.release-process', 'tixtac.release-dlx', 'release-task');

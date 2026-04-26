@@ -402,9 +402,9 @@ export const purchaseService = {
         };
       });
 
-      if (responseData.isNewOrder) {
-        await publishOrderTimeout(responseData.order_id);
-      }
+      // Always (re)publish a timeout message: the consumer's `expiresAt > now`
+      // check will drop any earlier stale message after the deadline is extended.
+      await publishOrderTimeout(responseData.order_id);
 
       return responseData;
     } catch (error) {

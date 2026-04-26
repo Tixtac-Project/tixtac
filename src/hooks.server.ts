@@ -5,9 +5,8 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
 const mqInitPromise = initMQWithRetry();
-await startWorker();
-
 await mqInitPromise;
+await startWorker();
 
 // ── Security headers (CSP + common hardening) ──
 const securityHeaders: Handle = async ({ event, resolve }) => {
