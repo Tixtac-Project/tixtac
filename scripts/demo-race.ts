@@ -147,10 +147,6 @@ function printStep(step: string, instruction: string) {
   console.log(`   ${instruction}`);
 }
 
-function printExpected(label: string, value: string) {
-  console.log(`   ${label}: ${value}`);
-}
-
 // ─── Demo Scenarios ─────────────────────────────────────────────────────────
 
 async function demoScenario1() {

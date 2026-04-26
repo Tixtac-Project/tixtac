@@ -21,14 +21,6 @@ async function resetTestData() {
 
   console.log('📊 Current state:');
 
-  const currentSeats = await db
-    .select({
-      available: seats.id,
-      status: seats.status,
-    })
-    .from(seats)
-    .limit(10);
-
   const availableCount = await db.select().from(seats).where(eq(seats.status, 'available'));
   const lockedCount = await db.select().from(seats).where(eq(seats.status, 'locked'));
   const soldCount = await db.select().from(seats).where(eq(seats.status, 'sold'));
@@ -39,7 +31,9 @@ async function resetTestData() {
   console.log(`  Sold: ${soldCount.length}`);
 
   const pendingOrders = await db.select().from(orders);
-  const pendingCount = pendingOrders.filter((o) => o.status === 'pending').length;
+  const pendingCount = pendingOrders.filter(
+    (o: { status: string }) => o.status === 'pending',
+  ).length;
   console.log(`  Pending orders: ${pendingCount}`);
 
   if (lockedCount.length === 0 && pendingCount === 0) {
@@ -59,7 +53,7 @@ async function resetTestData() {
         .from(orderItems)
         .where(eq(orderItems.orderId, order.id));
 
-      const seatIds = items.map((i) => i.seatId);
+      const seatIds = items.map((i: { seatId: number }) => i.seatId);
 
       if (seatIds.length > 0) {
         await db

@@ -49,14 +49,6 @@ async function cancelAllPendingOrders() {
   }
 }
 
-async function resetSeat(seatId: number) {
-  const database = await getDb();
-  await database
-    .update(seats)
-    .set({ status: 'available', lockedBy: null, lockedAt: null })
-    .where(eq(seats.id, seatId));
-}
-
 async function getAvailableSeatIds(count: number = 1): Promise<number[]> {
   const database = await getDb();
   const availableSeats = await database
@@ -165,12 +157,6 @@ async function getSeatStatus(seatId: number): Promise<string> {
     .from(seats)
     .where(eq(seats.id, seatId));
   return seat?.status || 'unknown';
-}
-
-async function getOrderCount(): Promise<number> {
-  const database = await getDb();
-  const result = await database.select({ count: orderItems.id }).from(orderItems);
-  return result.length;
 }
 
 // ─── Test Suites ────────────────────────────────────────────────────────────
