@@ -37,17 +37,30 @@ export async function startWorker(retryCount = 0) {
         const retries = headers['x-retry'] ?? 0;
         const MAX_RETRIES = 3;
 
-        if (retries < MAX_RETRIES) {
-          console.warn(`[Worker] Retry ${retries + 1}/${MAX_RETRIES}`);
-          ch.sendToQueue('tixtac.order.release-process.retry', msg.content, {
-            headers: { ...headers, 'x-retry': retries + 1 },
-            persistent: true,
-          });
-        } else {
-          ch.sendToQueue('tixtac.order.release-process.dlq', msg.content, { persistent: true });
+        let republished = false;
+        try {
+          if (retries < MAX_RETRIES) {
+            console.warn(`[Worker] Retry ${retries + 1}/${MAX_RETRIES}`);
+            republished = ch.sendToQueue('tixtac.order.release-process.retry', msg.content, {
+              headers: { ...headers, 'x-retry': retries + 1 },
+              persistent: true,
+            });
+          } else {
+            republished = ch.sendToQueue('tixtac.order.release-process.dlq', msg.content, {
+              persistent: true,
+            });
+          }
+        } catch (publishErr) {
+          console.error('[Worker] Failed to republish to retry/DLQ:', publishErr);
+          // republished stays false
         }
 
-        ch.ack(msg);
+        if (republished) {
+          ch.ack(msg);
+        } else {
+          // nack with requeue so the message is retried by the broker
+          ch.nack(msg, false, true);
+        }
       }
     });
 

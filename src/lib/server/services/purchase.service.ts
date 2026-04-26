@@ -1,3 +1,4 @@
+import { config } from '$lib/server/config';
 import { db } from '$lib/server/db';
 import {
   events,
@@ -10,8 +11,8 @@ import {
   users,
 } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { config } from '$lib/server/config';
 import { publishOrderTimeout } from '$lib/server/mq/publisher';
+import { orderService } from '$lib/server/services/order.service';
 import type { DbTransaction } from '$lib/types/db';
 import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
@@ -405,7 +406,14 @@ export const purchaseService = {
 
       // Always (re)publish a timeout message: the consumer's `expiresAt > now`
       // check will drop any earlier stale message after the deadline is extended.
-      await publishOrderTimeout(responseData.order_id);
+      try {
+        await publishOrderTimeout(responseData.order_id);
+      } catch (mqErr) {
+        console.error('[purchase] publishOrderTimeout failed; rolling back order', mqErr);
+        // Compensate: release seats and cancel the order so client can retry.
+        await orderService.releaseExpiredOrder(responseData.order_id).catch(() => {});
+        throwError(Errors.MQ_UNAVAILABLE, 'Hệ thống tạm thời bận, vui lòng thử lại.');
+      }
 
       return responseData;
     } catch (error) {
