@@ -8,30 +8,32 @@ Nền tảng đặt vé sự kiện trực tuyến với khả năng chống tra
 
 ## Tính năng chính
 
-| Tính năng            | Mô tả                                                      |
-| -------------------- | ---------------------------------------------------------- |
-| Sơ đồ ghế trực quan  | Ma trận ghế clickable, cập nhật màu realtime qua SSE       |
-| Chống tranh chấp ghế | Database Transaction + Row Lock (`SELECT ... FOR UPDATE`)  |
-| Tự động nhả ghế      | Ghế chưa thanh toán sau 10 phút → tự nhả qua Message Queue |
-| Hàng chờ ảo          | Khi quá tải → đẩy vào Waiting Room, lần lượt cấp quyền vào |
-| Vé điện tử QR Code   | Sau thanh toán → nhận QR Code cho từng ghế                 |
-| Dashboard realtime   | Doanh thu, tỉ lệ lấp đầy, demographics khán giả            |
+| Tính năng            | Mô tả                                                       |
+| -------------------- | ----------------------------------------------------------- |
+| Sơ đồ ghế trực quan  | Ma trận ghế clickable, cập nhật trạng thái realtime qua SSE |
+| Chống tranh chấp ghế | Database Transaction + Row Lock (`SELECT ... FOR UPDATE`)   |
+| Tự động nhả ghế      | Ghế chưa thanh toán sau 10 phút → tự nhả qua Message Queue  |
+| Hàng chờ ảo          | Khi quá tải → đẩy vào Waiting Room, lần lượt cấp quyền vào  |
+| Vé điện tử QR Code   | Sau thanh toán → nhận QR Code cho từng ghế                  |
+| Dashboard realtime   | Doanh thu, tỉ lệ lấp đầy, demographics khán giả             |
 
 ---
 
 ## Tech Stack
 
-| Layer         | Công nghệ                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------- |
-| Runtime       | [Bun](https://bun.sh/)                                                                    |
-| Framework     | [SvelteKit](https://kit.svelte.dev/)                                                      |
-| UI            | [TailwindCSS](https://tailwindcss.com/) + [shadcn-svelte](https://www.shadcn-svelte.com/) |
-| Database      | [Neon](https://neon.tech/) (PostgreSQL) ☁️                                                |
-| ORM           | [DrizzleORM](https://orm.drizzle.team/)                                                   |
-| Message Queue | [CloudAMQP](https://www.cloudamqp.com/) (RabbitMQ) ☁️                                     |
-| Auth          | JWT (httpOnly cookie) - SSR Auth                                                          |
-| Realtime      | Server-Sent Events (SSE)                                                                  |
-| Deploy        | [Render](https://render.com/) ☁️                                                          |
+| Layer            | Công nghệ                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| Runtime          | [Bun](https://bun.sh/)                                                                    |
+| Framework        | [SvelteKit](https://kit.svelte.dev/)                                                      |
+| UI               | [TailwindCSS](https://tailwindcss.com/) + [shadcn-svelte](https://www.shadcn-svelte.com/) |
+| Database         | [Neon](https://neon.tech/) (PostgreSQL) ☁️                                                |
+| ORM              | [DrizzleORM](https://orm.drizzle.team/)                                                   |
+| Message Queue    | [CloudAMQP](https://www.cloudamqp.com/) (RabbitMQ) ☁️                                     |
+| Auth             | Jose JWT (httpOnly cookie) - SSR Auth                                                     |
+| Realtime         | Server-Sent Events (SSE)                                                                  |
+| Validation       | [Zod](https://zod.dev/) (shared FE/BE schemas)                                            |
+| Seat Map Builder | [Konva](https://konvajs.org/) (svelte-konva)                                              |
+| Deploy           | [Render](https://render.com/) ☁️                                                          |
 
 ---
 
@@ -76,7 +78,7 @@ src/
 
 ### Yêu cầu
 
-- [Bun](https://bun.sh/) (hoặc npm/pnpm)
+- [Bun](https://bun.sh/)
 
 ### 1. Clone & Install
 
@@ -92,22 +94,7 @@ bun install
 cp .env.example .env
 ```
 
-Mở `.env` và điền thông tin:
-
-```env
-# Database (Neon)
-DATABASE_URL=postgresql://user:pass@ep-xxx.ap-southeast-1.aws.neon.tech/ticketrush?sslmode=require
-
-# Message Queue (CloudAMQP -> RabbitMQ)
-AMQP_URL=amqps://user:pass@rattlesnake.rmq.cloudamqp.com/vhost
-
-# Auth
-JWT_SECRET=your-super-secret-key-here
-
-# Business Config
-SEAT_LOCK_DURATION=600         # giây (10 phút)
-MAX_CONCURRENT_USERS=200       # ngưỡng virtual queue
-```
+Mở `.env` và điền các thông tin cần thiết (Neon, CloudAMQP, JWT secret, v.v.)
 
 ### 3. Database Migration & Seed
 
@@ -131,46 +118,9 @@ Mở [http://localhost:5173](http://localhost:5173)
 
 ## Tài khoản demo
 
-| Email               | Password | Role     |
-| ------------------- | -------- | -------- |
-| admin@ticketrush.vn | 123456   | Admin    |
-| alice@gmail.com     | 123456   | Customer |
-| bob@gmail.com       | 123456   | Customer |
-
----
-
-## API Endpoints
-
-### Public
-
-| Method | Endpoint             | Mô tả                |
-| ------ | -------------------- | -------------------- |
-| POST   | `/api/auth/register` | Đăng ký              |
-| POST   | `/api/auth/login`    | Đăng nhập            |
-| POST   | `/api/auth/logout`   | Đăng xuất            |
-| GET    | `/api/events`        | Danh sách + tìm kiếm |
-| GET    | `/api/events/[id]`   | Chi tiết sự kiện     |
-
-### Customer (Auth Required)
-
-| Method | Endpoint                        | Mô tả            |
-| ------ | ------------------------------- | ---------------- |
-| GET    | `/api/events/[id]/seats`        | Sơ đồ ghế        |
-| GET    | `/api/events/[id]/seats/stream` | SSE realtime     |
-| POST   | `/api/events/[id]/seats/hold`   | Giữ chỗ          |
-| POST   | `/api/orders/[id]/checkout`     | Thanh toán       |
-| GET    | `/api/me/tickets`               | Vé của tôi       |
-| POST   | `/api/events/[id]/queue`        | Đăng ký hàng chờ |
-| GET    | `/api/events/[id]/queue`        | Check lượt       |
-
-### Admin (Auth Required)
-
-| Method | Endpoint                  | Mô tả         |
-| ------ | ------------------------- | ------------- |
-| POST   | `/api/events`             | Tạo sự kiện   |
-| GET    | `/api/stats/revenue`      | Doanh thu     |
-| GET    | `/api/stats/occupancy`    | Tỉ lệ lấp đầy |
-| GET    | `/api/stats/demographics` | Demographics  |
+| Email              | Password | Role  |
+| ------------------ | -------- | ----- |
+| admin@tixtac.io.vn | 12345678 | Admin |
 
 ---
 
@@ -211,26 +161,6 @@ bun run format       # Prettier format
 bun run db:migrate   # Run migrations
 bun run db:seed      # Seed sample data
 bun run db:studio    # Open Drizzle Studio
-```
-
----
-
-## Demo nhanh
-
-```
-1. Admin đăng nhập → Tạo sự kiện "Rock Festival" (2 khu ghế)
-2. Customer A đăng nhập → Xem sự kiện → Chọn ghế → Thanh toán → QR Code
-3. Race Condition: 2 tab cùng click 1 ghế → 1 được, 1 bị từ chối
-4. Nhả ghế: Giữ ghế, không thanh toán → chờ hết hạn → ghế xanh lại
-5. Virtual Queue: Set MAX=3, mở 4 tab → tab 4 vào Waiting Room
-6. Admin xem Dashboard → Charts realtime
-```
-
-**Biến env cho demo nhanh:**
-
-```env
-SEAT_LOCK_DURATION=60          # 1 phút thay vì 10
-MAX_CONCURRENT_USERS=3         # Dễ trigger virtual queue
 ```
 
 ---
