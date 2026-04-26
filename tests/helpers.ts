@@ -1,7 +1,5 @@
-import { db } from '$lib/server/db';
-import { orderItems, orders, seats, users } from '$lib/server/db/schema';
-import { eq, inArray } from 'drizzle-orm';
-import { select } from 'drizzle-orm';
+import { events, eventShows, orderItems, orders, seats, users } from '$lib/server/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
 
 const BASE_URL = process.env.TEST_API_URL || 'http://localhost:5173';
 const TEST_PASSWORD = '12345678';
@@ -14,15 +12,31 @@ export interface TestUser {
   cookie: string;
 }
 
-async function getDb() {
+// ─── Database singleton (lazy, reused across calls) ─────────────────────────
+
+let _db: Awaited<ReturnType<typeof initDb>> | null = null;
+async function initDb() {
   const { drizzle } = await import('drizzle-orm/bun-sql');
-  const { default: config } = await import('$lib/server/config');
   return drizzle(process.env.DATABASE_URL!, { schema: await import('$lib/server/db/schema') });
 }
+async function getDb() {
+  return (_db ??= await initDb());
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
 
 export async function getTestCustomers(count: number = 5): Promise<TestUser[]> {
   const db = await getDb();
-  const customers = await db.select().from(users).where(eq(users.role, 'customer')).limit(count);
+  const customers = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      fullName: users.fullName,
+      role: users.role,
+    })
+    .from(users)
+    .where(eq(users.role, 'customer'))
+    .limit(count);
   return customers.map((u) => ({ ...u, cookie: '' }));
 }
 
@@ -32,47 +46,20 @@ export async function loginAs(email: string, password: string = TEST_PASSWORD): 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-
   if (!res.ok) {
     throw new Error(`Login failed for ${email}: ${res.status} ${await res.text()}`);
   }
-
-  const setCookie = res.headers.get('set-cookie');
-  if (!setCookie) {
-    throw new Error(`No cookie returned for ${email}`);
+  const cookies = res.headers.getSetCookie?.() ?? [];
+  const auth = cookies.find((c) => c.startsWith('auth_token='));
+  if (!auth) {
+    throw new Error(`No auth_token cookie returned for ${email}`);
   }
-
-  return setCookie.split(';')[0].split('=')[1]
-    ? setCookie.split(';')[0]
-    : `auth_token=${extractToken(setCookie)}`;
+  return auth.split(';')[0]; // name=value only
 }
 
-function extractToken(setCookie: string): string {
-  const match = setCookie.match(/auth_token=([^;]+)/);
-  return match ? match[1] : '';
-}
+export const loginAndGetCookie = loginAs;
 
-export async function loginAndGetCookie(
-  email: string,
-  password: string = TEST_PASSWORD,
-): Promise<string> {
-  const res = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Login failed for ${email}: ${res.status}`);
-  }
-
-  const cookies = res.headers.get('set-cookie');
-  if (!cookies) {
-    throw new Error(`No cookie returned for ${email}`);
-  }
-
-  return cookies.split(',')[0].trim();
-}
+// ─── Seat / Order cleanup ──────────────────────────────────────────────────
 
 export async function resetSeat(seatId: number): Promise<void> {
   const db = await getDb();
@@ -96,7 +83,7 @@ export async function cancelPendingOrders(userId: number): Promise<void> {
   const pendingOrders = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(eq(orders.userId, userId));
+    .where(and(eq(orders.userId, userId), eq(orders.status, 'pending')));
 
   for (const order of pendingOrders) {
     const items = await db
@@ -142,81 +129,90 @@ export async function cancelAllPendingOrders(): Promise<void> {
   }
 }
 
-export async function findSeat(
-  seatMapResponse: SeatMapResponse,
-  seatId: number,
-): Promise<SeatInfo | null> {
-  for (const section of seatMapResponse.data.sections) {
-    for (const seat of section.seats) {
-      if (seat.id === seatId) {
-        return seat;
-      }
-    }
-  }
-  return null;
+export async function cleanupTestData(): Promise<void> {
+  await cancelAllPendingOrders();
 }
 
-export async function getSeatMap(
+export async function getSeatStatus(seatId: number): Promise<string> {
+  const db = await getDb();
+  const [seat] = await db.select({ status: seats.status }).from(seats).where(eq(seats.id, seatId));
+  return seat?.status || 'unknown';
+}
+
+// ─── Event / Show resolution ───────────────────────────────────────────────
+
+/**
+ * Dynamically resolve a published event and its first published show.
+ * Avoids hardcoding IDs that change after re-seeding.
+ */
+export async function resolveEventAndShow(): Promise<{ eventId: number; showId: number }> {
+  const db = await getDb();
+  const [event] = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(eq(events.status, 'published'))
+    .limit(1);
+
+  if (!event) throw new Error('No published event found. Run seed first.');
+
+  const [show] = await db
+    .select({ id: eventShows.id })
+    .from(eventShows)
+    .where(and(eq(eventShows.eventId, event.id), eq(eventShows.status, 'published')))
+    .limit(1);
+
+  if (!show) throw new Error(`No published show found for event ${event.id}.`);
+
+  return { eventId: event.id, showId: show.id };
+}
+
+// ─── API call helpers ──────────────────────────────────────────────────────
+
+export async function getAvailableSeatIdsFromDB(
+  showId: number,
+  count: number = 1,
+): Promise<number[]> {
+  const db = await getDb();
+  const availableSeats = await db
+    .select({ id: seats.id })
+    .from(seats)
+    .where(and(eq(seats.status, 'available'), eq(seats.showId, showId)))
+    .limit(count);
+  return availableSeats.map((s) => s.id);
+}
+
+export async function holdSeats(
   eventId: number,
   showId: number,
+  seatIds: number[],
   cookie: string,
-): Promise<SeatMapResponse> {
-  const res = await fetch(`${BASE_URL}/api/events/${eventId}/shows/${showId}/seats`, {
+): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(`${BASE_URL}/api/events/${eventId}/checkout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+    },
+    body: JSON.stringify({
+      cart_items: [{ show_id: showId, assigned_seats: seatIds, general_admission: [] }],
+    }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  return { status: res.status, body };
+}
+
+export async function checkoutOrder(
+  orderId: number,
+  cookie: string,
+): Promise<{ status: number; body: unknown }> {
+  const res = await fetch(`${BASE_URL}/api/orders/${orderId}/checkout`, {
+    method: 'POST',
     headers: { Cookie: cookie },
   });
 
-  if (!res.ok) {
-    throw new Error(`Failed to get seat map: ${res.status}`);
-  }
-
-  return res.json();
-}
-
-export async function getAvailableSeatIds(
-  eventId: number,
-  showId: number,
-  cookie: string,
-  count: number = 1,
-): Promise<number[]> {
-  const seatMap = await getSeatMap(eventId, showId, cookie);
-  const availableSeats: number[] = [];
-
-  for (const section of seatMap.data.sections) {
-    for (const seat of section.seats) {
-      if (seat.status === 'available') {
-        availableSeats.push(seat.id);
-        if (availableSeats.length >= count) {
-          return availableSeats;
-        }
-      }
-    }
-  }
-
-  return availableSeats;
-}
-
-export interface SeatInfo {
-  id: number;
-  prefix: string;
-  row_label: string;
-  col_number: number;
-  status: 'available' | 'locked' | 'sold' | 'disabled';
-}
-
-export interface SeatMapResponse {
-  data: {
-    show_id: number;
-    sections: {
-      id: number;
-      name: string;
-      type: 'assigned' | 'general';
-      seats: SeatInfo[];
-    }[];
-  };
-}
-
-export async function cleanupTestData(): Promise<void> {
-  await cancelAllPendingOrders();
+  const body = await res.json().catch(() => ({}));
+  return { status: res.status, body };
 }
 
 export { BASE_URL };
