@@ -46,6 +46,7 @@
       return;
     }
     errors = {};
+    authError = null;
 
     loading = true;
     const { data, error, details } = await api.post<{ role: string }>('/auth/login', result.data);
@@ -56,7 +57,12 @@
       return;
     }
 
-    if (!error && data) {
+    if (error) {
+      authError = error;
+      return;
+    }
+
+    if (data) {
       toast.success('Đăng nhập thành công!');
 
       const redirectTo = page.url.searchParams.get('redirect');
@@ -153,6 +159,12 @@
         <span class="text-xs text-destructive">{errors.password}</span>
       {/if}
     </div>
+
+    {#if authError}
+      <div class="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        {authError}
+      </div>
+    {/if}
 
     <Button
       type="submit"

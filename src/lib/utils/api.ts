@@ -74,8 +74,13 @@ async function fetchWrapper<T>(
       const details: Record<string, string> | undefined =
         errorObj?.details && typeof errorObj.details === 'object' ? errorObj.details : undefined;
 
-      // 401 — Hết hạn session
-      if (res.status === 401 && browser && !isRedirectingToLogin) {
+      // 401 — Hết hạn session (except login endpoint)
+      if (
+        res.status === 401 &&
+        browser &&
+        !isRedirectingToLogin &&
+        !endpoint.includes('/auth/login')
+      ) {
         isRedirectingToLogin = true;
         toast.error('Phiên đăng nhập đã hết hạn.');
         await redirect(302, '/login');
@@ -83,6 +88,16 @@ async function fetchWrapper<T>(
           isRedirectingToLogin = false;
         }, 2_000);
         return { error: errorMessage, status: 401 };
+      }
+      // For login 401, just return error without redirect and without toast
+      if (res.status === 401 && endpoint.includes('/auth/login')) {
+        // Do not show any toast, let the page handle it
+        return { error: errorMessage, status: 401 };
+      }
+
+      // Also suppress toast for any 4xx errors on login endpoint when silent flag is set (handled by page)
+      if (customOptions?.silent && endpoint.includes('/auth/login') && res.status < 500) {
+        return { error: errorMessage, details, status: res.status };
       }
 
       // 5xx — Lỗi server
