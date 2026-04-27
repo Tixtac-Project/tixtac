@@ -1,23 +1,11 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import type { EventListItem } from '$lib/types/event-detail';
   import { formatDate } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
 
-  interface Event {
-    id: number;
-    title: string;
-    venue: string;
-    bannerImageUrl?: string | null;
-    categoryName?: string | null;
-    categorySlug?: string | null;
-    earliestShowDate?: string | null;
-    min_price: number;
-    totalSeats?: number;
-    availableSeats?: number;
-  }
-
   interface Props {
-    event: Event;
+    event: EventListItem;
     badge?: string;
     index?: number;
   }

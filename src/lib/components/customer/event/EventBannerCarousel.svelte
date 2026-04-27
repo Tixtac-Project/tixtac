@@ -2,24 +2,14 @@
   import { resolve } from '$app/paths';
   import type { CarouselAPI } from '$lib/components/ui/carousel/context.js';
   import * as Carousel from '$lib/components/ui/carousel/index.js';
+  import type { EventListItem } from '$lib/types/event-detail';
   import { formatDate } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
   import Autoplay from 'embla-carousel-autoplay';
   import { Calendar, ChevronLeft, ChevronRight, MapPin, Ticket } from 'lucide-svelte';
 
-  interface Event {
-    id: number;
-    title: string;
-    venue: string;
-    bannerImageUrl?: string | null;
-    categoryName?: string | null;
-    categorySlug?: string | null;
-    earliestShowDate?: string | null;
-    min_price: number;
-  }
-
   interface Props {
-    events: Event[];
+    events: EventListItem[];
   }
 
   let { events }: Props = $props();

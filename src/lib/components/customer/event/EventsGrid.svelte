@@ -1,21 +1,9 @@
 <script lang="ts">
+  import type { EventListItem } from '$lib/types/event-detail';
   import EventCard from './EventCard.svelte';
 
-  interface Event {
-    id: number;
-    title: string;
-    venue: string;
-    bannerImageUrl?: string | null;
-    categoryName?: string | null;
-    categorySlug?: string | null;
-    earliestShowDate?: string | null;
-    min_price: number;
-    totalSeats?: number;
-    availableSeats?: number;
-  }
-
   interface Props {
-    events: Event[];
+    events: EventListItem[];
     variant?: 'default' | 'compact' | 'full-width';
   }
 

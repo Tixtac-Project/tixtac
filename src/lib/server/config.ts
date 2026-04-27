@@ -10,7 +10,7 @@ const envSchema = z.object({
   SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
   MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
-  AMQP_URL: z.string().min(1, 'AMQP_URL is required'),
+  CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -20,7 +20,7 @@ const result = envSchema.safeParse({
   SEAT_LOCK_DURATION: env.SEAT_LOCK_DURATION,
   MAX_CONCURRENT_USERS: env.MAX_CONCURRENT_USERS,
   ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
-  AMQP_URL: env.AMQP_URL,
+  CLOUDAMQP_URL: env.CLOUDAMQP_URL,
 });
 
 if (!result.success) {
@@ -49,5 +49,5 @@ export const config = {
   /** Access token lifetime in seconds after queue*/
   accessTokenDuration: parsed.ACCESS_TOKEN_DURATION,
 
-  cloudAMQPURL: parsed.AMQP_URL,
+  cloudAMQPURL: parsed.CLOUDAMQP_URL,
 } as const;

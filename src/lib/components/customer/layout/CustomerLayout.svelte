@@ -1,23 +1,13 @@
 <script lang="ts">
+  import type { CategoryInfo, UserInfo } from '$lib/types/layout';
   import type { Snippet } from 'svelte';
   import CustomerFooter from './CustomerFooter.svelte';
   import CustomerNavbar from './CustomerNavbar.svelte';
 
-  interface Users {
-    id: number;
-    role: 'admin' | 'customer';
-  }
-
-  interface Category {
-    id: number;
-    name: string;
-    slug: string;
-  }
-
   interface Props {
-    user?: Users;
+    user?: UserInfo;
     searchQuery?: string;
-    categories?: Category[];
+    categories?: CategoryInfo[];
     children: Snippet;
   }
 

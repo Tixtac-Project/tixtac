@@ -1,28 +1,10 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardFooter, CardHeader } from '$lib/components/ui/card';
-  import { Calendar, Clock, Ticket } from 'lucide-svelte';
+  import type { PendingOrder, PendingOrderItem } from '$lib/types/purchase';
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
-
-  export interface PendingOrderItem {
-    event_title: string;
-    show_title: string | null;
-    start_time: string;
-    section_name: string;
-    seat_type: 'assigned' | 'general';
-    seat_label: string | null;
-    price: string | number;
-  }
-
-  export interface PendingOrder {
-    order_id: number;
-    total_amount: string | number;
-    status: 'pending';
-    expires_at: string;
-    created_at: string;
-    items: PendingOrderItem[];
-  }
+  import { Calendar, Clock, Ticket } from 'lucide-svelte';
 
   interface Props {
     order: PendingOrder;
