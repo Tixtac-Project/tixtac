@@ -2,11 +2,12 @@
   import { goto, replaceState } from '$app/navigation';
   import { resolve } from '$app/paths';
   import ConflictModal from '$lib/components/ConflictModal.svelte';
+  import PendingOrderModal from '$lib/components/PendingOrderModal.svelte';
   import SeatMap from '$lib/components/seat-map/SeatMap.svelte';
   import SummaryBar from '$lib/components/seat-map/SummaryBar.svelte';
   import { createSeatSelectionStore } from '$lib/stores/cart-store.svelte';
   import { toast } from '$lib/stores/toast';
-  import type { MapConfig, SeatMapData, StageElement } from '$lib/types/seat-map';
+  import type { MapConfig, SeatMapData, SeatMapSeat, StageElement } from '$lib/types/seat-map';
   import { api } from '$lib/utils/api';
   import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
   import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
@@ -19,6 +20,24 @@
     show_date: string;
     start_time: string;
     end_time: string | null;
+  }
+
+  interface PendingOrderItem {
+    event_title: string;
+    show_title: string | null;
+    show_date: string;
+    start_time: string;
+    section_name: string;
+    seat_type: 'assigned' | 'general';
+    seat_label: string | null;
+    price: string;
+  }
+
+  interface PendingOrder {
+    order_id: number;
+    total_amount: string;
+    expires_at: string;
+    items: PendingOrderItem[];
   }
 
   interface PageData {
@@ -34,6 +53,7 @@
     show: ShowInfo;
     allShows: ShowInfo[];
     seatMap: SeatMapData;
+    pendingOrder: PendingOrder | null;
   }
 
   let { data } = $props<{ data: PageData }>();
@@ -52,6 +72,9 @@
   let isLoadingSeatMap = $state(false);
   let showPickerOpen = $state(false);
 
+  // ── SSE real-time updates ──
+  let sseSource = $state<EventSource | null>(null);
+
   /** Track the last event+show combo we synced from server data */
   let lastSyncedKey = $state('');
   let lastEventId = $state<number | null>(null);
@@ -60,10 +83,8 @@
     allShows.find((s: ShowInfo) => s.id === currentShowId) ?? data.show,
   );
 
-  // ── Store: limit enforced inside the store using raw max + bought count ──
-  let store = $state(
-    createSeatSelectionStore(data.event.max_tickets_per_user, data.event.bought_count),
-  );
+  // ── Store: limits are set immediately by the $effect below ──
+  let store = $state(createSeatSelectionStore(0, 0));
 
   $effect(() => {
     store.updateLimits(data.event.max_tickets_per_user, data.event.bought_count);
@@ -101,7 +122,101 @@
     const label = show ? getShowLabel(show) : `Suất #${showId}`;
     store.setActiveShow(showId, label);
     store.setSections(mapData.sections);
+
+    // Close any existing SSE connection (will be re-opened in the SSE $effect)
+    closeSSE();
   });
+
+  // ── SSE: real-time seat status updates ──
+  $effect(() => {
+    const showId = currentShowId;
+    const eventId = data.event.id;
+    if (!showId || !eventId) return;
+
+    const url = `/api/events/${eventId}/shows/${showId}/seats/stream`;
+    const source = new EventSource(url);
+    sseSource = source;
+
+    source.onmessage = (msgEvent) => {
+      try {
+        const payload = JSON.parse(msgEvent.data);
+        // Server emits: { showId, seatIds, status: 'locked'|'sold'|'available' }
+        const { status: statusType, seatIds } = payload as {
+          status: string;
+          seatIds: number[];
+          showId?: number;
+        };
+
+        if (!Array.isArray(seatIds) || seatIds.length === 0) return;
+        if (!statusType) return;
+
+        // Mutate seat statuses in-place (Svelte 5 $state reactive)
+        const seatIdSet = new Set(seatIds);
+        for (const section of seatMap.sections) {
+          if (!section.seats) continue;
+          for (const seat of section.seats) {
+            if (seatIdSet.has(seat.id)) {
+              seat.status = statusType as SeatMapSeat['status'];
+            }
+          }
+        }
+
+        // If seats just became locked/sold, auto-remove them from user's cart.
+        // Skip auto-removal while a checkout is in-flight (the user themselves
+        // just locked those seats — the checkout response will handle the cart).
+        if (!isCheckingOut && (statusType === 'locked' || statusType === 'sold')) {
+          for (const cart of store.getActiveCarts()) {
+            for (const s of cart.selectedSeats) {
+              if (seatIdSet.has(s.id)) {
+                store.removeSeatFromShow(cart.showId, s.id);
+                toast.warning(`Rất tiếc, ghế ${s.label} vừa bị người khác giữ mất!`);
+              }
+            }
+          }
+        }
+
+        // Update sections in store so prices/sections stay in sync
+        store.setSections(seatMap.sections);
+      } catch (err) {
+        console.error('[SSE] Lỗi parse dữ liệu:', err);
+      }
+    };
+
+    source.onerror = () => {
+      // EventSource will auto-reconnect; when it reconnects successfully,
+      // re-fetch the full seat map to guarantee sync after disconnection.
+      // We use a small delay to avoid racing with the browser's reconnect.
+      const handleReconnect = () => {
+        void (async () => {
+          try {
+            const res = await api.get<SeatMapData>(
+              `/events/${data.event.id}/shows/${showId}/seats`,
+            );
+            if (res.data && res.data.sections) {
+              seatMap = res.data;
+              store.setSections(res.data.sections);
+            }
+          } catch {
+            // Silently ignore fetch errors during reconnect sync
+          }
+        })();
+      };
+      // Listen for the next successful open
+      source.addEventListener('open', handleReconnect, { once: true });
+    };
+
+    return () => {
+      source.close();
+      sseSource = null;
+    };
+  });
+
+  function closeSSE() {
+    if (sseSource) {
+      sseSource.close();
+      sseSource = null;
+    }
+  }
 
   function getShowLabel(show: ShowInfo): string {
     return show.title || `${formatTime(show.start_time)}, ${formatDate(show.show_date)}`;
@@ -136,6 +251,9 @@
     activeAbortController = controller;
 
     try {
+      // Close SSE before switching show (new SSE opens via $effect reacting to currentShowId)
+      closeSSE();
+
       const res = await api.get<SeatMapData>(`/events/${data.event.id}/shows/${showId}/seats`, {
         signal: controller.signal,
       });
@@ -182,17 +300,31 @@
     goto(resolve(`/events/${data.event.id}`));
   }
 
-  // Abort any in-flight request when the component is destroyed
-  onDestroy(abortPendingRequest);
+  // Abort any in-flight request and close SSE when the component is destroyed
+  onDestroy(() => {
+    abortPendingRequest();
+    closeSSE();
+  });
 
+  let isCheckingOut = $state(false);
   let isSubmitting = $state(false);
   let showConflictModal = $state(false);
+  let showPendingOrderModal = $state(false);
+  let pendingOrderDismissed = $state(false);
   let conflicts = $state<{ label: string; showName: string; type: 'seat' | 'section' }[]>([]);
 
   async function handleCheckout() {
     const activeCarts = store.getActiveCarts();
     if (activeCarts.length === 0 || isSubmitting) return;
 
+    // If user has a pending order for this event and hasn't dismissed the warning,
+    // show the modal first
+    if (!pendingOrderDismissed && data.pendingOrder && data.pendingOrder.items.length > 0) {
+      showPendingOrderModal = true;
+      return;
+    }
+
+    isCheckingOut = true;
     isSubmitting = true;
 
     // Build payload
@@ -265,6 +397,7 @@
       toast.error('Vượt quá giới hạn vé của sự kiện');
     }
 
+    isCheckingOut = false;
     isSubmitting = false;
   }
 
@@ -436,6 +569,29 @@
     boughtCount={data.event.bought_count}
     multiShowEvent={allShows.length > 1}
     isLoading={isSubmitting}
+  />
+
+  <PendingOrderModal
+    open={showPendingOrderModal}
+    orderId={data.pendingOrder?.order_id ?? 0}
+    totalAmount={data.pendingOrder?.total_amount ?? '0'}
+    expiresAt={data.pendingOrder?.expires_at ?? ''}
+    items={data.pendingOrder?.items ?? []}
+    isLoading={isSubmitting}
+    onConfirmNew={() => {
+      pendingOrderDismissed = true;
+      showPendingOrderModal = false;
+      handleCheckout();
+    }}
+    onPayOld={() => {
+      const orderId = data.pendingOrder?.order_id;
+      if (orderId) {
+        goto(resolve(`/orders/${orderId}/checkout`));
+      }
+    }}
+    onClose={() => {
+      showPendingOrderModal = false;
+    }}
   />
 
   <ConflictModal

@@ -1,4 +1,5 @@
 import { eventService } from '$lib/server/services/event.service';
+import { orderService } from '$lib/server/services/order.service';
 import { seatService } from '$lib/server/services/seat.service';
 import { handlePageError } from '$lib/server/utils/page-error';
 import { error, redirect } from '@sveltejs/kit';
@@ -19,9 +20,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   }
 
   try {
-    const [event, seatMap] = await Promise.all([
+    const [event, seatMap, orderDashboard] = await Promise.all([
       eventService.getEventDetail(eventId, user.role, user.id),
       seatService.getSeatMap(eventId, showId, user.role),
+      orderService.getMyOrdersAndTickets(user.id),
     ]);
 
     const show = event.shows.find((s) => s.id === showId);
@@ -38,6 +40,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
         start_time: s.start_time,
         end_time: s.end_time,
       }));
+
+    // Find the pending order for this specific event (max 1 per event)
+    const pendingOrderForEvent = orderDashboard.pending_orders.find((po) =>
+      po.items.some((item) => item.event_title === event.title),
+    );
 
     return {
       event: {
@@ -58,6 +65,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       },
       allShows,
       seatMap,
+      pendingOrder: pendingOrderForEvent
+        ? {
+            order_id: pendingOrderForEvent.order_id,
+            total_amount: pendingOrderForEvent.total_amount,
+            expires_at: pendingOrderForEvent.expires_at,
+            items: pendingOrderForEvent.items,
+          }
+        : null,
     };
   } catch (err: unknown) {
     handlePageError(err, {
