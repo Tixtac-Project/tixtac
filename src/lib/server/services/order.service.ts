@@ -365,6 +365,7 @@ export const orderService = {
           items: order.items.map((item) => {
             const formatted = formatItem(item);
             return {
+              event_id: formatted.event.id,
               event_title: formatted.event.title,
               show_title: formatted.show.title,
               show_date: formatted.show.showDate,

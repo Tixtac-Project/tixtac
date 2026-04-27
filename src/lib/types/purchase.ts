@@ -38,6 +38,7 @@ export interface PurchaseResponse {
 
 // ── Pending Order (shared between server responses and UI components) ──
 export interface PendingOrderItem {
+  event_id: number;
   event_title: string;
   show_title: string | null;
   show_date: string;

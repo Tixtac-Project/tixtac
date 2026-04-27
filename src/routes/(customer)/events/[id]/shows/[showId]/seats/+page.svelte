@@ -124,7 +124,11 @@
         };
 
         if (!Array.isArray(seatIds) || seatIds.length === 0) return;
-        if (!statusType) return;
+        if (statusType !== 'available' && statusType !== 'locked' && statusType !== 'sold') {
+          console.warn('[SSE] Unknown seat status received:', statusType);
+          return;
+        }
+        const nextStatus = statusType as SeatMapSeat['status'];
 
         // Mutate seat statuses in-place (Svelte 5 $state reactive)
         const seatIdSet = new Set(seatIds);
@@ -132,7 +136,7 @@
           if (!section.seats) continue;
           for (const seat of section.seats) {
             if (seatIdSet.has(seat.id)) {
-              seat.status = statusType as SeatMapSeat['status'];
+              seat.status = nextStatus;
             }
           }
         }
@@ -140,7 +144,7 @@
         // If seats just became locked/sold, auto-remove them from user's cart.
         // Skip auto-removal while a checkout is in-flight (the user themselves
         // just locked those seats — the checkout response will handle the cart).
-        if (!isCheckingOut && (statusType === 'locked' || statusType === 'sold')) {
+        if (!isCheckingOut && (nextStatus === 'locked' || nextStatus === 'sold')) {
           for (const cart of store.getActiveCarts()) {
             for (const s of cart.selectedSeats) {
               if (seatIdSet.has(s.id)) {
@@ -158,11 +162,12 @@
       }
     };
 
+    let reconnectPending = false;
     source.onerror = () => {
-      // EventSource will auto-reconnect; when it reconnects successfully,
-      // re-fetch the full seat map to guarantee sync after disconnection.
-      // We use a small delay to avoid racing with the browser's reconnect.
+      if (reconnectPending) return;
+      reconnectPending = true;
       const handleReconnect = () => {
+        reconnectPending = false;
         void (async () => {
           try {
             const res = await api.get<SeatMapData>(
@@ -177,7 +182,6 @@
           }
         })();
       };
-      // Listen for the next successful open
       source.addEventListener('open', handleReconnect, { once: true });
     };
 

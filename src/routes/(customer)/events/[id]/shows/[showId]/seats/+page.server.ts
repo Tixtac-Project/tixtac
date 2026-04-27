@@ -43,7 +43,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
     // Find the pending order for this specific event (max 1 per event)
     const pendingOrderForEvent = orderDashboard.pending_orders.find((po) =>
-      po.items.some((item) => item.event_title === event.title),
+      po.items.some((item) => item.event_id === event.id),
     );
 
     return {
