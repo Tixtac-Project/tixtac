@@ -26,22 +26,34 @@ export async function startWorker(retryCount = 0) {
         const { releasedSeats } = await orderService.releaseExpiredOrder(orderId);
         if (releasedSeats.length > 0) {
           console.log(`[Worker] SUCCESS: Đã nhả ${releasedSeats.length} ghế cho đơn ${orderId}`);
-          const seatsByShow = releasedSeats.reduce((acc, curr) => {
-            if (!acc[curr.showId]) acc[curr.showId] = [];
-            acc[curr.showId].push(curr.id);
-            return acc;
-          }, {} as Record<number, number[]>);
+          const seatsByShow = releasedSeats.reduce(
+            (acc, curr) => {
+              if (!acc[curr.showId]) acc[curr.showId] = [];
+              acc[curr.showId].push(curr.id);
+              return acc;
+            },
+            {} as Record<number, number[]>,
+          );
 
-          for (const [sId, sIds] of Object.entries(seatsByShow)) {
-            const numShowId = Number(sId);
-            eventBus.emit(SSE_EVENTS.SEAT_UPDATE(numShowId), {
-              showId: numShowId,
-              seatIds: sIds,
-              status: 'available',
-            });
+          try {
+            for (const [sId, sIds] of Object.entries(seatsByShow)) {
+              const numShowId = Number(sId);
+              eventBus.emit(SSE_EVENTS.SEAT_UPDATE(numShowId), {
+                showId: numShowId,
+                seatIds: sIds,
+                status: 'available',
+              });
+            }
+          } catch (emitErr) {
+            console.error(
+              `[Worker] SSE emit failed for order ${orderId}, seats already released`,
+              emitErr,
+            );
           }
         } else {
-          console.log(`[Worker] SKIP: Đơn hàng ${orderId} không cần nhả ghế (chưa hết hạn hoặc đã thanh toán)`);
+          console.log(
+            `[Worker] SKIP: Đơn hàng ${orderId} không cần nhả ghế (chưa hết hạn hoặc đã thanh toán)`,
+          );
         }
         ch.ack(msg);
       } catch (err) {

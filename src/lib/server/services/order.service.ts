@@ -282,11 +282,14 @@ export const orderService = {
     // SSE Emit realtime events for sold seats
     try {
       if (txResult.soldSeats && txResult.soldSeats.length > 0) {
-        const seatsByShow = txResult.soldSeats.reduce((acc, curr) => {
-          if (!acc[curr.showId]) acc[curr.showId] = [];
-          acc[curr.showId].push(curr.id);
-          return acc;
-        }, {} as Record<number, number[]>);
+        const seatsByShow = txResult.soldSeats.reduce(
+          (acc, curr) => {
+            if (!acc[curr.showId]) acc[curr.showId] = [];
+            acc[curr.showId].push(curr.id);
+            return acc;
+          },
+          {} as Record<number, number[]>,
+        );
 
         for (const [sId, sIds] of Object.entries(seatsByShow)) {
           const numShowId = Number(sId);
@@ -436,7 +439,9 @@ export const orderService = {
     };
   },
 
-  async releaseExpiredOrder(orderId: number): Promise<{ releasedSeats: { id: number; showId: number }[] }> {
+  async releaseExpiredOrder(
+    orderId: number,
+  ): Promise<{ releasedSeats: { id: number; showId: number }[] }> {
     return db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update');
 

@@ -424,11 +424,14 @@ export const purchaseService = {
       // SSE: Emit realtime events for locked seats, grouped by showId
       try {
         if (lockedSeatRows && lockedSeatRows.length > 0) {
-          const seatsByShow = lockedSeatRows.reduce((acc, curr) => {
-            if (!acc[curr.showId]) acc[curr.showId] = [];
-            acc[curr.showId].push(curr.id);
-            return acc;
-          }, {} as Record<number, number[]>);
+          const seatsByShow = lockedSeatRows.reduce(
+            (acc, curr) => {
+              if (!acc[curr.showId]) acc[curr.showId] = [];
+              acc[curr.showId].push(curr.id);
+              return acc;
+            },
+            {} as Record<number, number[]>,
+          );
 
           for (const [sId, sIds] of Object.entries(seatsByShow)) {
             const numShowId = Number(sId);
