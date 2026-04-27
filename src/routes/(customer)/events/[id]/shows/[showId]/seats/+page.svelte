@@ -7,38 +7,14 @@
   import SummaryBar from '$lib/components/seat-map/SummaryBar.svelte';
   import { createSeatSelectionStore } from '$lib/stores/cart-store.svelte';
   import { toast } from '$lib/stores/toast';
+  import type { ShowSummary } from '$lib/types/event-detail';
+  import type { PendingOrder } from '$lib/types/purchase';
   import type { MapConfig, SeatMapData, SeatMapSeat, StageElement } from '$lib/types/seat-map';
   import { api } from '$lib/utils/api';
   import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
   import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
   import { onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
-
-  interface ShowInfo {
-    id: number;
-    title: string | null;
-    show_date: string;
-    start_time: string;
-    end_time: string | null;
-  }
-
-  interface PendingOrderItem {
-    event_title: string;
-    show_title: string | null;
-    show_date: string;
-    start_time: string;
-    section_name: string;
-    seat_type: 'assigned' | 'general';
-    seat_label: string | null;
-    price: string;
-  }
-
-  interface PendingOrder {
-    order_id: number;
-    total_amount: string;
-    expires_at: string;
-    items: PendingOrderItem[];
-  }
 
   interface PageData {
     event: {
@@ -50,8 +26,8 @@
       map_config: MapConfig;
       stage_layout: StageElement[];
     };
-    show: ShowInfo;
-    allShows: ShowInfo[];
+    show: ShowSummary;
+    allShows: ShowSummary[];
     seatMap: SeatMapData;
     pendingOrder: PendingOrder | null;
   }
@@ -79,8 +55,8 @@
   let lastSyncedKey = $state('');
   let lastEventId = $state<number | null>(null);
 
-  let currentShow = $derived<ShowInfo>(
-    allShows.find((s: ShowInfo) => s.id === currentShowId) ?? data.show,
+  let currentShow = $derived<ShowSummary>(
+    allShows.find((s: ShowSummary) => s.id === currentShowId) ?? data.show,
   );
 
   // ── Store: limits are set immediately by the $effect below ──
@@ -118,7 +94,7 @@
     }
     lastEventId = eventId;
 
-    const show = allShows.find((s: ShowInfo) => s.id === showId);
+    const show = allShows.find((s: ShowSummary) => s.id === showId);
     const label = show ? getShowLabel(show) : `Suất #${showId}`;
     store.setActiveShow(showId, label);
     store.setSections(mapData.sections);
@@ -218,7 +194,7 @@
     }
   }
 
-  function getShowLabel(show: ShowInfo): string {
+  function getShowLabel(show: ShowSummary): string {
     return show.title || `${formatTime(show.start_time)}, ${formatDate(show.show_date)}`;
   }
 
@@ -263,7 +239,7 @@
         currentShowId = showId;
         seatMap = res.data;
 
-        const show = allShows.find((s: ShowInfo) => s.id === showId);
+        const show = allShows.find((s: ShowSummary) => s.id === showId);
         const label = show ? getShowLabel(show) : `Suất #${showId}`;
         store.setActiveShow(showId, label);
         store.setSections(res.data.sections);

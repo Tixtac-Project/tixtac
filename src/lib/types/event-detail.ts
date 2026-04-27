@@ -67,3 +67,26 @@ export interface EventDetail {
   status: string;
   shows: EventDetailShow[];
 }
+
+/** Lightweight show reference — used in seat selection, pending orders, etc. */
+export interface ShowSummary {
+  id: number;
+  title: string | null;
+  show_date: string;
+  start_time: string;
+  end_time: string | null;
+}
+
+/** Lightweight event card — used across EventCard, EventsGrid, BannerCarousel, +page */
+export interface EventListItem {
+  id: number;
+  title: string;
+  venue: string;
+  bannerImageUrl?: string | null;
+  categoryName?: string | null;
+  categorySlug?: string | null;
+  earliestShowDate?: string | null;
+  min_price: number;
+  totalSeats?: number;
+  availableSeats?: number;
+}

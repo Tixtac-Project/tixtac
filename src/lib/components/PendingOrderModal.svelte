@@ -1,27 +1,17 @@
 <script lang="ts">
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { Button } from '$lib/components/ui/button';
+  import type { PendingOrderItem } from '$lib/types/purchase';
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
   import { TriangleAlert } from 'lucide-svelte';
-
-  interface PendingItem {
-    event_title: string;
-    show_title: string | null;
-    show_date: string;
-    start_time: string;
-    section_name: string;
-    seat_type: 'assigned' | 'general';
-    seat_label: string | null;
-    price: string;
-  }
 
   interface Props {
     open: boolean;
     orderId: number;
     totalAmount: string;
     expiresAt: string;
-    items: PendingItem[];
+    items: PendingOrderItem[];
     isLoading: boolean;
     onConfirmNew: () => void;
     onPayOld: () => void;

@@ -35,3 +35,24 @@ export interface PurchaseResponse {
   locked_items: number;
   is_appended: boolean;
 }
+
+// ── Pending Order (shared between server responses and UI components) ──
+export interface PendingOrderItem {
+  event_title: string;
+  show_title: string | null;
+  show_date: string;
+  start_time: string;
+  section_name: string;
+  seat_type: 'assigned' | 'general';
+  seat_label: string | null;
+  price: string;
+}
+
+export interface PendingOrder {
+  order_id: number;
+  total_amount: string;
+  status?: string;
+  expires_at: string;
+  created_at?: string;
+  items: PendingOrderItem[];
+}

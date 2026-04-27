@@ -4,20 +4,7 @@
   import EventsGrid from '$lib/components/customer/event/EventsGrid.svelte';
   import PaginationNav from '$lib/components/customer/event/PaginationNav.svelte';
   import SectionHeader from '$lib/components/customer/event/SectionHeader.svelte';
-
-  // Shared Event interface
-  interface EventItem {
-    id: number;
-    title: string;
-    venue: string;
-    bannerImageUrl?: string | null;
-    categoryName?: string | null;
-    categorySlug?: string | null;
-    earliestShowDate?: string | null;
-    min_price: number;
-    totalSeats?: number;
-    availableSeats?: number;
-  }
+  import type { EventListItem } from '$lib/types/event-detail';
 
   interface Pagination {
     currentPage: number;
@@ -29,8 +16,8 @@
   let { data } = $props<{
     data: {
       categories: { id: number; name: string; slug: string }[];
-      featuredEvents: EventItem[];
-      events: EventItem[];
+      featuredEvents: EventListItem[];
+      events: EventListItem[];
       pagination: Pagination;
     };
   }>();

@@ -2,6 +2,7 @@ import { db } from '$lib/server/db';
 import { orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
+import type { PendingOrder } from '$lib/types/purchase';
 import { and, desc, eq, gt, inArray, or } from 'drizzle-orm';
 
 /* ================= TYPE ================= */
@@ -35,24 +36,6 @@ type FormattedItem = {
   section_name: string;
   seat_type: 'assigned' | 'general';
   seat_label: string | null;
-};
-
-type PendingOrderEntry = {
-  order_id: number;
-  total_amount: string;
-  status: 'pending';
-  expires_at: string;
-  created_at: string;
-  items: {
-    event_title: string;
-    show_title: string | null;
-    show_date: string;
-    start_time: string;
-    section_name: string;
-    seat_type: 'assigned' | 'general';
-    seat_label: string | null;
-    price: string;
-  }[];
 };
 
 type PaidTicketEntry = {
@@ -342,7 +325,7 @@ export const orderService = {
       },
     });
 
-    const pendingOrders: PendingOrderEntry[] = [];
+    const pendingOrders: PendingOrder[] = [];
     const paidTicketsFlatList: PaidTicketEntry[] = [];
 
     for (const order of userOrders) {

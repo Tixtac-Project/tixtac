@@ -14,24 +14,14 @@
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
+  import type { CategoryInfo, UserInfo } from '$lib/types/layout';
   import { CircleUserRound, House, LogOut, Search, Ticket, User } from 'lucide-svelte';
   import { onMount, tick } from 'svelte';
 
-  interface Users {
-    id: number;
-    role: 'admin' | 'customer';
-  }
-
-  interface Category {
-    id: number;
-    name: string;
-    slug: string;
-  }
-
   interface Props {
-    user?: Users;
+    user?: UserInfo;
     searchQuery?: string;
-    categories?: Category[];
+    categories?: CategoryInfo[];
   }
 
   let { user, searchQuery = '', categories = [] }: Props = $props();
