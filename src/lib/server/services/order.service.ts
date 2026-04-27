@@ -1,6 +1,7 @@
 import { db } from '$lib/server/db';
 import { orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import { and, desc, eq, gt, inArray, or } from 'drizzle-orm';
 
 /* ================= TYPE ================= */
@@ -188,7 +189,7 @@ export const orderService = {
   },
 
   async checkout(orderId: number, customerId: number) {
-    return await db.transaction(async (tx) => {
+    const txResult = await db.transaction(async (tx) => {
       const now = new Date();
 
       // 1. Lấy order với FOR UPDATE lock để tránh race condition
@@ -212,7 +213,10 @@ export const orderService = {
       if (order.status === 'paid') {
         // Fallback to order.updatedAt if paidAt is unexpectedly null
         const effectivePaidAt = order.paidAt ?? order.updatedAt;
-        return await buildOrderResponse(tx, orderId, effectivePaidAt, order);
+        return {
+          response: await buildOrderResponse(tx, orderId, effectivePaidAt, order),
+          soldSeats: [],
+        };
       }
 
       if (order.status !== 'pending') {
@@ -233,6 +237,8 @@ export const orderService = {
 
       const seatIds = items.map((i) => i.seatId);
 
+      let soldSeats: { id: number; showId: number }[] = [];
+
       // 6. Cập nhật trạng thái ghế -> sold (chỉ ghế đang locked bởi customer này)
       if (seatIds.length > 0) {
         const updatedSeats = await tx
@@ -249,11 +255,12 @@ export const orderService = {
               eq(seats.lockedBy, customerId),
             ),
           )
-          .returning({ id: seats.id });
+          .returning({ id: seats.id, showId: seats.showId });
 
         if (updatedSeats.length !== seatIds.length) {
           throwError(Errors.SEAT_NOT_AVAILABLE);
         }
+        soldSeats = updatedSeats;
       }
 
       // 7. Cập nhật order -> paid
@@ -266,8 +273,38 @@ export const orderService = {
         .where(eq(orders.id, orderId));
 
       // 8. Xây dựng response
-      return await buildOrderResponse(tx, orderId, now, order);
+      return {
+        response: await buildOrderResponse(tx, orderId, now, order),
+        soldSeats,
+      };
     });
+
+    // SSE Emit realtime events for sold seats
+    try {
+      if (txResult.soldSeats && txResult.soldSeats.length > 0) {
+        const seatsByShow = txResult.soldSeats.reduce(
+          (acc, curr) => {
+            if (!acc[curr.showId]) acc[curr.showId] = [];
+            acc[curr.showId].push(curr.id);
+            return acc;
+          },
+          {} as Record<number, number[]>,
+        );
+
+        for (const [sId, sIds] of Object.entries(seatsByShow)) {
+          const numShowId = Number(sId);
+          eventBus.emit(SSE_EVENTS.SEAT_UPDATE(numShowId), {
+            showId: numShowId,
+            seatIds: sIds,
+            status: 'sold',
+          });
+        }
+      }
+    } catch (sseErr) {
+      console.error('[checkout] SSE emit failed:', sseErr);
+    }
+
+    return txResult.response;
   },
 
   /**
@@ -402,24 +439,26 @@ export const orderService = {
     };
   },
 
-  async releaseExpiredOrder(orderId: number): Promise<{ releasedSeatIds: number[] }> {
+  async releaseExpiredOrder(
+    orderId: number,
+  ): Promise<{ releasedSeats: { id: number; showId: number }[] }> {
     return db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update');
 
       if (!order) {
         // Không có đơn hàng → coi như không có gì để giải phóng
-        return { releasedSeatIds: [] };
+        return { releasedSeats: [] };
       }
 
       if (order.status !== 'pending') {
         // Đã xử lý rồi (paid/cancelled/…) → không làm gì
-        return { releasedSeatIds: [] };
+        return { releasedSeats: [] };
       }
 
       const now = new Date();
       if (order.expiresAt > now) {
         // Chưa hết hạn → giữ nguyên
-        return { releasedSeatIds: [] };
+        return { releasedSeats: [] };
       }
 
       const items = await tx
@@ -430,7 +469,7 @@ export const orderService = {
       if (items.length === 0) {
         // Không có items vẫn cần hủy order để đồng bộ trạng thái
         await tx.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, orderId));
-        return { releasedSeatIds: [] };
+        return { releasedSeats: [] };
       }
 
       const seatIds = items.map((i) => i.seatId);
@@ -446,12 +485,12 @@ export const orderService = {
             eq(seats.lockedBy, order.userId),
           ),
         )
-        .returning({ id: seats.id });
+        .returning({ id: seats.id, showId: seats.showId });
 
       // Hủy đơn hàng
       await tx.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, orderId));
 
-      return { releasedSeatIds: released.map((r) => r.id) };
+      return { releasedSeats: released };
     });
   },
 };

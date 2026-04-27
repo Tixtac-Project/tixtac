@@ -11,6 +11,7 @@ import {
   users,
 } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
+import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import { publishOrderTimeout } from '$lib/server/mq/publisher';
 import { orderService } from '$lib/server/services/order.service';
 import type { DbTransaction } from '$lib/types/db';
@@ -340,7 +341,7 @@ export const purchaseService = {
         // 3. Cập nhật State
         const expiresAt = new Date(now.getTime() + config.seatLockDuration * 1000);
 
-        await tx
+        const lockedSeatRows = await tx
           .update(seats)
           .set({ status: 'locked', lockedBy: userId, lockedAt: now })
           .where(
@@ -348,7 +349,8 @@ export const purchaseService = {
               seats.id,
               lockedSeatsToProcess.map((s) => s.id),
             ),
-          );
+          )
+          .returning({ id: seats.id, showId: seats.showId });
 
         let finalOrderId = pendingOrderId;
         if (pendingOrderId) {
@@ -401,6 +403,7 @@ export const purchaseService = {
         return {
           ...finalResponse,
           isNewOrder: !pendingOrderId,
+          lockedSeatRows,
         };
       });
 
@@ -415,7 +418,35 @@ export const purchaseService = {
         throwError(Errors.MQ_UNAVAILABLE, 'Hệ thống tạm thời bận, vui lòng thử lại.');
       }
 
-      return responseData;
+      // Remove the internal property before returning to the controller
+      const { lockedSeatRows, ...finalResponseData } = responseData;
+
+      // SSE: Emit realtime events for locked seats, grouped by showId
+      try {
+        if (lockedSeatRows && lockedSeatRows.length > 0) {
+          const seatsByShow = lockedSeatRows.reduce(
+            (acc, curr) => {
+              if (!acc[curr.showId]) acc[curr.showId] = [];
+              acc[curr.showId].push(curr.id);
+              return acc;
+            },
+            {} as Record<number, number[]>,
+          );
+
+          for (const [sId, sIds] of Object.entries(seatsByShow)) {
+            const numShowId = Number(sId);
+            eventBus.emit(SSE_EVENTS.SEAT_UPDATE(numShowId), {
+              showId: numShowId,
+              seatIds: sIds,
+              status: 'locked',
+            });
+          }
+        }
+      } catch (sseErr) {
+        console.error('[purchase] SSE emit failed:', sseErr);
+      }
+
+      return finalResponseData;
     } catch (error) {
       if (idempotencyKey) {
         await db.delete(idempotencyKeys).where(eq(idempotencyKeys.key, idempotencyKey));

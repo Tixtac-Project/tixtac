@@ -1,6 +1,6 @@
+import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import { orderService } from '$lib/server/services/order.service';
 import { getChannel } from './connection';
-// import { EventBus } from '$lib/server/events';
 
 export async function startWorker(retryCount = 0) {
   try {
@@ -22,12 +22,38 @@ export async function startWorker(retryCount = 0) {
         return;
       }
       try {
-        const { releasedSeatIds } = await orderService.releaseExpiredOrder(orderId);
-        if (releasedSeatIds.length > 0) {
-          // EventBus.emit('seats.released', {
-          //   orderId,
-          //   seatIds: releasedSeatIds,
-          // });
+        console.log(`[Worker] <--- Nhận lệnh xử lý Đơn hàng: ${orderId}`);
+        const { releasedSeats } = await orderService.releaseExpiredOrder(orderId);
+        if (releasedSeats.length > 0) {
+          console.log(`[Worker] SUCCESS: Đã nhả ${releasedSeats.length} ghế cho đơn ${orderId}`);
+          const seatsByShow = releasedSeats.reduce(
+            (acc, curr) => {
+              if (!acc[curr.showId]) acc[curr.showId] = [];
+              acc[curr.showId].push(curr.id);
+              return acc;
+            },
+            {} as Record<number, number[]>,
+          );
+
+          try {
+            for (const [sId, sIds] of Object.entries(seatsByShow)) {
+              const numShowId = Number(sId);
+              eventBus.emit(SSE_EVENTS.SEAT_UPDATE(numShowId), {
+                showId: numShowId,
+                seatIds: sIds,
+                status: 'available',
+              });
+            }
+          } catch (emitErr) {
+            console.error(
+              `[Worker] SSE emit failed for order ${orderId}, seats already released`,
+              emitErr,
+            );
+          }
+        } else {
+          console.log(
+            `[Worker] SKIP: Đơn hàng ${orderId} không cần nhả ghế (chưa hết hạn hoặc đã thanh toán)`,
+          );
         }
         ch.ack(msg);
       } catch (err) {
