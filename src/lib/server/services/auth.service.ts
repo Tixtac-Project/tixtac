@@ -28,6 +28,23 @@ interface UserProfileResponse {
   updated_at: Date;
 }
 
+function toCookieMaxAgeSeconds(expiresIn: string | number): number {
+  if (typeof expiresIn === 'number') return expiresIn;
+  const match = /^(\d+)([smhd])$/.exec(expiresIn);
+  if (!match) {
+    throw new Error(`Unsupported JWT_EXPIRES_IN format: ${expiresIn}`);
+  }
+
+  const value = Number(match[1]);
+  const unit = match[2] as 's' | 'm' | 'h' | 'd';
+  return {
+    s: value,
+    m: value * 60,
+    h: value * 60 * 60,
+    d: value * 60 * 60 * 24,
+  }[unit];
+}
+
 export const authService = {
   async register(data: unknown) {
     // 1. VALIDATE BẰNG ZOD
@@ -279,10 +296,7 @@ export const authService = {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
-      maxAge:
-        typeof config.jwtExpiresIn === 'string'
-          ? parseInt(config.jwtExpiresIn, 10)
-          : config.jwtExpiresIn,
+      maxAge: toCookieMaxAgeSeconds(config.jwtExpiresIn),
     });
 
     return { message: 'Cập nhật bảo mật thành công' };
