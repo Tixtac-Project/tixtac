@@ -185,4 +185,27 @@ export const authService = {
 
     return profile;
   },
+
+  async getProfile(userId: number): Promise<UserProfileResponse> {
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        full_name: users.fullName,
+        phone: users.phone,
+        date_of_birth: users.dateOfBirth,
+        gender: users.gender,
+        avatar_url: users.avatarUrl || null,
+        role: users.role,
+        created_at: users.createdAt,
+        updated_at: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      throwError(Errors.USER_INACTIVE);
+    }
+    return user;
+  },
 };

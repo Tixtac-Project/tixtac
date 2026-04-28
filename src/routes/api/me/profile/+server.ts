@@ -9,3 +9,9 @@ export const PATCH = apiHandler(async ({ request, locals }) => {
   const profile = await authService.updateProfile(user.id, body);
   return json({ data: profile }, { status: 200 });
 });
+
+export const GET = apiHandler(async ({ locals }) => {
+  const user = requireAuth(locals);
+  const profile = await authService.getProfile(user.id);
+  return json({ data: profile });
+});
