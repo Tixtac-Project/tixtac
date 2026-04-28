@@ -117,13 +117,13 @@ export const updateProfileSchema = z.object({
 export const updateSecuritySchema = z
   .object({
     current_password: z.string().min(8, 'Mật khẩu hiện tại phải có ít nhất 8 ký tự'),
-    new_password: z.string().min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự').optional(),
-    new_email: z.string().email('Email không hợp lệ').optional(),
+    new_password: registerSchema.shape.password.optional(),
+    new_email: registerSchema.shape.email.optional(),
   })
-  .refine(
-    (data) => data.new_password || data.new_email,
-    'Phải cung cấp ít nhất một trong hai trường new_password hoặc new_email',
-  );
+  .refine((data) => data.new_password || data.new_email, {
+    message: 'Phải cung cấp ít nhất một trong hai trường new_password hoặc new_email',
+    path: ['new_password'],
+  });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
