@@ -1,5 +1,6 @@
 import { signAuthToken } from '$lib/server/auth/jwt';
 import { hashPassword, verifyPassword } from '$lib/server/auth/password';
+import { config } from '$lib/server/config';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
 import { AppError, Errors, throwError } from '$lib/server/errors';
@@ -7,9 +8,11 @@ import {
   loginSchema,
   registerSchema,
   updateProfileSchema,
+  updateSecuritySchema,
   type UpdateProfileInput,
 } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
+import type { Cookies } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 
 interface UserProfileResponse {
@@ -207,5 +210,81 @@ export const authService = {
       throwError(Errors.USER_INACTIVE);
     }
     return user;
+  },
+
+  async updateSecurity(userId: number, rawBody: unknown, cookies: Cookies) {
+    const parsed = updateSecuritySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const details: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path.join('.');
+        if (!details[field]) details[field] = issue.message;
+      }
+      throw Errors.VALIDATION(details);
+    }
+    const { current_password, new_password, new_email } = parsed.data;
+
+    const [userRecord] = await db
+      .select({
+        email: users.email,
+        passwordHash: users.passwordHash,
+        role: users.role,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!userRecord) {
+      throwError(Errors.USER_INACTIVE);
+    }
+
+    const valid = await verifyPassword(userRecord.passwordHash, current_password);
+    if (!valid) {
+      throw Errors.VALIDATION({ current_password: 'Mật khẩu hiện tại không đúng' });
+    }
+
+    const updates: Record<string, unknown> = {};
+
+    if (new_email) {
+      if (new_email !== userRecord.email) {
+        const [existing] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, new_email));
+        if (existing && existing.id !== userId) {
+          throw Errors.VALIDATION({ new_email: 'Email đã tồn tại' });
+        }
+        updates.email = new_email;
+      }
+    }
+
+    if (new_password) {
+      updates.passwordHash = await hashPassword(new_password);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return { message: 'Không có thay đổi nào' };
+    }
+
+    updates.updatedAt = new Date();
+
+    await db.update(users).set(updates).where(eq(users.id, userId));
+
+    const newToken = await signAuthToken({
+      sub: userId,
+      role: userRecord.role,
+    });
+
+    cookies.set('auth_token', newToken, {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge:
+        typeof config.jwtExpiresIn === 'string'
+          ? parseInt(config.jwtExpiresIn, 10)
+          : config.jwtExpiresIn,
+    });
+
+    return { message: 'Cập nhật bảo mật thành công' };
   },
 };

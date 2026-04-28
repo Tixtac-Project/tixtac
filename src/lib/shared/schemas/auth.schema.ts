@@ -114,6 +114,18 @@ export const updateProfileSchema = z.object({
   avatar_url: z.url('Avatar phải là một đường dẫn URL hợp lệ').optional().or(z.literal('')),
 });
 
+export const updateSecuritySchema = z
+  .object({
+    current_password: z.string().min(8, 'Mật khẩu hiện tại phải có ít nhất 8 ký tự'),
+    new_password: z.string().min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự').optional(),
+    new_email: z.string().email('Email không hợp lệ').optional(),
+  })
+  .refine(
+    (data) => data.new_password || data.new_email,
+    'Phải cung cấp ít nhất một trong hai trường new_password hoặc new_email',
+  );
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type UpdateSecurityInput = z.infer<typeof updateSecuritySchema>;
