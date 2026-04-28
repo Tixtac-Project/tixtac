@@ -3,9 +3,27 @@ import { hashPassword, verifyPassword } from '$lib/server/auth/password';
 import { db } from '$lib/server/db/index';
 import { users } from '$lib/server/db/schema';
 import { AppError, Errors, throwError } from '$lib/server/errors';
-import { loginSchema, registerSchema } from '$lib/shared/schemas';
+import {
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+  type UpdateProfileInput,
+} from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
 import { eq } from 'drizzle-orm';
+
+interface UserProfileResponse {
+  id: number;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  date_of_birth: string;
+  gender: 'male' | 'female' | 'other';
+  avatar_url: string | null;
+  role: 'admin' | 'customer';
+  created_at: Date;
+  updated_at: Date;
+}
 
 export const authService = {
   async register(data: unknown) {
@@ -99,15 +117,72 @@ export const authService = {
     const userInfo = {
       id: user.id,
       email: user.email,
-      fullName: user.fullName,
+      full_name: user.fullName,
       phone: user.phone,
-      dateOfBirth: user.dateOfBirth,
+      date_of_birth: user.dateOfBirth,
       gender: user.gender,
-      avatarUrl: user.avatarUrl,
+      avatar_url: user.avatarUrl,
       role: user.role,
       isActive: user.isActive,
     };
 
     return { user: userInfo, token };
+  },
+
+  async updateProfile(userId: number, rawBody: unknown): Promise<UserProfileResponse> {
+    const parsed = updateProfileSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const details: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path.join('.');
+        if (!details[field]) details[field] = issue.message;
+      }
+      throw Errors.VALIDATION(details);
+    }
+    const data: UpdateProfileInput = parsed.data;
+
+    const [current] = await db
+      .select({
+        full_name: users.fullName,
+        date_of_birth: users.dateOfBirth,
+        gender: users.gender,
+        phone: users.phone,
+        avatar_url: users.avatarUrl,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!current) {
+      throwError(Errors.USER_INACTIVE);
+    }
+
+    const updateData: Record<string, unknown> = {
+      fullName: data.full_name,
+      dateOfBirth: data.date_of_birth,
+      gender: data.gender,
+      phone: data.phone ?? null,
+      avatarUrl: data.avatar_url === '' ? null : data.avatar_url,
+      updatedAt: new Date(),
+    };
+
+    await db.update(users).set(updateData).where(eq(users.id, userId));
+
+    const [profile] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        full_name: users.fullName,
+        phone: users.phone,
+        date_of_birth: users.dateOfBirth,
+        gender: users.gender,
+        avatar_url: users.avatarUrl || null,
+        role: users.role,
+        created_at: users.createdAt,
+        updated_at: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    return profile;
   },
 };
