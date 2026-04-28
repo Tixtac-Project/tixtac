@@ -6,7 +6,7 @@ let connection: ChannelModel | null = null;
 let channel: Channel | null = null;
 let connecting: Promise<Channel> | null = null;
 
-const MQ_URL = config.cloudAMQPURL!;
+const MQ_URL = config.cloudAMQPUrl!;
 
 async function createChannel(): Promise<Channel> {
   if (!connection) {

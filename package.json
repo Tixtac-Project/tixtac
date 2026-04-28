@@ -64,6 +64,7 @@
   "dependencies": {
     "@fontsource-variable/lexend": "^5.2.11",
     "@tanstack/table-core": "^8.21.3",
+    "@upstash/redis": "^1.37.0",
     "amqplib": "^1.0.3",
     "drizzle-orm": "^0.45.2",
     "embla-carousel-autoplay": "^8.6.0",
