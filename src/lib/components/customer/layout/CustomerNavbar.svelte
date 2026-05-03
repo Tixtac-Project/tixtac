@@ -11,11 +11,15 @@
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
   import type { CategoryInfo, UserInfo } from '$lib/types/layout';
+  import MoonIcon from '@lucide/svelte/icons/moon';
+  import SunIcon from '@lucide/svelte/icons/sun';
   import { CircleUserRound, House, LogOut, Search, Ticket, User } from 'lucide-svelte';
+  import { toggleMode } from 'mode-watcher';
   import { onMount, tick } from 'svelte';
 
   interface Props {
@@ -137,15 +141,15 @@
       <!-- Right side: search + profile -->
       <div class="flex shrink-0 items-center gap-4">
         <!-- Animated expandable search -->
-        <div class="relative flex items-center">
+        <div class="relative flex items-center gap-3">
           <form action={resolve('/')} method="GET" class="flex items-center">
             <div
-              class="flex h-10 items-center overflow-hidden rounded-xl transition-all duration-300 ease-(--ease-architectural) {isSearchOpen
-                ? 'w-56 bg-white px-3 sm:w-72'
+              class="flex h-10 items-center overflow-hidden rounded-full transition-all duration-300 ease-(--ease-architectural) {isSearchOpen
+                ? 'w-56 border border-outline-variant bg-surface-container-lowest px-3 sm:w-72'
                 : 'w-0 px-0'}"
             >
               <Search
-                class="pointer-events-none h-4 w-4 shrink-0 text-muted-foreground transition-opacity duration-200 {isSearchOpen
+                class="pointer-events-none  size-4 shrink-0 text-muted-foreground transition-opacity duration-200 {isSearchOpen
                   ? 'opacity-100'
                   : 'opacity-0'}"
               />
@@ -167,7 +171,7 @@
             type="button"
             variant="ghost"
             size="icon"
-            class="h-9 w-9 shrink-0 text-muted-foreground transition-colors duration-200 hover:text-foreground"
+            class="h-9 w-9 shrink-0 rounded-full text-muted-foreground transition-colors duration-200 hover:text-foreground"
             onclick={toggleSearch}
           >
             {#if isSearchOpen}
@@ -190,59 +194,77 @@
           </Button>
         </div>
 
+        <!-- Theme toggle -->
+        <Button
+          onclick={toggleMode}
+          variant="ghost"
+          size="icon"
+          class="h-9 w-9 shrink-0 rounded-full text-muted-foreground transition-colors duration-200 hover:text-foreground"
+        >
+          <SunIcon
+            class="size-max scale-100 rotate-0 transition-all! dark:scale-0 dark:-rotate-90"
+          />
+          <MoonIcon
+            class="absolute size-max scale-0 rotate-90 transition-all! dark:scale-100 dark:rotate-0"
+          />
+          <span class="sr-only">Toggle theme</span>
+        </Button>
+
         <!-- Profile / Auth -->
         {#if user}
-          <DropdownMenu bind:open={isUserMenuOpen}>
-            <DropdownMenuTrigger
-              class="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <CircleUserRound class="size-6" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="w-48">
-              <DropdownMenuItem
-                onclick={() => {
-                  goto(resolve('/'));
-                  isUserMenuOpen = false;
-                }}
-                class="cursor-pointer"
+          <div class="hidden md:block">
+            <DropdownMenu bind:open={isUserMenuOpen}>
+              <DropdownMenuTrigger
+                class="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full  bg-surface-container-lowest text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary-light hover:text-primary"
               >
-                <User className="mr-2 h-4 w-4" />
-                <span>Tài khoản của tôi</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onclick={() => {
-                  goto(resolve('/me/tickets'));
-                  isUserMenuOpen = false;
-                }}
-                class="cursor-pointer"
-              >
-                <Ticket className="mr-2 h-4 w-4" />
-                <span>Vé của tôi</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <form
-                action={resolve('/api/auth/logout')}
-                method="POST"
-                use:enhance={handleLogout}
-                class="w-full"
-              >
-                <DropdownMenuItem onclick={() => (isUserMenuOpen = false)} class="cursor-pointer">
-                  <button type="submit" class="flex w-full items-center">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Đăng xuất</span>
-                  </button>
+                <CircleUserRound class="size-max" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-56">
+                <DropdownMenuLabel class="px-3 pt-2 pb-1">Tài khoản</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onclick={() => {
+                    goto(resolve('/'));
+                    isUserMenuOpen = false;
+                  }}
+                  class="cursor-pointer"
+                >
+                  <User class="size-4 text-muted-foreground" />
+                  <span>Trang cá nhân</span>
                 </DropdownMenuItem>
-              </form>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem
+                  onclick={() => {
+                    goto(resolve('/me/tickets'));
+                    isUserMenuOpen = false;
+                  }}
+                  class="cursor-pointer"
+                >
+                  <Ticket class="size-4 text-muted-foreground" />
+                  <span>Vé của tôi</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
+                  <DropdownMenuItem variant="destructive" class="cursor-pointer">
+                    <button
+                      type="submit"
+                      class="flex w-full items-center gap-2"
+                      onclick={() => (isUserMenuOpen = false)}
+                    >
+                      <LogOut class="size-4" />
+                      <span>Đăng xuất</span>
+                    </button>
+                  </DropdownMenuItem>
+                </form>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         {:else}
           <Button
             variant="ghost"
             size="icon"
             href={resolve('/login')}
-            class="h-9 w-9 text-muted-foreground hover:text-foreground"
+            class="hidden h-9 w-9 rounded-full text-muted-foreground transition-all hover:bg-primary-light hover:text-primary md:inline-flex"
           >
-            <CircleUserRound class="size-6" />
+            <CircleUserRound class="size-5" />
           </Button>
         {/if}
       </div>

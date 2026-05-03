@@ -4,11 +4,13 @@
   interface Props {
     title: string;
     searchQuery?: string;
-    viewAllHref?: string;
+    viewAllHref?: string | null;
     variant?: 'default' | 'small';
   }
 
-  let { title, searchQuery, viewAllHref = '/events', variant = 'default' }: Props = $props();
+  let { title, searchQuery, viewAllHref, variant = 'default' }: Props = $props();
+
+  const showViewAll = $derived(viewAllHref !== undefined && viewAllHref !== null);
 </script>
 
 <div
@@ -19,7 +21,7 @@
   <div>
     <h2
       class={`font-heading font-bold tracking-tight text-foreground
-        ${variant === 'small' ? 'text-xl' : 'text-2xl sm:text-3xl'}
+        ${variant === 'small' ? 'text-xl' : 'text-2xl md:text-3xl'}
       `}
     >
       {title}
@@ -32,9 +34,9 @@
     {/if}
   </div>
 
-  {#if viewAllHref}
+  {#if showViewAll}
     <a
-      href={resolve(viewAllHref)}
+      href={resolve(viewAllHref!)}
       class="inline-flex items-center gap-1 text-sm font-semibold text-primary transition-all duration-200 hover:gap-2"
     >
       Xem tất cả

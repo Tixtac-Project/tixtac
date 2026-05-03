@@ -1,6 +1,6 @@
 <script lang="ts">
-  import EventTicketCard from '$lib/components/customer/event/EventTicketCard.svelte';
-  import PendingOrderCard from '$lib/components/customer/event/PendingOrderCard.svelte';
+  import EventTicketCard from '$lib/components/customer/order/EventTicketCard.svelte';
+  import PendingOrderCard from '$lib/components/customer/order/PendingOrderCard.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Ticket } from 'lucide-svelte';
 
@@ -88,9 +88,11 @@
             {livePendingOrders.length} Đơn hàng
           </span>
         </div>
-        {#each livePendingOrders as order (order.order_id)}
-          <PendingOrderCard {order} />
-        {/each}
+        <div class="grid gap-6 sm:grid-cols-1 lg:grid-cols-2">
+          {#each livePendingOrders as order (order.order_id)}
+            <PendingOrderCard {order} />
+          {/each}
+        </div>
       </div>
     {/if}
 

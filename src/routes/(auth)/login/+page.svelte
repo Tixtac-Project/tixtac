@@ -15,10 +15,12 @@
   let showPassword = $state(false);
   let email = $state('');
   let password = $state('');
+  let authError = $state<string | null>(null);
 
   let errors = $state<Record<string, string>>({});
 
   function clearError(field: string) {
+    authError = null;
     if (!errors[field]) return;
     const next = { ...errors };
     delete next[field];
@@ -114,12 +116,12 @@
       <Input
         id="email"
         type="email"
+        autocomplete="username"
         placeholder="name@example.com"
         bind:value={email}
         onfocus={() => clearError('email')}
         onblur={() => validateField('email')}
         onkeydown={handleKeydown}
-        class="rounded-xl"
         oninput={(e) => stripWhitespace('email', e)}
       />
       {#if errors.email}
@@ -134,7 +136,7 @@
           id="password"
           type={showPassword ? 'text' : 'password'}
           bind:value={password}
-          class="rounded-xl pr-10"
+          class="pr-10"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
           onkeydown={handleKeydown}
@@ -161,16 +163,12 @@
     </div>
 
     {#if authError}
-      <div class="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      <div role="alert" class="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
         {authError}
       </div>
     {/if}
 
-    <Button
-      type="submit"
-      class="mt-1 w-full rounded-xl py-5 text-sm font-semibold"
-      disabled={loading}
-    >
+    <Button type="submit" class="mt-1 w-full py-5 text-sm font-semibold" disabled={loading}>
       {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
       Đăng nhập
     </Button>
