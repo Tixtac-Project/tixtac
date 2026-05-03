@@ -1,6 +1,18 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { page as pageState } from '$app/state';
+  import {
+    Disc3,
+    Dumbbell,
+    Guitar,
+    Laugh,
+    MicVocal,
+    Music,
+    Presentation,
+    Theater,
+    Trophy,
+  } from 'lucide-svelte';
 
   interface Category {
     id?: number;
@@ -16,6 +28,22 @@
   }
 
   let { categories, activeCategory = $bindable() }: Props = $props();
+
+  // Icon map keyed by actual DB slugs
+  const iconMap: Record<string, typeof Music> = {
+    'nhac-song': Guitar,
+    'edm-dj': Disc3,
+    'hai-kich': Laugh,
+    'the-thao': Trophy,
+    'hoi-thao': Presentation,
+    'nhac-hoi': MicVocal,
+    'kich-san-khau': Theater,
+    khac: Dumbbell,
+  };
+
+  function getIcon(slug: string) {
+    return iconMap[slug] ?? Music;
+  }
 
   function getCategorySlug(cat: Category): string {
     return cat.slug || cat.value || '';
@@ -33,45 +61,43 @@
     } else {
       url.searchParams.delete('category');
     }
-    // Reset to page 1 when changing category
     url.searchParams.delete('page');
-    // eslint-disable-next-line svelte/no-navigation-without-resolve
-    goto(`${url.pathname}${url.search}`, { keepFocus: true, noScroll: true });
+    goto(resolve(`${url.pathname}${url.search}`), { keepFocus: true, noScroll: true });
   }
 </script>
 
 <div class="no-scrollbar flex w-full items-center overflow-x-auto">
-  <ul class="flex h-full min-w-max items-center gap-6 md:gap-8">
+  <ul class="flex h-full min-w-max items-center gap-2.5">
+    <!-- "All" pill -->
     <li>
       <button
         type="button"
         onclick={() => handleSelectCategory('')}
-        class="relative flex h-14 items-center text-[15px] font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 {activeCategory ===
+        class="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-all duration-200 {activeCategory ===
         ''
-          ? 'text-primary'
-          : 'text-foreground hover:text-primary'}"
+          ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+          : 'bg-secondary text-secondary-foreground hover:bg-surface-container-high'}"
       >
+        <Music class="size-3.5" />
         Tất cả
-        {#if activeCategory === ''}
-          <div class="absolute bottom-0 left-0 h-[3px] w-full rounded-t-md bg-primary"></div>
-        {/if}
       </button>
     </li>
 
     {#each categories as cat (getCategorySlug(cat))}
+      {@const slug = getCategorySlug(cat)}
+      {@const label = getCategoryLabel(cat)}
+      {@const Icon = getIcon(slug)}
       <li>
         <button
           type="button"
-          onclick={() => handleSelectCategory(getCategorySlug(cat))}
-          class="relative flex h-14 items-center text-[15px] font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 {activeCategory ===
-          getCategorySlug(cat)
-            ? 'text-primary'
-            : 'text-foreground hover:text-primary'}"
+          onclick={() => handleSelectCategory(slug)}
+          class="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-all duration-200 {activeCategory ===
+          slug
+            ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+            : 'bg-secondary text-secondary-foreground hover:bg-surface-container-high'}"
         >
-          {getCategoryLabel(cat)}
-          {#if activeCategory === getCategorySlug(cat)}
-            <div class="absolute bottom-0 left-0 h-[3px] w-full rounded-t-md bg-primary"></div>
-          {/if}
+          <Icon class="size-3.5" />
+          {label}
         </button>
       </li>
     {/each}

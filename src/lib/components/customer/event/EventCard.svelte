@@ -1,8 +1,8 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import type { EventListItem } from '$lib/types/event-detail';
-  import { formatDate } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
+  import { MapPin, Ticket } from 'lucide-svelte';
 
   interface Props {
     event: EventListItem;
@@ -26,7 +26,6 @@
 
   const showDate = $derived(event.earliestShowDate ? new Date(event.earliestShowDate) : null);
 
-  // Availability status
   const availabilityStatus = $derived.by(() => {
     if (event.availableSeats === undefined || event.totalSeats === undefined) return null;
     if (event.availableSeats === 0) return 'soldout';
@@ -37,10 +36,10 @@
 
 <a
   href={resolve(`/events/${event.id}`)}
-  class="bento-card-interactive group flex flex-col overflow-hidden !p-0"
+  class="bento-card-interactive group flex h-full flex-col overflow-hidden !p-0"
 >
   <!-- Banner -->
-  <div class="relative h-40 overflow-hidden bg-muted sm:h-48">
+  <div class="relative h-48 overflow-hidden bg-muted">
     {#if event.bannerImageUrl}
       <img
         src={event.bannerImageUrl}
@@ -58,20 +57,20 @@
     {/if}
 
     <!-- Overlay gradient -->
-    <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
 
-    <!-- Badge (HOT/LIVE) -->
+    <!-- Badge (HOT/LIVE) - top left -->
     {#if badge}
       <div class="absolute top-3 left-3 z-10">
         {#if badge === 'hot'}
           <span
-            class="inline-block rounded-full bg-danger px-2.5 py-1 text-xs font-bold text-danger-foreground"
+            class="inline-block rounded-md bg-danger px-2.5 py-1 text-xs font-bold text-danger-foreground"
           >
             🔥 HOT
           </span>
         {:else if badge === 'live'}
           <span
-            class="inline-block rounded-full bg-warning px-2.5 py-1 text-xs font-bold text-warning-foreground"
+            class="inline-block rounded-md bg-warning px-2.5 py-1 text-xs font-bold text-warning-foreground"
           >
             🔴 LIVE
           </span>
@@ -79,11 +78,11 @@
       </div>
     {/if}
 
-    <!-- Availability badge -->
+    <!-- Availability badge - top left -->
     {#if availabilityStatus === 'soldout'}
       <div class="absolute top-3 left-3 z-10">
         <span
-          class="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground"
+          class="inline-block rounded-md bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground"
         >
           Sold out
         </span>
@@ -91,22 +90,10 @@
     {:else if availabilityStatus === 'limited'}
       <div class="absolute top-3 left-3 z-10">
         <span
-          class="inline-block rounded-full bg-warning-muted px-2.5 py-1 text-xs font-bold text-warning-muted-foreground"
+          class="inline-block rounded-md bg-warning-muted px-2.5 py-1 text-xs font-bold text-warning-muted-foreground"
         >
           Sắp hết vé
         </span>
-      </div>
-    {/if}
-
-    <!-- Date badge -->
-    {#if showDate}
-      <div
-        class="absolute top-3 right-3 z-10 rounded-xl border border-border bg-card/90 p-1.5 text-center backdrop-blur"
-      >
-        <div class="block text-sm font-black text-foreground">{showDate.getDate()}</div>
-        <div class="block text-xs font-bold text-muted-foreground uppercase">
-          {showDate.toLocaleString('vi-VN', { month: 'short' })}
-        </div>
       </div>
     {/if}
   </div>
@@ -116,7 +103,7 @@
     <!-- Category tag -->
     {#if event.categoryName}
       <span
-        class="mb-2 inline-block w-fit rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground"
+        class="mb-2 inline-block w-fit rounded-md bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary"
       >
         {event.categoryName}
       </span>
@@ -124,69 +111,49 @@
 
     <!-- Title -->
     <h3
-      class="mb-2.5 line-clamp-2 text-base font-bold text-foreground transition-colors group-hover:text-primary"
+      class="mb-3 line-clamp-2 font-heading text-lg leading-tight font-extrabold tracking-tight text-foreground transition-colors group-hover:text-primary"
     >
       {event.title}
     </h3>
 
-    <!-- Meta info -->
-    <div class="mb-3 space-y-1.5 text-sm text-muted-foreground">
-      <!-- Date -->
-      {#if event.earliestShowDate}
-        <div class="flex items-center gap-1.5">
-          <svg
-            class="h-3.5 w-3.5 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <span>{formatDate(event.earliestShowDate)}</span>
+    <!-- Meta: Date block on left + venue on right -->
+    <div class="mb-3 flex items-start gap-3">
+      <!-- Date block - calendar style with year -->
+      {#if showDate}
+        <div
+          class="flex min-w-[52px] shrink-0 flex-col items-center rounded-md bg-primary-light px-2 py-1.5 text-center"
+        >
+          <span class="text-xl leading-none font-extrabold text-primary">{showDate.getDate()}</span>
+          <span class="text-[10px] font-bold tracking-wider text-primary/70 uppercase">
+            {showDate.toLocaleString('vi-VN', { month: 'short' })}
+          </span>
+          <span class="mt-0.5 text-[9px] leading-none font-semibold text-primary/50">
+            {showDate.getFullYear()}
+          </span>
         </div>
       {/if}
 
-      <!-- Venue -->
-      <div class="flex items-center gap-1.5">
-        <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-        <span class="truncate">{event.venue}</span>
+      <!-- Venue (top-aligned, uses remaining space, truncates if needed) -->
+      <div class="min-w-0 flex-1 text-sm text-muted-foreground">
+        <div class="flex items-start gap-1.5">
+          <MapPin class="mt-0.5 size-3.5 flex-shrink-0" />
+          <span class="line-clamp-2 break-words">{event.venue}</span>
+        </div>
       </div>
     </div>
 
-    <!-- Footer -->
+    <!-- Footer with price + CTA -->
     <div class="mt-auto flex items-center justify-between border-t border-border pt-3">
-      <span class="text-sm font-bold text-primary">Giá từ: {formatPrice(event.min_price)}</span>
-      <svg
-        class="h-4.5 w-4.5 flex-shrink-0 text-primary transition-transform group-hover:translate-x-1"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+      <div class="flex flex-col">
+        <span class="text-[10px] tracking-wider text-muted-foreground uppercase">Giá từ</span>
+        <span class="text-base font-extrabold text-foreground">{formatPrice(event.min_price)}</span>
+      </div>
+      <span
+        class="inline-flex items-center gap-1.5 rounded-md bg-cta px-4 py-2 text-xs font-bold text-cta-foreground shadow-sm shadow-cta/15 transition-all group-hover:scale-105 group-hover:shadow-md group-hover:shadow-cta/20"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M14 5l7 7m0 0l-7 7m7-7H3"
-        />
-      </svg>
+        <Ticket class="size-3.5" />
+        Mua vé
+      </span>
     </div>
   </div>
 </a>

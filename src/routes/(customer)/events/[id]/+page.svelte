@@ -4,9 +4,11 @@
   import { page } from '$app/state';
   import MarkdownViewer from '$lib/components/admin/event/MarkdownViewer.svelte';
   import AmenityBadge from '$lib/components/customer/event/AmenityBadge.svelte';
+  import SeatMapPreview from '$lib/components/customer/event/SeatMapPreview.svelte';
   import * as Accordion from '$lib/components/ui/accordion';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index';
   import type { EventDetail, EventDetailSection, EventDetailShow } from '$lib/types/event-detail';
+  import type { SeatLayoutConfig } from '$lib/types/seat-map';
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
   import {
@@ -22,6 +24,7 @@
     Ticket,
     Users,
   } from 'lucide-svelte';
+  import { onMount } from 'svelte';
 
   let { data } = $props<{ data: { event: EventDetail } }>();
 
@@ -34,9 +37,7 @@
 
   let earliestShow = $derived(visibleShows.length > 0 ? visibleShows[0] : null);
 
-  // Selected show for the show picker
   let selectedShowId = $state<number | null>(null);
-  // Ensure selectedShowId is always valid
   let activeShow = $derived<EventDetailShow | null>(
     visibleShows.length === 0
       ? null
@@ -45,13 +46,29 @@
         : (visibleShows.find((s: EventDetailShow) => s.id === selectedShowId) ?? visibleShows[0]),
   );
 
-  // Accordion default values — about & terms expanded, itinerary collapsed
   let aboutTermsValue = $state<string[]>(['about']);
 
   $effect(() => {
     aboutTermsValue = ['about', event.terms_and_conditions ? 'terms' : ''].filter(
       (v): v is string => Boolean(v),
     );
+  });
+
+  // ── Mobile floating CTA visibility ──
+  let showMobileCta = $state(false);
+  let eventInfoEl = $state<HTMLElement | null>(null);
+
+  onMount(() => {
+    if (!eventInfoEl) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Show the floating CTA when the event info sidebar is no longer intersecting
+        showMobileCta = !entry.isIntersecting;
+      },
+      { threshold: 0 },
+    );
+    observer.observe(eventInfoEl);
+    return () => observer.disconnect();
   });
 
   function getAvailable(s: EventDetailSection): number {
@@ -73,7 +90,6 @@
     return { text: 'Còn vé', class: 'text-primary font-bold' };
   }
 
-  /** Format show_date to short date like "T6, 16 Thg 12" */
   function formatShortDate(dateStr: string): string {
     const d = new Date(dateStr);
     return new Intl.DateTimeFormat('vi-VN', {
@@ -86,19 +102,11 @@
       .toUpperCase();
   }
 
-  /** Get tier border color based on index */
   function getTierColor(idx: number, total: number): string {
     if (total <= 1) return 'border-t-primary';
     if (idx === 0) return 'border-t-tertiary';
     if (idx === total - 1) return 'border-t-outline-variant';
     return 'border-t-primary';
-  }
-
-  function scrollToShows() {
-    const el = document.getElementById('shows-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
   }
 
   function handleBuyTicket(showId: number) {
@@ -131,7 +139,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-surface">
-  <main class="px-4 pt-4 pb-16 sm:px-6 sm:pt-6 lg:px-8">
+  <main class="px-4 pt-4 pb-24 sm:px-6 sm:pt-6 lg:px-8">
     <div class="mx-auto max-w-7xl">
       <!-- BENTO GRID -->
       <div
@@ -150,13 +158,13 @@
           {:else}
             <div
               class="absolute inset-0 flex items-center justify-center"
-              style="background: linear-gradient(135deg, #004c6e, #00628e)"
+              style="background: linear-gradient(135deg, #1e3a8a, #2563eb)"
             >
               <span class="text-8xl opacity-20">🎫</span>
             </div>
           {/if}
           <div
-            class="absolute inset-0 bg-linear-to-t from-[#181c1e]/80 via-transparent to-transparent"
+            class="absolute inset-0 bg-gradient-to-t from-[#1a1c20]/80 via-transparent to-transparent"
           ></div>
 
           {#if event.status === 'published'}
@@ -187,6 +195,8 @@
 
         <!-- ── Sidebar: Event Info ── -->
         <section
+          bind:this={eventInfoEl}
+          id="event-info-sidebar"
           class="arch-enter flex flex-col justify-between rounded-xl bg-surface-container p-5 sm:p-6 md:col-span-4 md:row-span-2"
           style="animation-delay: 100ms"
         >
@@ -227,7 +237,10 @@
 
           {#if earliestShow}
             <div class="mt-5">
-              <button onclick={scrollToShows} class="btn-primary-gradient w-full py-3 text-sm">
+              <button
+                onclick={() => handleBuyTicket(activeShow?.id ?? earliestShow.id)}
+                class="btn-primary-gradient w-full rounded-lg py-3 text-sm"
+              >
                 Mua vé ngay
               </button>
             </div>
@@ -323,18 +336,20 @@
             <!-- ── Left Column: Shows + Ticket Info ── -->
             <div class="space-y-5 lg:col-span-8">
               <!-- Show Picker -->
-              <section class="rounded-xl bg-surface-container-low p-6 sm:p-8">
-                <div class="mb-6 flex items-end justify-between">
+              <section class="rounded-xl bg-surface-container-low p-4 sm:p-8">
+                <div class="mb-4 flex items-end justify-between sm:mb-6">
                   <div>
-                    <span class="text-[0.7rem] font-bold tracking-widest text-primary uppercase">
+                    <span
+                      class="text-[0.65rem] font-bold tracking-widest text-primary uppercase sm:text-[0.7rem]"
+                    >
                       Bước 01
                     </span>
-                    <h2 class="font-heading text-2xl font-bold text-foreground sm:text-3xl">
+                    <h2 class="font-heading text-xl font-bold text-foreground sm:text-3xl">
                       Suất diễn
                     </h2>
                   </div>
                   {#if activeShow}
-                    <span class="text-sm font-medium text-muted-foreground">
+                    <span class="text-xs font-medium text-muted-foreground sm:text-sm">
                       <span class="font-semibold text-gray-600">Đã chọn:</span>
                       {formatDate(activeShow.show_date)}
                     </span>
@@ -342,7 +357,7 @@
                 </div>
 
                 <ScrollArea class="w-full whitespace-nowrap" orientation="horizontal">
-                  <div class="flex w-max gap-4 p-5">
+                  <div class="flex w-max gap-2 p-3 sm:gap-4 sm:p-5">
                     {#each visibleShows as show (show.id)}
                       {@const isActive = activeShow?.id === show.id}
                       {@const available = show.sections.reduce(
@@ -356,23 +371,23 @@
                       {@const avail = getAvailabilityLabel(available, total)}
                       <button
                         onclick={() => selectShow(show.id)}
-                        class="flex min-w-37.5 shrink-0 cursor-pointer flex-col items-center gap-2 rounded-xl p-5 transition-all duration-300 {isActive
-                          ? 'scale-105 bg-primary-container text-white shadow-lg ring-4 ring-primary-container/20'
+                        class="flex min-w-[110px] shrink-0 cursor-pointer flex-col items-center gap-1 rounded-lg px-3.5 py-3 transition-all duration-300 sm:min-w-[150px] sm:gap-2 sm:rounded-xl sm:p-5 {isActive
+                          ? 'scale-105 bg-primary-container text-white shadow-lg ring-2 ring-primary-container/20 sm:ring-4'
                           : 'bg-surface-container text-foreground hover:bg-surface-container-high active:scale-95'}"
                       >
                         <span
-                          class="text-sm font-medium {isActive
+                          class="text-[11px] font-medium sm:text-sm {isActive
                             ? 'opacity-80'
                             : 'text-muted-foreground'}"
                         >
                           {formatShortDate(show.show_date)}
                         </span>
-                        <span class="font-heading text-2xl font-bold">
+                        <span class="font-heading text-lg font-bold sm:text-2xl">
                           {formatTime(show.start_time)}
                         </span>
                         <span
-                          class="text-[0.65rem] font-bold uppercase {isActive
-                            ? 'rounded-full bg-white/20 px-2 py-0.5'
+                          class="text-[0.6rem] font-bold uppercase sm:text-[0.65rem] {isActive
+                            ? 'rounded-full bg-white/20 px-1.5 py-0.5 sm:px-2'
                             : avail.class}"
                         >
                           {avail.text}
@@ -386,26 +401,65 @@
               <!-- Ticket Info (Thông tin vé) — Preview only -->
               {#if activeShow && activeShow.sections.length > 0}
                 {@const show = activeShow}
-                <section class="relative rounded-xl bg-surface-container-low p-6 sm:p-8">
-                  <div class="mb-6 flex items-center justify-between">
+                {@const hasMapConfig =
+                  event.map_config &&
+                  typeof event.map_config === 'object' &&
+                  'width' in event.map_config &&
+                  'height' in event.map_config}
+                {@const hasStageLayout =
+                  Array.isArray(event.stage_layout) && event.stage_layout.length > 0}
+                <section class="relative rounded-xl bg-surface-container-low p-4 sm:p-8">
+                  <div class="mb-4 flex items-center justify-between sm:mb-6">
                     <div>
-                      <span class="text-[0.7rem] font-bold tracking-widest text-primary uppercase">
+                      <span
+                        class="text-[0.65rem] font-bold tracking-widest text-primary uppercase sm:text-[0.7rem]"
+                      >
                         Bước 02
                       </span>
-                      <h2 class="font-heading text-2xl font-semibold text-foreground sm:text-3xl">
+                      <h2 class="font-heading text-xl font-semibold text-foreground sm:text-3xl">
                         Thông tin vé
                       </h2>
                     </div>
                     <div
-                      class="flex items-center gap-1.5 rounded-full bg-primary-light px-3 py-1 font-semibold text-accent-foreground"
+                      class="flex items-center gap-1.5 rounded-full bg-primary-light px-2.5 py-0.5 font-semibold text-accent-foreground sm:px-3 sm:py-1"
                     >
-                      <Lock class="size-4" />
-                      <span class="text-sm">Xem trước</span>
+                      <Lock class="size-3.5 sm:size-4" />
+                      <span class="text-xs sm:text-sm">Xem trước</span>
                     </div>
                   </div>
 
+                  <!-- Seat Map Area Preview -->
+                  {#if hasMapConfig && hasStageLayout}
+                    <div class="mb-5">
+                      <SeatMapPreview
+                        mapConfig={event.map_config as { width: number; height: number }}
+                        stageLayout={event.stage_layout as {
+                          id: string;
+                          type: string;
+                          label: string;
+                          x: number;
+                          y: number;
+                          w?: number;
+                          h?: number;
+                          width?: number;
+                          height?: number;
+                          rotation?: number;
+                        }[]}
+                        sections={show.sections.map((s) => ({
+                          id: s.id,
+                          name: s.name,
+                          type: s.type,
+                          price: s.price,
+                          available_count: getAvailable(s),
+                          capacity: getTotal(s),
+                          layout_config: s.layout_config as SeatLayoutConfig,
+                        }))}
+                      />
+                    </div>
+                  {/if}
+
                   <div
-                    class="pointer-events-none grid grid-cols-1 gap-5 opacity-60 sm:grid-cols-2 lg:grid-cols-3"
+                    class="pointer-events-none grid grid-cols-2 gap-3 opacity-60 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3"
                   >
                     {#each show.sections as section, sIdx (section.id)}
                       {@const available = getAvailable(section)}
@@ -414,12 +468,12 @@
                       {@const tierColor = getTierColor(sIdx, show.sections.length)}
 
                       <div
-                        class="rounded-xl border-t-4 {tierColor} bg-surface-container p-5 sm:p-6"
+                        class="rounded-lg border-t-4 {tierColor} bg-surface-container p-3 sm:rounded-xl sm:p-6"
                       >
-                        <h3 class="font-heading text-lg font-bold text-foreground">
+                        <h3 class="font-heading text-sm font-bold text-foreground sm:text-lg">
                           {section.name}
                         </h3>
-                        <p class="mt-1 text-xs text-muted-foreground">
+                        <p class="mt-0.5 text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">
                           Vé {seatTypeLabel(section.type)} •
                           {#if soldOut}
                             <span class="font-semibold text-destructive">Hết vé</span>
@@ -427,12 +481,12 @@
                             Còn {available}/{total}
                           {/if}
                         </p>
-                        <div class="mt-4 flex items-baseline gap-1">
-                          <span class="text-xl font-bold text-primary">
+                        <div class="mt-2 flex items-baseline gap-1 sm:mt-4">
+                          <span class="text-sm font-bold text-primary sm:text-xl">
                             {formatPrice(section.price)}
                           </span>
                           {#if section.price > 0}
-                            <span class="text-xs text-muted-foreground">/ vé</span>
+                            <span class="text-[10px] text-muted-foreground sm:text-xs">/ vé</span>
                           {/if}
                         </div>
                       </div>
@@ -449,13 +503,13 @@
 
             <!-- ── Right Column: CTA + Timeline ── -->
             <aside class="self-start lg:col-span-4 lg:self-stretch">
-              <!-- Sticky CTA -->
+              <!-- Sticky CTA (desktop only) -->
               {#if activeShow}
-                <div class="sticky top-20 z-10">
+                <div class="sticky top-20 z-10 hidden lg:block">
                   <div class="rounded-xl bg-surface pb-1">
                     <button
                       onclick={() => handleBuyTicket(activeShow!.id)}
-                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-full bg-linear-to-br from-primary to-primary-container px-8 py-5 text-lg font-bold text-white shadow-xl shadow-primary/20 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-cta to-cta-hover px-8 py-5 text-lg font-bold text-cta-foreground shadow-xl shadow-cta/25 transition-all duration-300 hover:scale-[1.02] active:scale-95"
                     >
                       Tiếp tục chọn chỗ
                       <ArrowRight class="h-5 w-5" />
@@ -486,13 +540,11 @@
                             ? ''
                             : 'border-l-2 border-primary/20 pb-7'}"
                         >
-                          <!-- Dot -->
                           <div
                             class="absolute top-0 -left-2.25 h-4 w-4 rounded-full {isFirst
                               ? 'bg-primary'
                               : 'bg-surface-container-highest'} ring-4 ring-background"
                           ></div>
-                          <!-- Content -->
                           <div class="pl-4">
                             <span
                               class="text-xs font-bold tracking-widest uppercase {isFirst
@@ -547,4 +599,25 @@
       </div>
     </div>
   </main>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- MOBILE FLOATING CTA BAR                              -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  {#if activeShow && visibleShows.length > 0}
+    <div
+      class="fixed right-0 bottom-18 left-0 z-40 transition-transform duration-300 ease-(--ease-architectural) lg:hidden {showMobileCta
+        ? 'translate-y-0'
+        : 'translate-y-full'}"
+    >
+      <div class="mx-auto max-w-lg px-4 pb-2">
+        <button
+          onclick={() => handleBuyTicket(activeShow!.id)}
+          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3.5 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98]"
+        >
+          <Ticket class="size-4" />
+          Tiếp tục chọn chỗ
+        </button>
+      </div>
+    </div>
+  {/if}
 </div>

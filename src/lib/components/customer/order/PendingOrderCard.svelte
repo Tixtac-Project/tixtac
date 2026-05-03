@@ -72,9 +72,9 @@
 
 {#if !isExpired}
   <Card
-    class="flex h-full flex-col overflow-hidden rounded-2xl border-border shadow-sm transition-all hover:shadow-md"
+    class="flex h-full flex-col overflow-hidden border-border bg-card shadow-sm transition-all hover:shadow-md"
   >
-    <CardHeader class="border-b border-border bg-surface-container-lowest p-4 sm:p-5">
+    <CardHeader class="border-b border-border p-4 sm:p-5">
       <!-- Luôn nằm ngang: title trái, timer phải -->
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
@@ -95,14 +95,16 @@
       </div>
     </CardHeader>
 
-    <CardContent class="flex-1 bg-surface-container-lowest p-4 sm:p-5">
+    <CardContent class="flex-1 p-4 sm:p-5">
       <div class="mb-4 line-clamp-2">
         <h4 class="text-base font-bold text-foreground sm:text-lg">{eventTitle}</h4>
       </div>
       <div class="space-y-4">
         {#each groupedDisplayItems as group, i (i)}
           <!-- Nhóm vé cùng Suất diễn -->
-          <div class="rounded-xl border border-border bg-background p-3 shadow-sm sm:p-4">
+          <div
+            class="rounded-xl border border-border bg-surface-container-lowest p-3 shadow-sm sm:p-4"
+          >
             <div class="mb-3 border-b border-dashed border-border pb-2">
               <p class="text-sm font-bold text-foreground">
                 {group.show_title || 'Suất diễn'}
@@ -117,7 +119,7 @@
               {#each group.tickets as ticket, j (j)}
                 <div class="flex items-center justify-between gap-3">
                   <span
-                    class="rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-semibold text-foreground"
+                    class="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground"
                   >
                     {ticket.section_name}{#if ticket.seat_type !== 'general'}
                       · Ghế {ticket.seat_label}{/if}
@@ -133,7 +135,7 @@
 
         {#if hiddenItemsCount > 0}
           <div
-            class="mt-2 rounded-lg border border-dashed border-border bg-surface-container-low py-2.5 text-center text-xs font-semibold text-muted-foreground"
+            class="mt-2 rounded-lg border border-dashed border-border bg-muted/50 py-2.5 text-center text-xs font-semibold text-muted-foreground"
           >
             + {hiddenItemsCount} vé khác đang chờ thanh toán
           </div>
@@ -142,7 +144,7 @@
     </CardContent>
 
     <CardFooter
-      class="flex flex-col gap-4 bg-surface-container-low p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+      class="flex flex-col gap-4 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
     >
       <div class="w-full text-center sm:w-auto sm:text-left">
         <p class="text-xs font-semibold tracking-wider text-muted-foreground uppercase">

@@ -137,7 +137,6 @@
         type="email"
         bind:value={form.email}
         placeholder="name@example.com"
-        class="rounded-xl"
         onfocus={() => clearError('email')}
         onblur={() => validateField('email')}
         onkeydown={handleKeydown}
@@ -155,7 +154,7 @@
           id="password"
           type={showPassword ? 'text' : 'password'}
           bind:value={form.password}
-          class="rounded-xl pr-10"
+          class="pr-10"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
           onkeydown={handleKeydown}
@@ -188,7 +187,6 @@
           id="dob"
           type="date"
           bind:value={form.date_of_birth}
-          class="rounded-xl"
           onfocus={() => clearError('date_of_birth')}
           onchange={() => validateField('date_of_birth')}
           onblur={() => validateField('date_of_birth')}
@@ -207,7 +205,7 @@
             else validateField('gender');
           }}
         >
-          <Select.Trigger class="w-full rounded-xl">
+          <Select.Trigger class="w-full">
             {#if genderLabel}
               {genderLabel}
             {:else}
@@ -229,11 +227,7 @@
       </div>
     </div>
 
-    <Button
-      type="submit"
-      class="mt-1 w-full rounded-xl py-5 text-sm font-semibold"
-      disabled={loading}
-    >
+    <Button type="submit" class="mt-1 w-full  py-5 text-sm font-semibold" disabled={loading}>
       {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
       Đăng ký
     </Button>
