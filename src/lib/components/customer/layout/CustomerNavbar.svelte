@@ -141,11 +141,11 @@
       <!-- Right side: search + profile -->
       <div class="flex shrink-0 items-center gap-4">
         <!-- Animated expandable search -->
-        <div class="relative flex items-center">
+        <div class="relative flex items-center gap-3">
           <form action={resolve('/')} method="GET" class="flex items-center">
             <div
               class="flex h-10 items-center overflow-hidden rounded-full transition-all duration-300 ease-(--ease-architectural) {isSearchOpen
-                ? 'w-56 bg-white px-3 sm:w-72'
+                ? 'w-56 border border-outline-variant bg-surface-container-lowest px-3 sm:w-72'
                 : 'w-0 px-0'}"
             >
               <Search
@@ -217,7 +217,7 @@
               <DropdownMenuTrigger
                 class="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full  bg-surface-container-lowest text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary-light hover:text-primary"
               >
-                <CircleUserRound class="size-5" />
+                <CircleUserRound class="size-max" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-56">
                 <DropdownMenuLabel class="px-3 pt-2 pb-1">Tài khoản</DropdownMenuLabel>

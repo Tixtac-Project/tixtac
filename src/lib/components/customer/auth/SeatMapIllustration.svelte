@@ -1,5 +1,8 @@
 <script lang="ts">
   let { class: cls = '' } = $props<{ class?: string }>();
+  const uid = crypto.randomUUID().slice(0, 8);
+  const titleId = `seating-chart-title-${uid}`;
+  const descId = `seating-chart-desc-${uid}`;
 </script>
 
 <!--
@@ -49,12 +52,12 @@
   viewBox="0 0 200 125"
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
-  aria-labelledby="seating-chart-title seating-chart-desc"
+  aria-labelledby="{titleId} {descId}"
   role="img"
 >
   <!-- Accessibility tags -->
-  <title id="seating-chart-title">Sơ đồ ghế ngồi</title>
-  <desc id="seating-chart-desc">
+  <title id={titleId}>Sơ đồ ghế ngồi</title>
+  <desc id={descId}>
     Minh họa sơ đồ ghế ngồi với các trạng thái: còn trống, đang chọn, và đã bán.
   </desc>
 

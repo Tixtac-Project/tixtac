@@ -28,7 +28,7 @@
   <!-- Mobile: Floating blurred decorative cards      -->
   <!-- ═══════════════════════════════════════════════ -->
   <div
-    class="pointer-events-none absolute inset-0 -z-10 overflow-hidden md:hidden"
+    class="pointer-events-none absolute inset-0 z-0 overflow-hidden md:hidden"
     aria-hidden="true"
   >
     <!-- Seat map vibe — emerald -->
@@ -96,11 +96,11 @@
 
     <!-- ══════ F · Chọn chỗ ngồi ══════ -->
     <div
-      class="area-seat bento-card group relative hidden flex-col justify-between overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex lg:p-6"
+      class="area-seat bento-card group relative hidden flex-col justify-between overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex lg:p-6"
     >
       <div class="relative z-10">
-        <p class="text-sm font-bold tracking-tight text-slate-900">Chọn chỗ ngồi</p>
-        <p class="text-[11px] font-medium text-slate-500">Trực quan, dễ dàng</p>
+        <p class="text-sm font-bold tracking-tight text-foreground">Chọn chỗ ngồi</p>
+        <p class="text-[11px] font-medium text-muted-foreground">Trực quan, dễ dàng</p>
       </div>
       <SeatMapIllustration
         class="mx-auto mt-2 h-20 w-full max-w-[150px] transition-transform duration-500 group-hover:scale-105"
@@ -109,19 +109,19 @@
 
     <!-- ══════ B · Stats mini ══════ -->
     <div
-      class="area-stats bento-card group hidden flex-col items-center justify-center gap-1 rounded-[24px] border border-black/[0.04] bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex lg:p-6"
+      class="area-stats bento-card group hidden flex-col items-center justify-center gap-1 rounded-[24px] border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex lg:p-6"
     >
       <div class="text-3xl font-extrabold tracking-tight text-primary lg:text-4xl">12.4K</div>
-      <p class="mt-1 text-xs font-medium text-slate-500">Vé đã bán ra</p>
+      <p class="mt-1 text-xs font-medium text-muted-foreground">Vé đã bán ra</p>
     </div>
 
     <!-- ══════ E · Vé điện tử ══════ -->
     <div
-      class="area-ticket bento-card group relative hidden flex-col justify-between overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex"
+      class="area-ticket bento-card group relative hidden flex-col justify-between overflow-hidden rounded-[24px] border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex"
     >
       <div class="relative z-10">
-        <p class="text-base font-bold tracking-tight text-slate-900">Vé điện tử</p>
-        <p class="text-xs font-medium text-slate-500">Nhận vé ngay lập tức</p>
+        <p class="text-base font-bold tracking-tight text-foreground">Vé điện tử</p>
+        <p class="text-xs font-medium text-muted-foreground">Nhận vé ngay lập tức</p>
       </div>
       <TicketIllustration
         class="mx-auto mt-4 h-24 w-full max-w-[160px] transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-2"
@@ -130,12 +130,12 @@
 
     <!-- ══════ G · Thống kê ══════ -->
     <div
-      class="area-chart bento-card group relative hidden items-center justify-between overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex"
+      class="area-chart bento-card group relative hidden items-center justify-between overflow-hidden rounded-[24px] border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex"
     >
       <div class="relative z-10 shrink-0 pr-4">
-        <p class="text-base font-bold tracking-tight text-slate-900">Doanh thu</p>
-        <p class="mb-2 text-xs font-medium text-slate-500">Realtime data</p>
-        <div class="text-2xl font-extrabold text-slate-800">₫48.2M</div>
+        <p class="text-base font-bold tracking-tight text-foreground">Doanh thu</p>
+        <p class="mb-2 text-xs font-medium text-muted-foreground">Realtime data</p>
+        <div class="text-2xl font-extrabold text-foreground">₫48.2M</div>
         <div
           class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600"
         >
@@ -153,7 +153,7 @@
     <div class="area-right flex h-full flex-col gap-5">
       <!-- C · Form Card (frosted glass on mobile, solid on tablet+) -->
       <div
-        class="z-10 flex w-full max-w-md flex-1 flex-col justify-center rounded-[32px] border border-black/6 bg-white/85 p-8 shadow-xl backdrop-blur-xl md:max-w-none md:bg-white md:backdrop-blur-none lg:p-10"
+        class="z-10 flex w-full max-w-md flex-1 flex-col justify-center rounded-[32px] border border-border bg-card/85 p-8 shadow-xl backdrop-blur-xl md:max-w-none md:bg-card md:backdrop-blur-none lg:p-10"
         style="view-transition-name: auth-card;"
       >
         <!-- Mobile-only brand header -->
@@ -161,7 +161,7 @@
           <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm">
             <Ticket class="h-5 w-5 text-white" />
           </div>
-          <span class="text-lg font-bold tracking-tight text-slate-900">TixTac</span>
+          <span class="text-lg font-bold tracking-tight text-foreground">TixTac</span>
         </div>
         {@render children()}
       </div>
@@ -169,10 +169,10 @@
       <!-- D · Switch Pill -->
       <div class="flex items-start justify-center self-center">
         <div
-          class="inline-flex items-center justify-center rounded-xl border border-black/[0.04] bg-white/60 px-6 py-2.5 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:shadow-md"
+          class="inline-flex items-center justify-center rounded-xl border border-border bg-card/60 px-6 py-2.5 shadow-sm backdrop-blur-md transition-all hover:bg-card hover:shadow-md"
         >
           {#if isLogin}
-            <p class="text-sm font-medium text-slate-600">
+            <p class="text-sm font-medium text-muted-foreground">
               Chưa có tài khoản?
               <a
                 href={resolve('/register')}
@@ -182,7 +182,7 @@
               </a>
             </p>
           {:else}
-            <p class="text-sm font-medium text-slate-600">
+            <p class="text-sm font-medium text-muted-foreground">
               Đã có tài khoản?
               <a
                 href={resolve('/login')}

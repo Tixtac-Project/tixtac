@@ -65,26 +65,30 @@
   }
 
   function hexToRgba(hex: string, alpha: number): string {
-    try {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    } catch {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
       return `rgba(128, 128, 128, ${alpha})`;
     }
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+      return `rgba(128, 128, 128, ${alpha})`;
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   function getContrastColor(hex: string): string {
-    try {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      return lum > 0.55 ? '#1f2937' : '#ffffff';
-    } catch {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
       return '#1f2937';
     }
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+      return '#1f2937';
+    }
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.55 ? '#1f2937' : '#ffffff';
   }
 
   function getElDim(el: StageElement): { w: number; h: number } {
@@ -168,7 +172,7 @@
         {@const color = lc.color || '#3b82f6'}
         {@const avail = sec.available_count}
         {@const total = sec.capacity}
-        {@const soldOut = avail === 0}
+        {@const soldOut = avail === 0 || total === 0}
         {@const pad = 8}
         {@const innerW = lc.width - pad * 2}
         {@const innerH = lc.height - pad * 2}
@@ -221,7 +225,7 @@
 
           <!-- Availability bar at bottom -->
           {#if !soldOut}
-            {@const ratio = avail / total}
+            {@const ratio = Math.max(0, Math.min(1, avail / total))}
             <rect
               x={pad}
               y={lc.height - pad - 3}

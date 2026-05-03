@@ -36,7 +36,7 @@
 
 <a
   href={resolve(`/events/${event.id}`)}
-  class="bento-card-interactive group flex h-full flex-col overflow-hidden !p-0"
+  class="bento-card-interactive group flex h-full flex-col overflow-hidden p-0!"
 >
   <!-- Banner -->
   <div class="relative h-48 overflow-hidden bg-muted">
@@ -57,10 +57,10 @@
     {/if}
 
     <!-- Overlay gradient -->
-    <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+    <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent"></div>
 
-    <!-- Badge (HOT/LIVE) - top left -->
-    {#if badge}
+    <!-- Badge (HOT/LIVE) - top left, only when no availability status -->
+    {#if badge && !availabilityStatus}
       <div class="absolute top-3 left-3 z-10">
         {#if badge === 'hot'}
           <span
@@ -136,8 +136,8 @@
       <!-- Venue (top-aligned, uses remaining space, truncates if needed) -->
       <div class="min-w-0 flex-1 text-sm text-muted-foreground">
         <div class="flex items-start gap-1.5">
-          <MapPin class="mt-0.5 size-3.5 flex-shrink-0" />
-          <span class="line-clamp-2 break-words">{event.venue}</span>
+          <MapPin class="mt-0.5 size-3.5 shrink-0" />
+          <span class="line-clamp-2 wrap-break-word">{event.venue}</span>
         </div>
       </div>
     </div>

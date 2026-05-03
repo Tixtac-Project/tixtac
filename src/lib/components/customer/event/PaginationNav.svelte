@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { page as pageStore } from '$app/state';
   import { Button } from '$lib/components/ui/button/index.js';
 
@@ -26,7 +27,7 @@
     } else {
       url.searchParams.delete('q');
     }
-    goto(`${url.pathname}${url.search}`, { noScroll: true });
+    goto(resolve(`${url.pathname}${url.search}`), { noScroll: true });
   }
 </script>
 

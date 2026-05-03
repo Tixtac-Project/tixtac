@@ -4,11 +4,13 @@
   interface Props {
     title: string;
     searchQuery?: string;
-    viewAllHref?: string;
+    viewAllHref?: string | null;
     variant?: 'default' | 'small';
   }
 
-  let { title, searchQuery, viewAllHref = '/events', variant = 'default' }: Props = $props();
+  let { title, searchQuery, viewAllHref, variant = 'default' }: Props = $props();
+
+  const showViewAll = $derived(viewAllHref !== undefined && viewAllHref !== null);
 </script>
 
 <div
@@ -32,9 +34,9 @@
     {/if}
   </div>
 
-  {#if viewAllHref}
+  {#if showViewAll}
     <a
-      href={resolve(viewAllHref)}
+      href={resolve(viewAllHref!)}
       class="inline-flex items-center gap-1 text-sm font-semibold text-primary transition-all duration-200 hover:gap-2"
     >
       Xem tất cả

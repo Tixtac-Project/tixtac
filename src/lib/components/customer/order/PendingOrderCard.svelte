@@ -23,6 +23,7 @@
         isExpired = true;
         timeLeft = 0;
       } else {
+        isExpired = false;
         timeLeft = Math.floor(diff / 1000);
       }
     };

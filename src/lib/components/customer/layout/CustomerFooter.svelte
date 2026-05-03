@@ -141,7 +141,7 @@
           </li>
           <li>
             <a
-              href={resolve('/terms')}
+              href={resolve('/privacy')}
               class="text-secondary-foreground transition-colors hover:text-primary"
             >
               Chính sách bảo mật

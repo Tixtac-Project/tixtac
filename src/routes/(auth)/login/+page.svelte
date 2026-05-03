@@ -163,7 +163,7 @@
     </div>
 
     {#if authError}
-      <div class="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      <div role="alert" class="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
         {authError}
       </div>
     {/if}

@@ -1,5 +1,8 @@
 <script lang="ts">
   let { class: cls = '' } = $props<{ class?: string }>();
+  const uid = crypto.randomUUID().slice(0, 8);
+  const titleId = `ticket-title-${uid}`;
+  const descId = `ticket-desc-${uid}`;
 </script>
 
 <!--
@@ -18,13 +21,11 @@
   viewBox="0 0 200 110"
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
-  aria-labelledby="ticket-title ticket-desc"
+  aria-labelledby="{titleId} {descId}"
   role="img"
 >
-  <title id="ticket-title">Vé điện tử</title>
-  <desc id="ticket-desc">
-    Minh họa vé điện tử với thông tin chỗ ngồi, mã QR và chi tiết sự kiện.
-  </desc>
+  <title id={titleId}>Vé điện tử</title>
+  <desc id={descId}>Minh họa vé điện tử với thông tin chỗ ngồi, mã QR và chi tiết sự kiện.</desc>
 
   <!-- Realistic Soft Shadows (Stacked Effect) -->
   <g transform="rotate(-3, 96, 51) translate(-1, 4)">
