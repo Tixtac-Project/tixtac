@@ -19,12 +19,45 @@ import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
 import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
+// Prepared statements — compiled once, reused across requests
+const userById = db
+  .select()
+  .from(users)
+  .where(eq(users.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('pur_user_by_id');
+
+const eventById = db
+  .select()
+  .from(events)
+  .where(eq(events.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('pur_event_by_id');
+
+const idempotencyByKey = db
+  .select()
+  .from(idempotencyKeys)
+  .where(eq(idempotencyKeys.key, sql.placeholder('key')))
+  .prepare('pur_idem_by_key');
+
+const showByIdAndEvent = db
+  .select()
+  .from(eventShows)
+  .where(
+    and(
+      eq(eventShows.id, sql.placeholder('showId')),
+      eq(eventShows.eventId, sql.placeholder('eventId')),
+    ),
+  )
+  .limit(1)
+  .prepare('pur_show_by_event');
+
 // ══════════════════════════════════════════════════
 // INTERNAL HELPERS
 // ══════════════════════════════════════════════════
 
 async function validateUser(userId: number) {
-  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  const [user] = await userById.execute({ id: userId });
   if (!user) throwError(Errors.UNAUTHORIZED, 'Người dùng không tồn tại.');
   if (user.isActive !== true) throwError(Errors.USER_INACTIVE, 'Tài khoản không hoạt động.');
   if (user.role !== 'customer') throwError(Errors.FORBIDDEN, 'Chỉ khách hàng mới được đặt vé.');
@@ -32,7 +65,7 @@ async function validateUser(userId: number) {
 }
 
 async function validateEvent(eventId: number) {
-  const [event] = await db.select().from(events).where(eq(events.id, eventId));
+  const [event] = await eventById.execute({ id: eventId });
   if (!event) throwError(Errors.NOT_FOUND, 'Sự kiện không tồn tại.');
   if (event.status !== 'published') {
     throwError(Errors.EVENT_NOT_AVAILABLE, 'Sự kiện chưa mở bán hoặc đã hủy.');
@@ -176,10 +209,7 @@ export const purchaseService = {
         .returning();
 
       if (!inserted) {
-        const [existing] = await db
-          .select()
-          .from(idempotencyKeys)
-          .where(eq(idempotencyKeys.key, idempotencyKey));
+        const [existing] = await idempotencyByKey.execute({ key: idempotencyKey });
 
         if (existing) {
           if (existing.userId !== userId) {
@@ -220,10 +250,7 @@ export const purchaseService = {
         }
         showIdsInCart.add(item.show_id);
 
-        const [show] = await db
-          .select()
-          .from(eventShows)
-          .where(and(eq(eventShows.id, item.show_id), eq(eventShows.eventId, eventId)));
+        const [show] = await showByIdAndEvent.execute({ showId: item.show_id, eventId });
         if (!show) {
           throwError(Errors.SHOW_NOT_AVAILABLE, `Suất diễn ${item.show_id} không thuộc sự kiện.`);
         }

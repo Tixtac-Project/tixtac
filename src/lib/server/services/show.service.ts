@@ -5,6 +5,21 @@ import { addShowsSchema, showIdSchema, updateShowSchema } from '$lib/shared/sche
 import { validateInput } from '$lib/shared/validation';
 import { eq, sql } from 'drizzle-orm';
 
+// Prepared statements — compiled once, reused across requests
+const showById = db
+  .select()
+  .from(eventShows)
+  .where(eq(eventShows.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('shw_by_id');
+
+const eventById = db
+  .select()
+  .from(events)
+  .where(eq(events.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('shw_evt_by_id');
+
 export const showService = {
   /**
    * Step 2: Add shows (sessions) to an existing draft event.
@@ -209,10 +224,10 @@ export const showService = {
     const showId = validateInput(showIdSchema, rawShowId);
     const fields = validateInput(updateShowSchema, data);
 
-    const [show] = await db.select().from(eventShows).where(eq(eventShows.id, showId)).limit(1);
+    const [show] = await showById.execute({ id: showId });
     if (!show) throwError(Errors.NOT_FOUND);
 
-    const [event] = await db.select().from(events).where(eq(events.id, show.eventId)).limit(1);
+    const [event] = await eventById.execute({ id: show.eventId });
     if (!event) throwError(Errors.NOT_FOUND);
     if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
     if (show.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
