@@ -5,45 +5,60 @@ import { config } from '$lib/server/config';
 
 export const queueService = {
   async joinQueue(userId: number, eventId: number) {
-    console.log(
-      `[DEBUG] User ${userId} đang join. Max config hiện tại:`,
-      config.maxConcurrentUsers,
-    );
     const userCurrentKey = `user_current_queue:${userId}`;
     const activeKey = `active_users:${eventId}`;
     const waitingKey = `waiting_queue:${eventId}`;
     const now = Date.now();
+    const maxUsers = config.maxConcurrentUsers || 200;
 
-    const currentQueuedEvent = await redis.get<number>(userCurrentKey);
-    if (currentQueuedEvent && currentQueuedEvent !== eventId) {
+    const currentQueuedEvent = await redis.get<number | string>(userCurrentKey);
+    // Redis returns strings by default, casting ensures safe comparison
+    if (currentQueuedEvent && Number(currentQueuedEvent) !== eventId) {
       throwError(Errors.EVENT_NOT_AVAILABLE, 'Bạn đang tham gia hàng chờ của một sự kiện khác');
     }
 
     const existingScore = await redis.zscore(activeKey, userId);
     if (existingScore && existingScore > now) {
-      const token = await encryptSeatToken({ sub: userId, event_id: eventId });
+      const token = await encryptSeatToken({ userId, eventId });
       return { status: 'active', expiresAt: existingScore, token };
     }
 
-    // const activeCount = await redis.zcard(activeKey);
-    // const maxUsers = config.maxConcurrentUsers || 200;
+    const expiresAt = now + config.accessTokenDuration * 1000;
 
-    const activeCount = await redis.zcount(activeKey, now, '+inf'); // Chỉ đếm người còn hạn
-    const totalInSet = await redis.zcard(activeKey); // Đếm tất cả để đối chiếu
-    const maxUsers = config.maxConcurrentUsers || 200;
-    console.log(
-      `[DEBUG] Event ${eventId}: Còn hạn=${activeCount}, Tổng trong Set=${totalInSet}, Max=${maxUsers}`,
+    // Lua script for atomic check-and-add to prevent Race Condition
+    const luaScript = `
+      local activeKey = KEYS[1]
+      local now = tonumber(ARGV[1])
+      local maxUsers = tonumber(ARGV[2])
+      local expiresAt = tonumber(ARGV[3])
+      local userId = ARGV[4]
+
+      local activeCount = redis.call('ZCOUNT', activeKey, now, '+inf')
+      if activeCount < maxUsers then
+        redis.call('ZADD', activeKey, expiresAt, userId)
+        return 1
+      end
+      return 0
+    `;
+
+    const addedToActive = await redis.eval<[number, number, number, number], number>(
+      luaScript,
+      [activeKey],
+      [now, maxUsers, expiresAt, userId]
     );
 
-    if (activeCount < maxUsers) {
-      const expiresAt = now + 5 * 60 * 1000;
-      await redis.zadd(activeKey, { score: expiresAt, member: userId });
-      await redis.set(userCurrentKey, eventId, { ex: 600 }); // Lưới an toàn 10 phút
+    if (addedToActive === 1) {
+      // Clear from waiting queue to avoid Zombie waiting records
+      await redis.pipeline()
+        .zrem(waitingKey, userId)
+        .set(userCurrentKey, eventId, { ex: 600 })
+        .exec();
 
-      const token = await encryptSeatToken({ sub: userId, event_id: eventId });
+      const token = await encryptSeatToken({ userId, eventId });
       return { status: 'active', expiresAt, token };
     } else {
-      await redis.zadd(waitingKey, { score: now, member: userId });
+      // nx: true ensures we don't overwrite existing wait times/positions
+      await redis.zadd(waitingKey, { nx: true }, { score: now, member: userId });
       await redis.set(userCurrentKey, eventId, { ex: 600 }); // Lưới an toàn 10 phút
 
       const position = await redis.zrank(waitingKey, userId);
@@ -60,11 +75,11 @@ export const queueService = {
       throwError(Errors.FORBIDDEN, 'Slot của bạn không tồn tại hoặc đã hết hạn');
     }
 
-    const expiresAt = now + 5 * 60 * 1000;
+    const expiresAt = now + config.accessTokenDuration * 1000;
     await redis.zadd(activeKey, { xx: true }, { score: expiresAt, member: userId });
     await redis.set(`user_current_queue:${userId}`, eventId, { ex: 600 });
 
-    const token = await encryptSeatToken({ sub: userId, event_id: eventId });
+    const token = await encryptSeatToken({ userId, eventId });
     return { expiresAt, token };
   },
 
@@ -82,7 +97,7 @@ export const queueService = {
 
     const activeScore = await redis.zscore(activeKey, userId);
     if (activeScore && activeScore > now) {
-      const token = await encryptSeatToken({ sub: userId, event_id: eventId });
+      const token = await encryptSeatToken({ userId, eventId });
       return { status: 'active', expiresAt: activeScore, token };
     }
 

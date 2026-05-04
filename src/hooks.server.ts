@@ -53,7 +53,7 @@ async function runQueueWorker() {
         console.log(`[QueueWorker] 🧹 Đuổi ${expiredUserIds.length} users khỏi Event ${eventId}`);
       }
 
-      const currentActiveCount = await redis.zcard(activeKey);
+      const currentActiveCount = await redis.zcount(activeKey, now, '+inf');
       const availableSlots = config.maxConcurrentUsers - currentActiveCount;
 
       if (availableSlots > 0) {
@@ -64,6 +64,7 @@ async function runQueueWorker() {
           for (const uId of nextUserIds) {
             pipeline.zadd(activeKey, { score: now + 60000, member: uId });
             pipeline.zrem(waitingKey, uId);
+            pipeline.expire(`user_current_queue:${uId}`, 600);
           }
           await pipeline.exec();
           console.log(
@@ -77,10 +78,27 @@ async function runQueueWorker() {
   }
 }
 
-const globalForWorker = globalThis as unknown as { __queueWorkerStarted: boolean };
+const globalForWorker = globalThis as unknown as { 
+  __queueWorkerStarted: boolean; 
+  __isWorkerRunning: boolean;
+};
+
 if (!globalForWorker.__queueWorkerStarted) {
-  setInterval(runQueueWorker, 3000);
   globalForWorker.__queueWorkerStarted = true;
+  globalForWorker.__isWorkerRunning = false;
+
+  const loopWorker = async () => {
+    if (globalForWorker.__isWorkerRunning) return;
+    globalForWorker.__isWorkerRunning = true;
+    try {
+      await runQueueWorker();
+    } finally {
+      globalForWorker.__isWorkerRunning = false;
+      setTimeout(loopWorker, 3000);
+    }
+  };
+
+  setTimeout(loopWorker, 3000);
   console.log('👷 [Gatekeeper Worker] Đã khởi động!');
 }
 

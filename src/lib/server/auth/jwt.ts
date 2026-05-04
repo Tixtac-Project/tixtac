@@ -58,12 +58,12 @@ export async function verifyAuthToken(token: string) {
  * Sử dụng cho Gatekeeper để bảo vệ API Checkout.
  */
 export async function encryptSeatToken(payload: {
-  sub: number;
-  event_id: number;
+  userId: number;
+  eventId: number;
 }): Promise<string> {
   const jwePayload = {
-    sub: payload.sub.toString(),
-    event_id: payload.event_id,
+    userId: payload.userId.toString(),
+    eventId: payload.eventId,
   };
 
   return await new EncryptJWT(jwePayload)
@@ -86,8 +86,8 @@ export async function decryptSeatToken(token: string) {
     });
 
     return {
-      sub: Number(payload.sub),
-      event_id: Number(payload.event_id),
+      userId: Number(payload.userId),
+      eventId: Number(payload.eventId),
     };
   } catch {
     throwError(Errors.FORBIDDEN, 'Token giữ chỗ không hợp lệ hoặc đã hết hạn');

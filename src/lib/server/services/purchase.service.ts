@@ -17,7 +17,7 @@ import { orderService } from '$lib/server/services/order.service';
 import type { DbTransaction } from '$lib/types/db';
 import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
 // ══════════════════════════════════════════════════
