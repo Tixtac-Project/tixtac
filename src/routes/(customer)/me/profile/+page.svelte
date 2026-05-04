@@ -30,7 +30,7 @@
   } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
 
-  const user = $derived($page.data.profile);
+  const profile = $derived($page.data.profile);
 
   // ─── Profile Form ──────────────────────────
   let profileForm = $state({
@@ -44,12 +44,12 @@
   let isProfileLoading = $state(false);
 
   $effect(() => {
-    if (user) {
+    if (profile) {
       profileForm = {
-        full_name: user.full_name ?? '',
-        phone: user.phone ?? '',
-        date_of_birth: user.date_of_birth ? user.date_of_birth.split('T')[0] : '',
-        gender: user.gender ?? 'male',
+        full_name: profile.full_name ?? '',
+        phone: profile.phone ?? '',
+        date_of_birth: profile.date_of_birth ? profile.date_of_birth.split('T')[0] : '',
+        gender: profile.gender ?? 'male',
       };
     }
   });
@@ -59,6 +59,7 @@
     const data = {
       ...profileForm,
       date_of_birth: profileForm.date_of_birth || undefined,
+      phone: profileForm.phone || null,
     };
     const result = updateProfileSchema.safeParse(data);
     if (!result.success) {
@@ -80,8 +81,13 @@
         await invalidateAll();
       } else if (res.status === 400) {
         const json = await res.json();
-        if (json.errors) profileErrors = json.errors;
-        else toast.error('Dữ liệu không hợp lệ');
+        if (json.errors?.details) {
+          profileErrors = json.errors.details;
+        } else if (json.errors) {
+          profileErrors = json.errors;
+        } else {
+          toast.error('Dữ liệu không hợp lệ');
+        }
       } else {
         toast.error('Lỗi máy chủ');
       }
@@ -98,7 +104,7 @@
   let isEmailLoading = $state(false);
   let currentEmail = $state('');
   $effect(() => {
-    if (user) currentEmail = user.email ?? '';
+    if (profile) currentEmail = profile.email ?? '';
   });
 
   async function handleEmailSubmit(e: Event) {
@@ -128,8 +134,13 @@
         await invalidateAll();
       } else if (res.status === 400) {
         const json = await res.json();
-        if (json.errors) emailErrors = json.errors;
-        else toast.error('Dữ liệu không hợp lệ');
+        if (json.errors?.details) {
+          emailErrors = json.errors.details;
+        } else if (json.errors) {
+          profileErrors = json.errors;
+        } else {
+          toast.error('Dữ liệu không hợp lệ');
+        }
       } else {
         toast.error('Lỗi máy chủ');
       }
@@ -178,8 +189,13 @@
         passwordForm = { current_password: '', new_password: '', confirm_password: '' };
       } else if (res.status === 400) {
         const json = await res.json();
-        if (json.errors) passwordErrors = json.errors;
-        else toast.error('Dữ liệu không hợp lệ');
+        if (json.errors?.details) {
+          passwordErrors = json.errors.details;
+        } else if (json.errors) {
+          profileErrors = json.errors;
+        } else {
+          toast.error('Dữ liệu không hợp lệ');
+        }
       } else {
         toast.error('Lỗi máy chủ');
       }
