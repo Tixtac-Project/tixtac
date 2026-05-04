@@ -1,11 +1,10 @@
-// import { DATABASE_URL } from '$env/static/private';
-import { drizzle } from 'drizzle-orm/bun-sql';
+import { DATABASE_URL } from '$env/static/private';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import * as schema from './schema';
 
-const DATABASE_URL = process.env.DATABASE_URL;
+neonConfig.webSocketConstructor = ws;
 
-if (!DATABASE_URL) {
-  throw new Error('❌ DATABASE_URL không tồn tại trong file .env');
-}
-
-export const db = drizzle(DATABASE_URL, { schema });
+const pool = new Pool({ connectionString: DATABASE_URL });
+export const db = drizzle(pool, { schema });

@@ -21,6 +21,68 @@ import { and, count, eq, ilike, min, sql } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 import { insertShowWithSections } from './seatmap.service';
 
+// Prepared statements — compiled once, reused across requests
+const eventById = db
+  .select()
+  .from(events)
+  .where(eq(events.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('evt_by_id');
+
+const eventDetailById = db
+  .select({
+    id: events.id,
+    categoryId: events.categoryId,
+    categoryName: categories.name,
+    categorySlug: categories.slug,
+    title: events.title,
+    description: events.description,
+    termsAndConditions: events.termsAndConditions,
+    venue: events.venue,
+    bannerImageUrl: events.bannerImageUrl,
+    staticMapImageUrl: events.staticMapImageUrl,
+    minAge: events.minAge,
+    maxTicketsPerUser: events.maxTicketsPerUser,
+    mapConfig: events.mapConfig,
+    stageLayout: events.stageLayout,
+    amenities: events.amenities,
+    organizerInfo: events.organizerInfo,
+    status: events.status,
+    createdBy: events.createdBy,
+    createdAt: events.createdAt,
+  })
+  .from(events)
+  .leftJoin(categories, eq(categories.id, events.categoryId))
+  .where(eq(events.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('evt_detail_by_id');
+
+const categoryBySlug = db
+  .select({ id: categories.id })
+  .from(categories)
+  .where(eq(categories.slug, sql.placeholder('slug')))
+  .limit(1)
+  .prepare('evt_cat_by_slug');
+
+const showsByEventId = db
+  .select()
+  .from(eventShows)
+  .where(eq(eventShows.eventId, sql.placeholder('eventId')))
+  .orderBy(eventShows.showDate, eventShows.startTime)
+  .prepare('evt_shows_by_event');
+
+const seatCountsByShowId = db
+  .select({
+    sectionId: seats.sectionId,
+    seatCount: count(),
+    availableCount: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
+    disabledCount: count(sql`CASE WHEN ${seats.status} = 'disabled' THEN 1 END`),
+  })
+  .from(seats)
+  .where(eq(seats.showId, sql.placeholder('showId')))
+  .groupBy(seats.sectionId)
+  .prepare('evt_seat_counts_by_show');
+
 export const eventService = {
   async listEvents(params: {
     q?: string;
@@ -53,11 +115,7 @@ export const eventService = {
 
     // Filter by category slug
     if (category) {
-      const [cat] = await db
-        .select({ id: categories.id })
-        .from(categories)
-        .where(eq(categories.slug, category))
-        .limit(1);
+      const [cat] = await categoryBySlug.execute({ slug: category });
       if (cat) {
         conditions.push(eq(events.categoryId, cat.id));
       }
@@ -147,32 +205,7 @@ export const eventService = {
     }
 
     // 1. Get event basic info with category
-    const [eventRow] = await db
-      .select({
-        id: events.id,
-        categoryId: events.categoryId,
-        categoryName: categories.name,
-        categorySlug: categories.slug,
-        title: events.title,
-        description: events.description,
-        termsAndConditions: events.termsAndConditions,
-        venue: events.venue,
-        bannerImageUrl: events.bannerImageUrl,
-        staticMapImageUrl: events.staticMapImageUrl,
-        minAge: events.minAge,
-        maxTicketsPerUser: events.maxTicketsPerUser,
-        mapConfig: events.mapConfig,
-        stageLayout: events.stageLayout,
-        amenities: events.amenities,
-        organizerInfo: events.organizerInfo,
-        status: events.status,
-        createdBy: events.createdBy,
-        createdAt: events.createdAt,
-      })
-      .from(events)
-      .leftJoin(categories, eq(categories.id, events.categoryId))
-      .where(eq(events.id, eventId))
-      .limit(1);
+    const [eventRow] = await eventDetailById.execute({ id: eventId });
 
     if (!eventRow) throwError(Errors.NOT_FOUND);
     const event = eventRow;
@@ -185,11 +218,7 @@ export const eventService = {
     }
 
     // 2. Get all shows for this event
-    const shows = await db
-      .select()
-      .from(eventShows)
-      .where(eq(eventShows.eventId, eventId))
-      .orderBy(eventShows.showDate, eventShows.startTime);
+    const shows = await showsByEventId.execute({ eventId });
 
     // 3. Get all sections across all shows
     const showIds = shows.map((s) => s.id);
@@ -207,29 +236,16 @@ export const eventService = {
         .orderBy(seatSections.sortOrder);
     }
 
-    // 4. Aggregate seat counts per section in a single query (avoid N+1)
-    let seatCounts: {
+    // 4. Aggregate seat counts per section — collect all shows
+    const seatCounts: {
       sectionId: number;
       seatCount: number;
       availableCount: number;
       disabledCount: number;
     }[] = [];
-    if (showIds.length > 0) {
-      seatCounts = await db
-        .select({
-          sectionId: seats.sectionId,
-          seatCount: count(),
-          availableCount: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
-          disabledCount: count(sql`CASE WHEN ${seats.status} = 'disabled' THEN 1 END`),
-        })
-        .from(seats)
-        .where(
-          sql`${seats.showId} IN (${sql.join(
-            showIds.map((id) => sql`${id}`),
-            sql`, `,
-          )})`,
-        )
-        .groupBy(seats.sectionId);
+    for (const sid of showIds) {
+      const rows = await seatCountsByShowId.execute({ showId: sid });
+      seatCounts.push(...rows);
     }
 
     // 5. Build a map for O(1) lookup
@@ -397,7 +413,7 @@ export const eventService = {
   async updateBasicInfo(adminId: number, data: unknown) {
     const { event_id, ...fields } = validateInput(updateBasicInfoSchema, data);
 
-    const [event] = await db.select().from(events).where(eq(events.id, event_id)).limit(1);
+    const [event] = await eventById.execute({ id: event_id });
     if (!event) throwError(Errors.NOT_FOUND);
     if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
     if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);

@@ -78,7 +78,8 @@ src/
 
 ### Yêu cầu
 
-- [Bun](https://bun.sh/)
+- [Bun](https://bun.sh/) - Không dùng NodeJS vì dự án phụ thuộc vào một số tính năng chỉ có trên Bun.
+- Tài khoản Neon, CloudAMQP, Upstash Redis, Resend (xem hướng dẫn bên dưới)
 
 ### 1. Clone & Install
 
@@ -94,7 +95,22 @@ bun install
 cp .env.example .env
 ```
 
-Mở `.env` và điền các thông tin cần thiết (Neon, CloudAMQP, JWT secret, v.v.)
+#### Hướng dẫn lấy các thông tin cần thiết cho `.env`
+
+Mở file `.env` và điền các thông tin sau:
+
+- **DATABASE_URL (Neon PostgreSQL):**
+  Đăng ký tại [Neon.tech](https://neon.tech) -> Tạo Project -> Copy chuỗi kết nối (Connection string), nhớ bật "Connection pooling"
+- **CLOUDAMQP_URL (RabbitMQ):**
+  Đăng ký tại [CloudAMQP](https://www.cloudamqp.com) -> Tạo instance RabbitMQ -> Copy chuỗi AMQP URL.
+- **JWT_SECRET:**
+  Chuỗi bảo mật để ký token. Mở terminal chạy lệnh `bun -e "console.log(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex'))"` và copy kết quả vào.
+- **VAPID Keys (Web Push):**
+  Mở terminal chạy lệnh `bunx @pushforge/builder vapid`. Copy `VAPID_PUBLIC_KEY` và `VAPID_PRIVATE_KEY_JWK` từ màn hình kết quả.
+- **UPSTASH_REDIS (Queue & Cache):**
+  Đăng ký tại [Upstash.com](https://upstash.com) -> Tạo Redis Database -> Copy `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`.
+- **RESEND_API_KEY (Email):**
+  Đăng ký tại[Resend.com](https://resend.com) -> Mục API Keys -> Create API Key.
 
 ### 3. Database Migration & Seed
 
@@ -177,9 +193,9 @@ bun run db:studio    # Open Drizzle Studio
 
 ## 📄 Tài liệu
 
-| Tài liệu            | Link                                                                                         |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| Yêu cầu & Nghiệp vụ | [Notion](https://tixtac.notion.site/Y-u-c-u-Nghi-p-v-33a7b684490780d4ba8efdb8b66e3afa)       |
-| Kiến trúc & CSDL    | [Notion](https://tixtac.notion.site/Thi-t-k-ki-n-tr-c-CSDL-33a7b6844907805f81a3e8fd254b364c) |
-| Code Convention     | [Notion](https://tixtac.notion.site/Quy-chu-n-code-33a7b684490780eb9059d90421f448b4)         |
-| Project Plan        | [Github Project](https://github.com/orgs/Tixtac-Project/projects/1)                          |
+| Tài liệu            | Link                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| Yêu cầu & Nghiệp vụ | [Notion](https://tixtac.notion.site/Y-u-c-u-Nghi-p-v-33a7b684490780d4ba8efdb8b66e3afa) |
+| Kiến trúc & CSDL    | [Github Wiki](https://github.com/Tixtac-Project/tixtac/wiki/Architecture)              |
+| Code Convention     | [Notion](https://tixtac.notion.site/Quy-chu-n-code-33a7b684490780eb9059d90421f448b4)   |
+| Project Plan        | [Github Project](https://github.com/orgs/Tixtac-Project/projects/1)                    |

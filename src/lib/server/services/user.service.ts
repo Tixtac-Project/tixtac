@@ -13,7 +13,22 @@ import {
 } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
 import type { Cookies } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+
+// Prepared statements – compiled once, reused across requests
+const userByEmail = db
+  .select()
+  .from(users)
+  .where(eq(users.email, sql.placeholder('email')))
+  .limit(1)
+  .prepare('auth_user_by_email');
+
+const userById = db
+  .select()
+  .from(users)
+  .where(eq(users.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('auth_user_by_id');
 
 interface UserProfileResponse {
   id: number;
@@ -45,7 +60,7 @@ function toCookieMaxAgeSeconds(expiresIn: string | number): number {
   }[unit];
 }
 
-export const authService = {
+export const userService = {
   async register(data: unknown) {
     // 1. VALIDATE BẰNG ZOD
     const { email, password, full_name, phone, date_of_birth, gender, avatar_url } = validateInput(
@@ -54,11 +69,7 @@ export const authService = {
     );
 
     // 2. CHECK EMAIL TỒN TẠI
-    const [existing] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+    const [existing] = await userByEmail.execute({ email });
 
     if (existing) {
       throwError(Errors.EMAIL_EXISTS);
@@ -120,7 +131,7 @@ export const authService = {
     }
     const normalizedEmail = email.trim().toLowerCase();
 
-    const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+    const [user] = await userByEmail.execute({ email: normalizedEmail });
 
     // Kiểm tra user tồn tại và đang hoạt động
     if (!user || !user.isActive) {
@@ -161,16 +172,7 @@ export const authService = {
     }
     const data: UpdateProfileInput = parsed.data;
 
-    const [current] = await db
-      .select({
-        full_name: users.fullName,
-        date_of_birth: users.dateOfBirth,
-        gender: users.gender,
-        phone: users.phone,
-        avatar_url: users.avatarUrl,
-      })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [current] = await userById.execute({ id: userId });
 
     if (!current) {
       throwError(Errors.USER_INACTIVE);
@@ -187,46 +189,40 @@ export const authService = {
 
     await db.update(users).set(updateData).where(eq(users.id, userId));
 
-    const [profile] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        full_name: users.fullName,
-        phone: users.phone,
-        date_of_birth: users.dateOfBirth,
-        gender: users.gender,
-        avatar_url: users.avatarUrl || null,
-        role: users.role,
-        created_at: users.createdAt,
-        updated_at: users.updatedAt,
-      })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [profile] = await userById.execute({ id: userId });
 
-    return profile;
+    return {
+      id: profile.id,
+      email: profile.email,
+      full_name: profile.fullName,
+      phone: profile.phone,
+      date_of_birth: profile.dateOfBirth,
+      gender: profile.gender,
+      avatar_url: profile.avatarUrl || null,
+      role: profile.role,
+      created_at: profile.createdAt,
+      updated_at: profile.updatedAt,
+    };
   },
 
   async getProfile(userId: number): Promise<UserProfileResponse> {
-    const [user] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        full_name: users.fullName,
-        phone: users.phone,
-        date_of_birth: users.dateOfBirth,
-        gender: users.gender,
-        avatar_url: users.avatarUrl || null,
-        role: users.role,
-        created_at: users.createdAt,
-        updated_at: users.updatedAt,
-      })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [user] = await userById.execute({ id: userId });
 
     if (!user) {
       throwError(Errors.USER_INACTIVE);
     }
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      full_name: user.fullName,
+      phone: user.phone,
+      date_of_birth: user.dateOfBirth,
+      gender: user.gender,
+      avatar_url: user.avatarUrl || null,
+      role: user.role,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt,
+    };
   },
 
   async updateSecurity(userId: number, rawBody: unknown, cookies: Cookies) {
@@ -241,14 +237,7 @@ export const authService = {
     }
     const { current_password, new_password, new_email } = parsed.data;
 
-    const [userRecord] = await db
-      .select({
-        email: users.email,
-        passwordHash: users.passwordHash,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [userRecord] = await userById.execute({ id: userId });
 
     if (!userRecord) {
       throwError(Errors.USER_INACTIVE);
