@@ -19,7 +19,8 @@ export const queueService = {
 
     const existingScore = await redis.zscore(activeKey, userId);
     if (existingScore && existingScore > now) {
-      const token = await encryptSeatToken({ userId, eventId });
+      const expiresInSeconds = Math.max(1, Math.ceil((existingScore - now) / 1000));
+      const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
       return { status: 'active', expiresAt: existingScore, token };
     }
 
@@ -54,7 +55,7 @@ export const queueService = {
         .set(userCurrentKey, eventId, { ex: 600 })
         .exec();
 
-      const token = await encryptSeatToken({ userId, eventId });
+      const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
       return { status: 'active', expiresAt, token };
     } else {
       // nx: true ensures we don't overwrite existing wait times/positions
@@ -79,7 +80,7 @@ export const queueService = {
     await redis.zadd(activeKey, { xx: true }, { score: expiresAt, member: userId });
     await redis.set(`user_current_queue:${userId}`, eventId, { ex: 600 });
 
-    const token = await encryptSeatToken({ userId, eventId });
+    const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
     return { expiresAt, token };
   },
 
@@ -97,7 +98,8 @@ export const queueService = {
 
     const activeScore = await redis.zscore(activeKey, userId);
     if (activeScore && activeScore > now) {
-      const token = await encryptSeatToken({ userId, eventId });
+      const expiresInSeconds = Math.max(1, Math.ceil((activeScore - now) / 1000));
+      const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
       return { status: 'active', expiresAt: activeScore, token };
     }
 

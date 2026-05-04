@@ -57,10 +57,13 @@ export async function verifyAuthToken(token: string) {
  * Mã hóa hoàn toàn Token giữ chỗ (JWE Encrypted)
  * Sử dụng cho Gatekeeper để bảo vệ API Checkout.
  */
-export async function encryptSeatToken(payload: {
-  userId: number;
-  eventId: number;
-}): Promise<string> {
+export async function encryptSeatToken(
+  payload: {
+    userId: number;
+    eventId: number;
+  },
+  expiresInSeconds: number,
+): Promise<string> {
   const jwePayload = {
     userId: payload.userId.toString(),
     eventId: payload.eventId,
@@ -71,7 +74,7 @@ export async function encryptSeatToken(payload: {
     .setIssuedAt()
     .setIssuer('tixtac:queue')
     .setAudience('tixtac:booking')
-    .setExpirationTime(`${config.accessTokenDuration}s`)
+    .setExpirationTime(`${expiresInSeconds}s`)
     .encrypt(encryptionKey);
 }
 
