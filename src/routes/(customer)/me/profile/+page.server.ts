@@ -1,6 +1,6 @@
 // src/routes/(customer)/me/profile/+page.server.ts
+import type { PageServerLoad } from '.$types';
 import { redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from '../../$types';
 
 export const load: PageServerLoad = async ({ fetch, locals }) => {
   const user = locals.user;
@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ fetch, locals }) => {
   if (!res.ok) {
     return { user: locals.user, profile: null };
   }
-  const profile = await res.json();
+  const { data: profile } = await res.json();
 
   return {
     user: locals.user,

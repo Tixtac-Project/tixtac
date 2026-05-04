@@ -203,7 +203,7 @@
 </svelte:head>
 
 <div
-  class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100/50 py-8 sm:py-12 dark:from-slate-950 dark:to-slate-900"
+  class="min-h-screen bg-linear-to-br from-slate-50 to-slate-100/50 py-8 sm:py-12 dark:from-slate-950 dark:to-slate-900"
 >
   <div class="mx-auto max-w-3xl px-4 sm:px-6">
     <!-- Header -->
