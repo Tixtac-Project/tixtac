@@ -223,7 +223,7 @@
                 <DropdownMenuLabel class="px-3 pt-2 pb-1">Tài khoản</DropdownMenuLabel>
                 <DropdownMenuItem
                   onclick={() => {
-                    goto(resolve('/'));
+                    goto(resolve('/me/profile'));
                     isUserMenuOpen = false;
                   }}
                   class="cursor-pointer"
