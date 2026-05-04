@@ -17,7 +17,6 @@ import { orderService } from '$lib/server/services/order.service';
 import type { DbTransaction } from '$lib/types/db';
 import type { PurchaseBody, PurchaseResponse } from '$lib/types/purchase';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import { createHash } from 'crypto';
 import { and, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 
 // ══════════════════════════════════════════════════
@@ -154,7 +153,7 @@ export const purchaseService = {
     idempotencyKey?: string,
   ): Promise<PurchaseResponse> {
     const now = new Date();
-    const payloadHash = createHash('sha256')
+    const payloadHash = new Bun.CryptoHasher('sha256')
       .update(JSON.stringify({ eventId, body }))
       .digest('hex');
 
