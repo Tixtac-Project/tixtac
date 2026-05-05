@@ -9,7 +9,6 @@
         "@tanstack/table-core": "^8.21.3",
         "@upstash/redis": "^1.37.0",
         "amqplib": "^1.0.3",
-        "crypto": "^1.0.1",
         "drizzle-orm": "^0.45.2",
         "embla-carousel-autoplay": "^8.6.0",
         "isomorphic-dompurify": "^3.10.0",
@@ -438,8 +437,6 @@
     "cookie": ["cookie@0.6.0", "", {}, "sha512-U71cyTamuh1CRNCfpGY6to28lxvNwPG4Guz/EVjgf3Jmzv0vlDp1atT9eS5dDjMYHucpHbWns6Lwf3BKz6svdw=="],
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
-
-    "crypto": ["crypto@1.0.1", "", {}, "sha512-VxBKmeNcqQdiUQUW2Tzq0t377b54N2bMtXO/qiLa+6eRRmmC4qT3D4OnTGoT/U6O9aklQ/jTwbOtRMTTY8G0Ig=="],
 
     "css-tree": ["css-tree@3.2.1", "", { "dependencies": { "mdn-data": "2.27.1", "source-map-js": "^1.2.1" } }, "sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA=="],
 
