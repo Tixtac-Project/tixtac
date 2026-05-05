@@ -1,11 +1,11 @@
 import { config } from '$lib/server/config';
 import { apiHandler } from '$lib/server/handler';
-import { authService } from '$lib/server/services/auth.service';
+import { userService } from '$lib/server/services/auth.service';
 import { json } from '@sveltejs/kit';
 
 export const POST = apiHandler(async ({ request, cookies }) => {
   const body = await request.json();
-  const { user, token } = await authService.login(body);
+  const { user, token } = await userService.login(body);
 
   cookies.set('auth_token', token, {
     path: '/',

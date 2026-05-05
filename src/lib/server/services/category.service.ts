@@ -1,7 +1,15 @@
 import { db } from '$lib/server/db';
 import { categories } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+
+// Prepared statements – compiled once, reused across requests
+const categoryById = db
+  .select()
+  .from(categories)
+  .where(eq(categories.id, sql.placeholder('id')))
+  .limit(1)
+  .prepare('cat_by_id');
 
 export const categoryService = {
   /** List all categories ordered by sortOrder */
@@ -18,7 +26,7 @@ export const categoryService = {
 
   /** Get a single category by ID */
   async getCategoryById(id: number) {
-    const [cat] = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+    const [cat] = await categoryById.execute({ id });
     if (!cat) throwError(Errors.NOT_FOUND);
     return {
       id: cat.id,
@@ -49,7 +57,7 @@ export const categoryService = {
 
   /** Update a category (admin only) */
   async updateCategory(id: number, data: { name?: string; slug?: string; sort_order?: number }) {
-    const [existing] = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+    const [existing] = await categoryById.execute({ id });
     if (!existing) throwError(Errors.NOT_FOUND);
 
     const [updated] = await db
@@ -72,7 +80,7 @@ export const categoryService = {
 
   /** Delete a category (admin only). Will fail if events reference it (ON DELETE RESTRICT). */
   async deleteCategory(id: number) {
-    const [existing] = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+    const [existing] = await categoryById.execute({ id });
     if (!existing) throwError(Errors.NOT_FOUND);
 
     await db.delete(categories).where(eq(categories.id, id));

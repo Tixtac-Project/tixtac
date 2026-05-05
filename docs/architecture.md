@@ -21,6 +21,8 @@ graph TB
     subgraph Infra["☁️ Infrastructure"]
         PG["PostgreSQL"]
         MQ["CloudAMQP<br/>(RabbitMQ)"]
+        Redis["Upstash Redis<br/>(Queue, Cache, Push)"]
+        Resend["Resend API<br/>(Email)"]
     end
 
     SPA -- "HTTP / SSE" --> Hooks
@@ -73,7 +75,7 @@ graph TD
     C["<b>Middleware Layer</b><br/>hooks.server.ts — Auth (JWT) + Security Headers"]
     D["<b>Service Layer</b><br/>*.service.ts — Business Logic, DB Transactions, Validation"]
     E["<b>Data Access Layer</b><br/>Drizzle ORM — schema.ts + db client"]
-    F["<b>Infrastructure Layer</b><br/>PostgreSQL · CloudAMQP · SSE EventBus"]
+    F["<b>Infrastructure Layer</b><br/>PostgreSQL · CloudAMQP · Upstash Redis · Resend · PushForge"]
     G["<b>Shared Layer</b><br/>Zod Schemas — Single source of truth cho FE & BE"]
 
     A --> B
@@ -128,7 +130,9 @@ src/routes/api/
 ├── auth/
 │   ├── register/+server.ts       # POST
 │   ├── login/+server.ts          # POST
-│   └── logout/+server.ts         # POST
+│   ├── logout/+server.ts         # POST
+│   ├── forgot-password/+server.ts # POST (Gửi email Resend)
+│   └── reset-password/+server.ts  # POST (Xác thực HMAC token)
 ├── categories/
 │   ├── +server.ts                # GET list
 │   └── [id]/+server.ts           # GET/PATCH/DELETE
@@ -229,6 +233,8 @@ src/lib/server/
 ├── validators/
 │   ├── seat-overlap.validator.ts   # Section overlap & requirement checks
 │   └── disabled-seats.validator.ts # Disabled seat validation
+├── redis.ts               # Upstash Redis client (Singleton)
+├── push.ts                # PushForge Builder config
 ├── config.ts              # Env validation via Zod (fail-fast)
 ├── errors.ts              # AppError class + predefined error catalog
 └── handler.ts             # apiHandler wrapper (centralized error catching)
@@ -503,6 +509,14 @@ CHECK (is_checked_in = (checked_in_at IS NOT NULL))   -- Consistency check
 INDEX idx_idempotency_keys_created_at ON idempotency_keys(created_at)
 ```
 
+### `password_reset_tokens`
+
+| Cột        | Kiểu        | Ràng buộc                       | Mô tả                          |
+| :--------- | :---------- | :------------------------------ | :----------------------------- |
+| token_hash | VARCHAR(64) | PK                              | Bản băm HMAC-SHA256 của token  |
+| user_id    | INT         | FK → users.id (CASCADE), UNIQUE | Mỗi user chỉ có 1 token active |
+| expires_at | TIMESTAMPTZ | NOT NULL                        | Thời điểm hết hạn (1 giờ)      |
+
 ---
 
 ### 3.3 Enum Definitions
@@ -535,6 +549,9 @@ CREATE TYPE order_status   AS ENUM ('pending', 'paid', 'cancelled');
 | `idx_orders_expires`              | orders           | (status, expires_at) WHERE pending              | Worker nhả ghế hết hạn           |
 | `uq_ticket_code`                  | order_items      | (ticket_code) UNIQUE                            | Lookup vé theo mã                |
 | `idx_idempotency_keys_created_at` | idempotency_keys | (created_at)                                    | Cleanup old keys                 |
+| `idx_orders_analytics`            | orders           | `(status, created_at)` WHERE `paid`             | Tối ưu đếm Doanh thu / Velocity  |
+| `idx_orders_dropoff`              | orders           | `(status)` WHERE `paid` OR `cancelled`          | Tối ưu tính tỉ lệ rớt giỏ hàng   |
+| `idx_users_demographics`          | users            | `(gender, date_of_birth)`                       | Tối ưu biểu đồ Nhân khẩu học     |
 
 **Tại sao chọn những index này:**
 
@@ -838,24 +855,23 @@ graph TB
 
 ---
 
-### 4.5 Virtual Queue
+### 4.5 Virtual Queue & Active Session Protection
 
-Sử dụng Upstash Redis để quản lý state tập trung. Hàng chờ được quản lý theo **Sự kiện (Event)** để hỗ trợ luồng mua vé Multi-show.
+Sử dụng Upstash Redis để quản lý state tập trung, chống quá tải Database. Luồng xếp hàng được thiết kế với tiêu chuẩn bảo mật cao (JWE) và bảo vệ trải nghiệm người dùng tối đa.
 
 1. **Cấu trúc Redis:**
-   - active_users:{eventId}: Redis SET chứa ID các user đang được phép mua vé trong sự kiện này.
-   - waiting_queue:{eventId}: Redis Sorted Set (ZSET) chứa ID user đang xếp hàng.
-2. **Access Token Flow:**
-   - Khi tới lượt, user được cấp **Event Access Token**.
-   - Token này cho phép user gọi API POST /seats/hold cho **bất kỳ suất diễn (show) nào** thuộc eventId đó.
-3. **Luồng vào (Gatekeeper):**
-   - User truy cập → Check size của `active_users`.
-   - Nếu < `MAX_CONCURRENT` → Cho vào thẳng.
-   - Nếu ≥ `MAX_CONCURRENT` → `ZADD waiting_queue {timestamp} {userId}` → Trả về FE trạng thái "Đang chờ".
-4. **Luồng xả (Cron/Worker):**
-   - Chạy mỗi 3s: Check số slot trống = `MAX - active_users`.
-   - Nếu có slot: `ZPOPMIN waiting_queue {số_slot}` → Chuyển user sang `active_users` → Cấp **Seat Access Token (JWT hạn 5 phút)**.
-   - User dùng token này để gọi API lấy ghế và giữ chỗ.
+   - `user_current_queue:{userId}` (String): Lưu `eventId`. Dùng để chặn xếp hàng chéo (1 User chỉ được tham gia 1 Queue).
+   - `active_users:{eventId}` (ZSET): Chứa ID user đang được phép mua vé. Score là timestamp hết hạn.
+   - `waiting_queue:{eventId}` (ZSET): Chứa ID user đang xếp hàng. Score là timestamp bắt đầu chờ.
+   - `push_sub:{userId}` (String): Lưu PushSubscription để bắn Web Push khi tới lượt.
+2. **Luồng vào (Gatekeeper):**
+   - User truy cập → Check `user_current_queue`. Nếu đang ở sự kiện khác → Block (HTTP 409).
+   - Check size `active_users`. Nếu < `MAX` → Cấp slot (5 phút), trả về **JWE Seat Access Token** + `expiresAt`.
+   - Nếu ≥ `MAX` → `ZADD waiting_queue` → Trả về trạng thái "Đang chờ".
+3. **Luồng xả & Grace Period (Worker mỗi 3s):**
+   - Dọn dẹp user hết hạn khỏi `active_users` và xóa `user_current_queue` của họ.
+   - Bốc user từ `waiting_queue` sang `active_users` nhưng **CHỈ CẤP 1 PHÚT (Grace Period)**. Đồng thời gọi PushForge bắn **Web Push Notification** gọi user quay lại.
+   - User quay lại bấm "Vào mua" → Gọi API `/confirm` → Gia hạn lên 5 phút.
 
 ```mermaid
 graph TB
@@ -899,6 +915,30 @@ graph TD
     V --> C["GET /seats/stream"]
 ```
 
+### 4.6 Web Push Notification (PushForge)
+
+Giải quyết bài toán user rời tab khi đang xếp hàng.
+
+- **Frontend:** Xin quyền Notification, gọi `pushManager.subscribe()`, gửi object keys lên API.
+- **Backend:** Lưu subscription vào Upstash Redis (TTL 2 giờ).
+- **Worker:** Khi xả hàng chờ, dùng `@pushforge/builder` (Zero-dependency Web Crypto API) bọc payload và gửi POST request thẳng tới FCM/APNs. Đặt header `ttl: 60` (chỉ sống 60s khớp với Grace Period).
+
+### 4.7 Password Reset & Email (Resend + Bun Crypto)
+
+Bảo mật tối đa cho luồng khôi phục mật khẩu.
+
+- **Sinh Token:** Dùng `crypto.getRandomValues` (CSPRNG) sinh chuỗi 32 bytes ngẫu nhiên.
+- **Bảo mật (HMAC-SHA256):** Dùng `Bun.CryptoHasher` kết hợp Secret Key để băm token trước khi lưu vào DB. Chống lộ token kể cả khi DB bị hack.
+- **Gửi Email:** Render template HTML trực tiếp từ Svelte component bằng `better-svelte-email`, gửi qua API của `Resend`.
+
+### 4.8 SSR QR Code (etiket)
+
+Mã QR trên vé được sinh ra bằng kỹ thuật SSR (Server-Side Rendering) thông qua thư viện `etiket`.
+
+- Không lưu ảnh QR vào Database.
+- Trình duyệt nhận chuỗi `<svg>` thuần túy ngay khi load HTML, không cần tải thư viện JS nặng nề ở client.
+- CSS ép nền trắng vân đen để đảm bảo máy quét vật lý đọc được kể cả khi user dùng Dark Mode.
+
 ---
 
 ## 5. Thiết kế xác thực & phân quyền (Auth)
@@ -920,13 +960,14 @@ graph TD
 └──────────────────────────────────┘
 
 ┌──────────────────────────────────┐
-│      Seat Access Token           │
+│ Seat Access Token (JWE Encrypted)│
 │──────────────────────────────────│
-│  Payload: {                      │
-│    sub: 123,                     │
-│    event_id: 5,                  │
-│    type: "seat_access",          │
-│    exp: 1716000300  // 5 phút    │
+│  Header:  { alg: dir, enc: A256GCM }
+│  Ciphertext: (Mã hóa hoàn toàn payload)
+│  * Payload ẩn bên trong: {       │
+│      iss: "tixtac:queue",        │
+│      aud: "tixtac:booking",      │
+│      sub: 123, event_id: 5       │
 │  }                               │
 └──────────────────────────────────┘
 ```
@@ -1002,14 +1043,16 @@ export const handle = sequence(securityHeaders, auth);
 
 ### 6.1 Public
 
-| Method | Endpoint             | Mô tả                       |
-| ------ | -------------------- | --------------------------- |
-| POST   | `/api/auth/register` | Đăng ký                     |
-| POST   | `/api/auth/login`    | Đăng nhập                   |
-| POST   | `/api/auth/logout`   | Đăng xuất (xóa auth cookie) |
-| GET    | `/api/events`        | Danh sách + tìm kiếm        |
-| GET    | `/api/events/[id]`   | Chi tiết sự kiện            |
-| GET    | `/api/categories`    | Danh sách danh mục          |
+| Method | Endpoint                    | Mô tả                                 |
+| ------ | --------------------------- | ------------------------------------- |
+| POST   | `/api/auth/register`        | Đăng ký                               |
+| POST   | `/api/auth/login`           | Đăng nhập                             |
+| POST   | `/api/auth/logout`          | Đăng xuất (xóa auth cookie)           |
+| GET    | `/api/events`               | Danh sách + tìm kiếm                  |
+| GET    | `/api/events/[id]`          | Chi tiết sự kiện                      |
+| GET    | `/api/categories`           | Danh sách danh mục                    |
+| POST   | `/api/auth/forgot-password` | Gửi email khôi phục (Rate limit 3/hr) |
+| POST   | `/api/auth/reset-password`  | Đặt lại mật khẩu với HMAC token       |
 
 ### 6.2 Customer
 
@@ -1019,6 +1062,13 @@ export const handle = sequence(securityHeaders, auth);
 | POST   | `/api/events/[id]/checkout`             | Mua vé (hold seats, cart replacement, idempotent) |
 | POST   | `/api/orders/[id]/checkout`             | Thanh toán đơn hàng                               |
 | GET    | `/api/me/tickets`                       | Vé của tôi (pending orders + paid tickets)        |
+| POST   | `/api/events/[id]/queue`                | Xin slot Queue (Gatekeeper)                       |
+| GET    | `/api/events/[id]/queue/status`         | Polling lấy STT hoặc trạng thái                   |
+| POST   | `/api/events/[id]/queue/confirm`        | Xác nhận vào mua (Gia hạn 5 phút)                 |
+| DELETE | `/api/events/[id]/queue`                | Hủy/Thoát hàng chờ                                |
+| POST   | `/api/me/push-subscription`             | Lưu Web Push keys vào Redis                       |
+| PATCH  | `/api/me/profile`                       | Sửa thông tin cá nhân                             |
+| PATCH  | `/api/me/security`                      | Đổi Mật khẩu / Email                              |
 
 ### 6.3 Admin — Event Creation (3-Step Flow)
 
@@ -1200,6 +1250,11 @@ const envSchema = z.object({
   MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
+  UPSTASH_REDIS_REST_URL: z.string().url(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
+  RESEND_API_KEY: z.string().min(1),
+  VAPID_PUBLIC_KEY: z.string().min(1),
+  VAPID_PRIVATE_KEY_JWK: z.string().min(1),
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -1209,6 +1264,12 @@ const result = envSchema.safeParse({
   SEAT_LOCK_DURATION: env.SEAT_LOCK_DURATION,
   MAX_CONCURRENT_USERS: env.MAX_CONCURRENT_USERS,
   ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
+  CLOUDAMQP_URL: env.CLOUDAMQP_URL,
+  UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
+  UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
+  RESEND_API_KEY: env.RESEND_API_KEY,
+  VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY_JWK: env.VAPID_PRIVATE_KEY_JWK,
 });
 
 if (!result.success) {
@@ -1226,6 +1287,12 @@ export const config = {
   seatLockDuration: parsed.SEAT_LOCK_DURATION,
   maxConcurrentUsers: parsed.MAX_CONCURRENT_USERS,
   accessTokenDuration: parsed.ACCESS_TOKEN_DURATION,
+  cloudAmqpUrl: parsed.CLOUDAMQP_URL,
+  upstashUrl: parsed.UPSTASH_REDIS_REST_URL,
+  upstashToken: parsed.UPSTASH_REDIS_REST_TOKEN,
+  resendApiKey: parsed.RESEND_API_KEY,
+  vapidPublicKey: parsed.VAPID_PUBLIC_KEY,
+  vapidPrivateKeyJwk: parsed.VAPID_PRIVATE_KEY_JWK,
 } as const;
 ```
 
@@ -1281,21 +1348,26 @@ Lưu ý:
 
 ## 10. Tech Stack
 
-| Concern          | Technology                               |
-| ---------------- | ---------------------------------------- |
-| Framework        | SvelteKit (Svelte 5)                     |
-| Runtime          | Bun                                      |
-| Language         | TypeScript                               |
-| Database         | PostgreSQL + Drizzle ORM                 |
-| Auth             | JWT (jose) + argon2 password hashing     |
-| Validation       | Zod (shared FE/BE schemas)               |
-| Message Queue    | CloudAMQP (RabbitMQ via amqplib)         |
-| UI Components    | Tailwind CSS 4 + shadcn-svelte + bits-ui |
-| Icons            | Lucide                                   |
-| Seat Map Builder | Konva (svelte-konva)                     |
-| Charts           | LayerChart                               |
-| Carousel         | Embla Carousel                           |
-| Deployment       | Render (svelte-adapter-bun)              |
+| Concern                | Technology                               |
+| ---------------------- | ---------------------------------------- |
+| Framework              | SvelteKit (Svelte 5)                     |
+| Runtime                | Bun                                      |
+| Language               | TypeScript                               |
+| Database               | PostgreSQL + Drizzle ORM                 |
+| Auth/Password          | JWT (jose) + argon2 password hashing     |
+| Validation             | Zod (shared FE/BE schemas)               |
+| Message Queue          | CloudAMQP (RabbitMQ via amqplib)         |
+| UI Components          | Tailwind CSS 4 + shadcn-svelte + bits-ui |
+| Icons                  | Lucide                                   |
+| Seat Map Builder       | Konva (svelte-konva)                     |
+| Charts                 | LayerChart                               |
+| Carousel               | Embla Carousel                           |
+| Cache & Queue State    | Upstash Redis                            |
+| Email Service          | Resend + better-svelte-email             |
+| Web Push Notifications | @pushforge/builder (Web Crypto API)      |
+| QR Code (SSR)          | etiket                                   |
+| Unit Testing           | bun:test                                 |
+| Deployment             | Render (svelte-adapter-bun)              |
 
 ---
 
@@ -1314,6 +1386,8 @@ src/
 │   │   ├── customer/           # Customer-specific components (event cards, ticket cards)
 │   │   ├── seat-map/           # Shared seat map viewer (SeatItem, SectionBlock, SummaryBar)
 │   │   └── ui/                 # shadcn-svelte primitives (button, badge, popover, etc.)
+│   ├───emails                  # Template email Svelte (Resend)
+│   │   └───ResetPassword.svelte
 │   ├── server/
 │   │   ├── auth/               # JWT, password hashing, guards
 │   │   ├── db/                 # Drizzle schema, client, seed scripts
@@ -1322,6 +1396,8 @@ src/
 │   │   ├── validators/         # Domain validators (seat overlap, disabled seats)
 │   │   ├── config.ts           # Env validation (Zod, fail-fast)
 │   │   ├── errors.ts           # AppError class + error catalog
+│   │   ├───redis.ts            # Upstash Redis client
+│   │   └───push.ts             # PushForge builder config
 │   │   └── handler.ts          # apiHandler wrapper
 │   ├── shared/
 │   │   └── schemas/            # Zod schemas (shared FE/BE)
