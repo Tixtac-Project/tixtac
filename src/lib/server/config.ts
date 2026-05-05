@@ -10,7 +10,7 @@ const envSchema = z.object({
   SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
   MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
-  AMQP_URL: z.string().min(1, 'AMQP_URL is required'),
+  CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
   UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),
 });
@@ -22,7 +22,7 @@ const result = envSchema.safeParse({
   SEAT_LOCK_DURATION: env.SEAT_LOCK_DURATION,
   MAX_CONCURRENT_USERS: env.MAX_CONCURRENT_USERS,
   ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
-  AMQP_URL: env.AMQP_URL,
+  CLOUDAMQP_URL: env.CLOUDAMQP_URL,
   UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
 });
@@ -53,7 +53,7 @@ export const config = {
   /** Access token lifetime in seconds after queue*/
   accessTokenDuration: parsed.ACCESS_TOKEN_DURATION,
   /** CloudAMQP connection URL */
-  cloudAMQPUrl: parsed.AMQP_URL,
+  cloudAMQPUrl: parsed.CLOUDAMQP_URL,
   /** Upstash Redis REST URL */
   upstashUrl: parsed.UPSTASH_REDIS_REST_URL,
   /** Upstash Redis REST token */
