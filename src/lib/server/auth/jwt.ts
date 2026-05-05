@@ -1,14 +1,15 @@
 // src/lib/server/auth/jwt.ts
 import { SignJWT, jwtVerify, EncryptJWT, jwtDecrypt } from 'jose';
 import { config } from '$lib/server/config';
-import { createHash } from 'node:crypto';
 import { Errors, throwError } from '$lib/server/errors';
 
 // 1. Chìa khóa để KÝ JWT (dùng TextEncoder thông thường)
 const signSecret = new TextEncoder().encode(config.jwtSecret);
 
 // 2. Chìa khóa để MÃ HÓA JWE (Băm qua SHA-256 để luôn đảm bảo đúng 32 bytes)
-const encryptionKey = createHash('sha256').update(config.jwtSecret).digest();
+const hasher = new Bun.CryptoHasher('sha256');
+hasher.update(config.jwtSecret);
+const encryptionKey = hasher.digest();
 
 // ==========================================================
 // PHẦN 1: AUTH TOKEN (DÙNG ĐỂ ĐĂNG NHẬP - JWT)

@@ -13,6 +13,10 @@ await startWorker();
 
 async function runQueueWorker() {
   try {
+    // Phân tán (Distributed lock) để tránh race condition khi chạy nhiều instance
+    const lockAcquired = await redis.set('worker_lock:queue', '1', { nx: true, ex: 10 });
+    if (!lockAcquired) return;
+
     let cursor = '0';
     const eventIds = new Set<string>();
 
@@ -54,7 +58,7 @@ async function runQueueWorker() {
       }
 
       const currentActiveCount = await redis.zcount(activeKey, now, '+inf');
-      const availableSlots = config.maxConcurrentUsers - currentActiveCount;
+      const availableSlots = (config.maxConcurrentUsers ?? 200) - currentActiveCount;
 
       if (availableSlots > 0) {
         const nextUserIds = await redis.zrange(waitingKey, 0, availableSlots - 1);
@@ -64,7 +68,7 @@ async function runQueueWorker() {
           for (const uId of nextUserIds) {
             pipeline.zadd(activeKey, { score: now + 60000, member: uId });
             pipeline.zrem(waitingKey, uId);
-            pipeline.expire(`user_current_queue:${uId}`, 600);
+            pipeline.set(`user_current_queue:${uId}`, eventId, { ex: 600 });
           }
           await pipeline.exec();
           console.log(
