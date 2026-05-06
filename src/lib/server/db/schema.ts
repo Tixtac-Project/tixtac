@@ -304,6 +304,12 @@ export const orderItems = pgTable(
     seatId: integer('seat_id')
       .notNull()
       .references(() => seats.id, { onDelete: 'restrict' }),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'restrict' }),
+    showId: integer('show_id')
+      .notNull()
+      .references(() => eventShows.id, { onDelete: 'restrict' }),
     priceSnapshot: decimal('price_snapshot', { precision: 12, scale: 2 }).notNull(),
     ticketCode: varchar('ticket_code', { length: 20 }).notNull().unique(), // e.g. "TIX-A3F8K2"
     qrCode: text('qr_code'),
@@ -317,6 +323,8 @@ export const orderItems = pgTable(
       'chk_checked_in_consistency',
       sql`${table.isCheckedIn} = (${table.checkedInAt} IS NOT NULL)`,
     ),
+    index('idx_order_items_event').on(table.eventId),
+    index('idx_order_items_show').on(table.showId),
   ],
 );
 
@@ -380,4 +388,6 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   seat: one(seats, { fields: [orderItems.seatId], references: [seats.id] }),
+  event: one(events, { fields: [orderItems.eventId], references: [events.id] }),
+  show: one(eventShows, { fields: [orderItems.showId], references: [eventShows.id] }),
 }));

@@ -21,6 +21,19 @@ import { and, count, eq, ilike, min, sql } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 import { insertShowWithSections } from './seatmap.service';
 
+const boughtCountByUserEvent = db
+  .select({ count: sql<number>`count(*)` })
+  .from(orders)
+  .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+  .where(
+    and(
+      eq(orders.userId, sql.placeholder('userId')),
+      eq(orders.status, 'paid'),
+      eq(orderItems.eventId, sql.placeholder('eventId')),
+    ),
+  )
+  .prepare('evt_bought_count_by_user_event');
+
 // Prepared statements — compiled once, reused across requests
 const eventById = db
   .select()
@@ -188,19 +201,7 @@ export const eventService = {
     // 0. Count already-bought (paid) tickets for this user+event
     let boughtCount = 0;
     if (userId) {
-      const [bought] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(orders)
-        .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
-        .innerJoin(seats, eq(seats.id, orderItems.seatId))
-        .innerJoin(eventShows, eq(eventShows.id, seats.showId))
-        .where(
-          and(
-            eq(orders.userId, userId),
-            eq(orders.status, 'paid'),
-            eq(eventShows.eventId, eventId),
-          ),
-        );
+      const [bought] = await boughtCountByUserEvent.execute({ userId, eventId });
       boughtCount = Number(bought?.count ?? 0);
     }
 

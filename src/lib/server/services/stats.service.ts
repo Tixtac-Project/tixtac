@@ -8,7 +8,7 @@ import {
   refreshRateLimitKey,
 } from '$lib/server/cache';
 import { db } from '$lib/server/db';
-import { events, eventShows, orderItems, orders, seats, users } from '$lib/server/db/schema';
+import { events, orderItems, orders, users } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { redis } from '$lib/server/redis';
 import type { DemographicsStats, OverviewStats, SalesVelocityPoint } from '$lib/types/stats';
@@ -88,7 +88,6 @@ function ageGroup(dobStr: string, now: Date): string {
   return '> 60';
 }
 
-/** Guard against `new Date(undefined)` / `new Date("")` producing Invalid Date */
 function isValidDate(d: Date): boolean {
   return d instanceof Date && !isNaN(d.getTime());
 }
@@ -138,16 +137,13 @@ function cacheDateSegment(dateStr: string | null): string {
 // ══════════════════════════════════════════════════
 
 /**
- * EXISTS clause shared by overview & velocity to filter orders linked
- * to a specific event WITHOUT multiplying rows via a flat JOIN.
+ * Simple EXISTS on orderItems.event_id — hits idx_order_items_event directly.
  */
 function existsOrderForEvent() {
   return sql`EXISTS (
     SELECT 1 FROM ${orderItems}
-    INNER JOIN ${seats} ON ${seats.id} = ${orderItems.seatId}
-    INNER JOIN ${eventShows} ON ${eventShows.id} = ${seats.showId}
     WHERE ${orderItems.orderId} = ${orders.id}
-      AND ${eventShows.eventId} = ${sql.placeholder('eventId')}
+      AND ${orderItems.eventId} = ${sql.placeholder('eventId')}
   )`;
 }
 
@@ -199,8 +195,11 @@ function getVelocityStmt(interval: 'hour' | 'day' | 'week') {
   return velocityDayStmt;
 }
 
-// Dedup users in SQL via GROUP BY instead of selectDistinct (incompatible
-// with .prepare()). Multiple orders per user are collapsed by GROUP BY.
+/**
+ * Demographics now joins only 3 tables instead of 5:
+ *   users → orders → order_items
+ * No more seats or event_shows joins needed.
+ */
 const demographicsRowStmt = db
   .select({
     gender: sql<'male' | 'female' | 'other'>`MAX(${users.gender})`,
@@ -209,12 +208,10 @@ const demographicsRowStmt = db
   .from(users)
   .innerJoin(orders, eq(orders.userId, users.id))
   .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
-  .innerJoin(seats, eq(seats.id, orderItems.seatId))
-  .innerJoin(eventShows, eq(eventShows.id, seats.showId))
   .where(
     and(
       eq(orders.status, 'paid'),
-      eq(eventShows.eventId, sql.placeholder('eventId')),
+      eq(orderItems.eventId, sql.placeholder('eventId')),
       gte(orders.createdAt, sql.placeholder('startDate')),
       lte(orders.createdAt, sql.placeholder('endDate')),
     ),

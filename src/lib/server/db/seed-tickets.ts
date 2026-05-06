@@ -9,7 +9,7 @@ async function seedTickets() {
   console.log('🎫 Starting Ticketing Test Seed...');
 
   // 1. Đảm bảo có User Test
-  const testEmail = 'hnd1@gmail.com';
+  const testEmail = 'user@tixtac.io.vn';
   const passwordHash = await hashPassword('12345678');
 
   console.log(`👤 Checking for test user: ${testEmail}`);
@@ -80,6 +80,8 @@ async function seedTickets() {
     await db.insert(orderItems).values({
       orderId: paidOrder1.id,
       seatId: s.id,
+      eventId: night1.eventId,
+      showId: night1.id,
       priceSnapshot: '1000000',
       ticketCode: code,
       qrCode: code,
@@ -110,6 +112,8 @@ async function seedTickets() {
     await db.insert(orderItems).values({
       orderId: paidOrder2.id,
       seatId: s.id,
+      eventId: night2.eventId,
+      showId: night2.id,
       priceSnapshot: '2000000',
       ticketCode: code,
       qrCode: code,
@@ -139,6 +143,8 @@ async function seedTickets() {
     await db.insert(orderItems).values({
       orderId: pendingOrder.id,
       seatId: s.id,
+      eventId: night1.eventId,
+      showId: night1.id,
       priceSnapshot: '800000',
       ticketCode: code,
       qrCode: code,
