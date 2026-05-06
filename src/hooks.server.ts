@@ -4,21 +4,36 @@ import { initMQWithRetry } from '$lib/server/mq/initMQ';
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
-import { redis } from '$lib/server/redis';
 import { config } from '$lib/server/config';
+import { redis } from '$lib/server/redis';
 
-const mqInitPromise = initMQWithRetry();
-await mqInitPromise;
-await startWorker();
+// Fire-and-forget background init — must not block server startup on slow MQ connect.
+void (async () => {
+  try {
+    await initMQWithRetry();
+    await startWorker();
+  } catch (err) {
+    console.error('[MQ] Background init failed:', err);
+  }
+})();
+
+const RELEASE_LOCK_SCRIPT = `
+  if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+  else
+    return 0
+  end
+`;
 
 async function runQueueWorker() {
-  let lockAcquired = false;
+  const lockToken = crypto.randomUUID();
+  let lockHeld = false;
   try {
-    // Distributed lock to prevent race conditions across instances.
-    // ex: 10 is a failsafe — lock is explicitly released in finally.
-    const lockResult = await redis.set('worker_lock:queue', '1', { nx: true, ex: 10 });
+    // Token-based distributed lock: prevents worker A from deleting worker B's lock
+    // if A's TTL expires mid-run. ex: 10 is a failsafe.
+    const lockResult = await redis.set('worker_lock:queue', lockToken, { nx: true, ex: 10 });
     if (!lockResult) return;
-    lockAcquired = true;
+    lockHeld = true;
 
     // O(1) lookup via dedicated tracking set instead of O(N) SCAN over all keys.
     const eventIdsArray = await redis.smembers('active_event_ids');
@@ -47,9 +62,11 @@ async function runQueueWorker() {
         console.log(`[QueueWorker] 🧹 Đuổi ${expiredUserIds.length} users khỏi Event ${eventId}`);
       }
 
+      const maxUsers = config.maxConcurrentUsers ?? 200;
+
       // B. Promote waiting users into available slots
       const currentActiveCount = await redis.zcount(activeKey, now, '+inf');
-      const availableSlots = (config.maxConcurrentUsers ?? 200) - currentActiveCount;
+      const availableSlots = Math.max(0, maxUsers - currentActiveCount);
 
       if (availableSlots > 0) {
         const nextUserIds = await redis.zrange(waitingKey, 0, availableSlots - 1);
@@ -59,7 +76,9 @@ async function runQueueWorker() {
           for (const uId of nextUserIds) {
             pipeline.zadd(activeKey, { score: now + slotDurationMs, member: uId });
             pipeline.zrem(waitingKey, uId);
-            pipeline.set(`user_current_queue:${uId}`, eventId, { ex: config.accessTokenDuration });
+            pipeline.set(`user_current_queue:${uId}`, eventId, {
+              ex: config.accessTokenDuration + 5,
+            });
           }
           await pipeline.exec();
           console.log(
@@ -69,7 +88,7 @@ async function runQueueWorker() {
       }
 
       // C. Garbage-collect event from tracking set when both queues are empty
-      if (availableSlots === (config.maxConcurrentUsers ?? 200)) {
+      if (maxUsers > 0 && availableSlots === maxUsers) {
         // All slots free — check if anyone is waiting
         const waitingCount = await redis.zcard(waitingKey);
         if (waitingCount === 0) {
@@ -81,9 +100,9 @@ async function runQueueWorker() {
   } catch (error) {
     console.error('[QueueWorker] Error:', error);
   } finally {
-    // Release the lock so the next tick can run on schedule (every 3s).
-    if (lockAcquired) {
-      await redis.del('worker_lock:queue').catch(() => {});
+    // Safe release: only delete if the lock still holds our token.
+    if (lockHeld) {
+      await redis.eval(RELEASE_LOCK_SCRIPT, ['worker_lock:queue'], [lockToken]).catch(() => {});
     }
   }
 }
@@ -117,6 +136,7 @@ const securityHeaders: Handle = async ({ event, resolve }) => {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
   return response;
 };
 
@@ -146,10 +166,11 @@ const auth: Handle = async ({ event, resolve }) => {
       throw new Error('Invalid role in token');
     }
 
-    event.locals.user = {
-      id: typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : Number(payload.sub),
-      role: role as 'admin' | 'customer',
-    };
+    const id = Number(payload.sub);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error('Invalid sub in token');
+    }
+    event.locals.user = { id, role: role as 'admin' | 'customer' };
   } catch (e) {
     console.warn('[auth] Token validation failed:', e instanceof Error ? e.message : e);
     event.cookies.delete('auth_token', { path: '/' });
