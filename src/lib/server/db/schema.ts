@@ -273,6 +273,8 @@ export const seats = pgTable(
     uniqueIndex('uq_seats_id_show').on(table.id, table.showId),
     index('idx_seats_show_status').on(table.showId, table.status),
     index('idx_seats_section').on(table.sectionId),
+    index('idx_seats_section_status').on(table.sectionId, table.status),
+    index('idx_seats_section_row_col').on(table.sectionId, table.rowLabel, table.colNumber),
   ],
 );
 
@@ -340,6 +342,7 @@ export const orderItems = pgTable(
       sql`${table.isCheckedIn} = (${table.checkedInAt} IS NOT NULL)`,
     ),
     index('idx_order_items_event').on(table.eventId),
+    index('idx_order_items_event_order').on(table.eventId, table.orderId),
     index('idx_order_items_show').on(table.showId),
     index('idx_order_items_order').on(table.orderId),
   ],
