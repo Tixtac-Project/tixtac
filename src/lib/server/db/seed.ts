@@ -177,6 +177,21 @@ async function createShowWithSections(eventId: number, show: ShowSeed) {
     for (let i = 0; i < seatValues.length; i += 1000) {
       await db.insert(seats).values(seatValues.slice(i, i + 1000));
     }
+
+    // Sync materialized counters on seat_sections after seats are inserted.
+    // In production this would be a DB trigger; the seed does it manually.
+    const totalCount = seatValues.length;
+    const availableCount = seatValues.filter((v) => v.status === 'available').length;
+    const disabledCount = seatValues.filter((v) => v.status === 'disabled').length;
+
+    await db
+      .update(seatSections)
+      .set({
+        totalSeats: totalCount,
+        availableSeats: availableCount,
+        disabledSeats: disabledCount,
+      })
+      .where(eq(seatSections.id, section.id));
   }
 
   return newShow;
@@ -397,6 +412,21 @@ export async function seed() {
             sql`, `,
           )})`,
         );
+
+      // Sync materialized counters on affected sections after order
+      if (seatStatus === 'sold' || seatStatus === 'locked') {
+        // Decrement availableSeats for each affected section
+        const affectedSections = [...new Set(seatsForShow.map((s) => s.sectionId))];
+        for (const sid of affectedSections) {
+          const count = seatIds.filter((_, i) => seatsForShow[i].sectionId === sid).length;
+          await db
+            .update(seatSections)
+            .set({
+              availableSeats: sql`${seatSections.availableSeats} - ${count}`,
+            })
+            .where(eq(seatSections.id, sid));
+        }
+      }
 
       totalOrders++;
       totalItems += itemValues.length;
