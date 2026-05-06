@@ -336,6 +336,16 @@ export const idempotencyKeys = pgTable(
   (table) => [index('idx_idempotency_keys_created_at').on(table.createdAt)],
 );
 
+// ── Password Reset Tokens ──────────────────────────────────────────────────
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  token_hash: varchar('token_hash', { length: 64 }).primaryKey(),
+  user_id: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' })
+    .unique(),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+});
+
 // ══════════════════════════════════════════════════
 // RELATIONS
 // ══════════════════════════════════════════════════
