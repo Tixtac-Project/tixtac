@@ -145,6 +145,36 @@ export async function insertSectionsWithSeats(
     await tx.insert(seats).values(allSeats.slice(i, i + SEAT_INSERT_BATCH_SIZE));
   }
 
+  // ── 4. Sync materialized counters on each section ──
+  for (let idx = 0; idx < sections.length; idx++) {
+    const sec = sections[idx];
+    const dbSection = insertedSections[idx];
+    const sectionType = sec.type ?? 'assigned';
+
+    if (sectionType === 'general') {
+      const gaCapacity = sec.capacity ?? 0;
+      await tx
+        .update(seatSections)
+        .set({ totalSeats: gaCapacity, availableSeats: gaCapacity, disabledSeats: 0 })
+        .where(eq(seatSections.id, dbSection.id));
+    } else {
+      const seatCfg = sec.seat_config;
+      const totalCount = seatCfg.rows * seatCfg.cols;
+      const sectionSeats = allSeats.filter((s) => s.sectionId === dbSection.id);
+      const disabledCount = sectionSeats.filter((s) => s.status === 'disabled').length;
+      const availableCount = totalCount - disabledCount;
+
+      await tx
+        .update(seatSections)
+        .set({
+          totalSeats: totalCount,
+          availableSeats: availableCount,
+          disabledSeats: disabledCount,
+        })
+        .where(eq(seatSections.id, dbSection.id));
+    }
+  }
+
   return { total_seats, total_available_seats, sectionsInfo };
 }
 

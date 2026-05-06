@@ -1,41 +1,37 @@
 import { db } from '$lib/server/db';
-import { orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
+import { events, eventShows, orderItems, orders, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import type { PendingOrder } from '$lib/types/purchase';
-import { and, desc, eq, gt, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, or, sql } from 'drizzle-orm';
 
 /* ================= TYPE ================= */
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Order = typeof orders.$inferSelect;
 
-type OrderItemWithRelations = typeof orderItems.$inferSelect & {
-  seat: typeof seats.$inferSelect & {
-    section: typeof seatSections.$inferSelect;
-    show: {
-      title: string | null;
-      showDate: string;
-      startTime: Date;
-      event: {
-        id: number;
-        title: string;
-        venue: string;
-        bannerImageUrl: string | null;
-      };
-    };
-  };
-};
-
-type FormattedItem = {
-  event: { id: number; title: string; venue: string; bannerImageUrl: string | null };
-  show: { title: string | null; showDate: string; startTime: Date };
-  item_id: number;
-  price: string;
-  ticket_code: string;
-  section_name: string;
-  seat_type: 'assigned' | 'general';
-  seat_label: string | null;
+type OrderListRow = {
+  orderId: number;
+  status: 'pending' | 'paid' | 'cancelled';
+  totalAmount: string;
+  expiresAt: Date;
+  createdAt: Date;
+  paidAt: Date | null;
+  itemId: number;
+  priceSnapshot: string;
+  ticketCode: string;
+  eventId: number;
+  eventTitle: string;
+  venue: string;
+  bannerImageUrl: string | null;
+  showTitle: string | null;
+  showDate: string;
+  startTime: Date;
+  sectionName: string;
+  seatType: 'assigned' | 'general';
+  prefix: string;
+  rowLabel: string;
+  colNumber: number;
 };
 
 type PaidTicketEntry = {
@@ -244,6 +240,9 @@ export const orderService = {
           throwError(Errors.SEAT_NOT_AVAILABLE);
         }
         soldSeats = updatedSeats;
+
+        // locked → sold does not change availableSeats: seats were already removed
+        // from the available counter when the order was created.
       }
 
       // 7. Cập nhật order -> paid
@@ -292,133 +291,122 @@ export const orderService = {
 
   /**
    * Lấy lịch sử mua vé của User (Pending Orders & Paid Events).
-   * Tự động ẩn số ghế đối với khu vực vé đứng (General Admission).
+   * Uses one explicit projection query instead of Drizzle relational hydration to
+   * reduce nested object allocation and avoid selecting unused columns.
    */
   async getMyOrdersAndTickets(userId: number) {
-    /**
-     * 1. Query: Lấy tất cả đơn hàng (đã thanh toán hoặc đang chờ thanh toán mà chưa hết hạn).
-     * Query trực tiếp điều kiện thời gian, thay vì lấy hết rồi mới lọc.
-     */
     const now = new Date();
 
-    const userOrders = await db.query.orders.findMany({
-      where: and(
-        eq(orders.userId, userId),
-        or(eq(orders.status, 'paid'), and(eq(orders.status, 'pending'), gt(orders.expiresAt, now))),
-      ),
-      orderBy: [desc(orders.createdAt)],
-      with: {
-        items: {
-          with: {
-            seat: {
-              with: {
-                section: true,
-                show: {
-                  with: {
-                    event: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const rows: OrderListRow[] = await db
+      .select({
+        orderId: orders.id,
+        status: orders.status,
+        totalAmount: orders.totalAmount,
+        expiresAt: orders.expiresAt,
+        createdAt: orders.createdAt,
+        paidAt: orders.paidAt,
+        itemId: orderItems.id,
+        priceSnapshot: orderItems.priceSnapshot,
+        ticketCode: orderItems.ticketCode,
+        eventId: events.id,
+        eventTitle: events.title,
+        venue: events.venue,
+        bannerImageUrl: events.bannerImageUrl,
+        showTitle: eventShows.title,
+        showDate: eventShows.showDate,
+        startTime: eventShows.startTime,
+        sectionName: seatSections.name,
+        seatType: seatSections.type,
+        prefix: seats.prefix,
+        rowLabel: seats.rowLabel,
+        colNumber: seats.colNumber,
+      })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .innerJoin(events, eq(events.id, orderItems.eventId))
+      .innerJoin(eventShows, eq(eventShows.id, orderItems.showId))
+      .innerJoin(seats, eq(seats.id, orderItems.seatId))
+      .innerJoin(seatSections, eq(seatSections.id, seats.sectionId))
+      .where(
+        and(
+          eq(orders.userId, userId),
+          or(
+            eq(orders.status, 'paid'),
+            and(eq(orders.status, 'pending'), gt(orders.expiresAt, now)),
+          ),
+        ),
+      )
+      .orderBy(desc(orders.createdAt), desc(orderItems.id));
 
-    const pendingOrders: PendingOrder[] = [];
-    const paidTicketsFlatList: PaidTicketEntry[] = [];
-
-    for (const order of userOrders) {
-      const formatItem = (item: OrderItemWithRelations): FormattedItem => {
-        const seat = item.seat;
-        const section = seat.section;
-        const isGeneral = section.type === 'general';
-
-        let seatLabel: string | null = null;
-
-        if (!isGeneral) {
-          const rowCol = `${seat.rowLabel}${seat.colNumber}`;
-          seatLabel = seat.prefix ? `${seat.prefix}-${rowCol}` : rowCol;
-        }
-
-        return {
-          event: seat.show.event,
-          show: seat.show,
-          item_id: item.id,
-          price: Number(item.priceSnapshot).toFixed(2),
-          ticket_code: item.ticketCode,
-
-          section_name: section.name,
-          seat_type: section.type,
-          seat_label: seatLabel,
-        };
-      };
-
-      if (order.status === 'pending') {
-        pendingOrders.push({
-          order_id: order.id,
-          total_amount: Number(order.totalAmount).toFixed(2),
-          status: 'pending',
-          expires_at: order.expiresAt.toISOString(),
-          created_at: order.createdAt.toISOString(),
-
-          items: order.items.map((item) => {
-            const formatted = formatItem(item);
-            return {
-              event_id: formatted.event.id,
-              event_title: formatted.event.title,
-              show_title: formatted.show.title,
-              show_date: formatted.show.showDate,
-              start_time: formatted.show.startTime.toISOString(),
-              section_name: formatted.section_name,
-              seat_type: formatted.seat_type,
-              seat_label: formatted.seat_label,
-              price: formatted.price,
-            };
-          }),
-        });
-      } else if (order.status === 'paid') {
-        order.items.forEach((item) => {
-          const formatted = formatItem(item);
-          paidTicketsFlatList.push({
-            event: formatted.event,
-            ticket: {
-              order_item_id: formatted.item_id,
-              show_title: formatted.show.title,
-              show_date: formatted.show.showDate,
-              start_time: formatted.show.startTime.toISOString(),
-              section_name: formatted.section_name,
-              seat_type: formatted.seat_type,
-              seat_label: formatted.seat_label,
-              ticket_code: formatted.ticket_code,
-              qr_code: null, // Dành cho Sprint 5
-              paid_at: order.paidAt ? order.paidAt.toISOString() : null,
-            },
-          });
-        });
-      }
-    }
-
+    const pendingOrdersMap = new Map<number, PendingOrder>();
     const paidEventsMap = new Map<number, PaidEventEntry>();
 
-    for (const { event, ticket } of paidTicketsFlatList) {
-      const eventId = event.id;
+    for (const row of rows) {
+      const seatLabel =
+        row.seatType === 'general'
+          ? null
+          : row.prefix
+            ? `${row.prefix}-${row.rowLabel}${row.colNumber}`
+            : `${row.rowLabel}${row.colNumber}`;
 
-      if (!paidEventsMap.has(eventId)) {
-        paidEventsMap.set(eventId, {
-          event_id: eventId,
-          title: event.title,
-          venue: event.venue,
-          banner_image_url: event.bannerImageUrl,
-          tickets: [],
+      if (row.status === 'pending') {
+        let pending = pendingOrdersMap.get(row.orderId);
+        if (!pending) {
+          pending = {
+            order_id: row.orderId,
+            total_amount: Number(row.totalAmount).toFixed(2),
+            status: 'pending',
+            expires_at: row.expiresAt.toISOString(),
+            created_at: row.createdAt.toISOString(),
+            items: [],
+          };
+          pendingOrdersMap.set(row.orderId, pending);
+        }
+
+        pending.items.push({
+          event_id: row.eventId,
+          event_title: row.eventTitle,
+          show_title: row.showTitle,
+          show_date: row.showDate,
+          start_time: row.startTime.toISOString(),
+          section_name: row.sectionName,
+          seat_type: row.seatType,
+          seat_label: seatLabel,
+          price: Number(row.priceSnapshot).toFixed(2),
         });
+        continue;
       }
 
-      paidEventsMap.get(eventId)!.tickets.push(ticket);
+      if (row.status === 'paid') {
+        let paidEvent = paidEventsMap.get(row.eventId);
+        if (!paidEvent) {
+          paidEvent = {
+            event_id: row.eventId,
+            title: row.eventTitle,
+            venue: row.venue,
+            banner_image_url: row.bannerImageUrl,
+            tickets: [],
+          };
+          paidEventsMap.set(row.eventId, paidEvent);
+        }
+
+        paidEvent.tickets.push({
+          order_item_id: row.itemId,
+          show_title: row.showTitle,
+          show_date: row.showDate,
+          start_time: row.startTime.toISOString(),
+          section_name: row.sectionName,
+          seat_type: row.seatType,
+          seat_label: seatLabel,
+          ticket_code: row.ticketCode,
+          qr_code: null,
+          paid_at: row.paidAt ? row.paidAt.toISOString() : null,
+        });
+      }
     }
 
     return {
-      pending_orders: pendingOrders,
+      pending_orders: Array.from(pendingOrdersMap.values()),
       paid_events: Array.from(paidEventsMap.values()),
     };
   },
@@ -459,6 +447,7 @@ export const orderService = {
       const seatIds = items.map((i) => i.seatId);
 
       // Chỉ release ghế đang thật sự locked bởi chính user của đơn này.
+      // Also return sectionId so we can restore materialized counters.
       const released = await tx
         .update(seats)
         .set({ status: 'available', lockedBy: null, lockedAt: null })
@@ -469,7 +458,19 @@ export const orderService = {
             eq(seats.lockedBy, order.userId),
           ),
         )
-        .returning({ id: seats.id, showId: seats.showId });
+        .returning({ id: seats.id, showId: seats.showId, sectionId: seats.sectionId });
+
+      // Restore availableSeats counters for each affected section
+      const releaseSectionDelta = new Map<number, number>();
+      for (const row of released) {
+        releaseSectionDelta.set(row.sectionId, (releaseSectionDelta.get(row.sectionId) ?? 0) + 1);
+      }
+      for (const [sid, delta] of releaseSectionDelta) {
+        await tx
+          .update(seatSections)
+          .set({ availableSeats: sql`${seatSections.availableSeats} + ${delta}` })
+          .where(eq(seatSections.id, sid));
+      }
 
       // Hủy đơn hàng
       await tx.update(orders).set({ status: 'cancelled' }).where(eq(orders.id, orderId));
