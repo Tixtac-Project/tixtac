@@ -7,18 +7,13 @@ import { json } from '@sveltejs/kit';
 export const GET = apiHandler(async ({ url, locals }) => {
   const admin = requireAdmin(locals);
 
-  const eventId = Number(url.searchParams.get('eventId'));
+  const rawId = url.searchParams.get('eventId');
+  const eventId = rawId && !isNaN(Number(rawId)) ? Number(rawId) : null;
   const interval = (url.searchParams.get('interval') as 'hour' | 'day' | 'week') || 'day';
   const startDate = url.searchParams.get('startDate');
   const endDate = url.searchParams.get('endDate');
   const forceRefresh = url.searchParams.get('forceRefresh') === 'true';
 
-  if (!eventId || isNaN(eventId)) {
-    return json(
-      { error: { code: 'VALIDATION_ERROR', message: 'eventId is required' } },
-      { status: 400 },
-    );
-  }
   if (!['hour', 'day', 'week'].includes(interval)) {
     return json(
       { error: { code: 'VALIDATION_ERROR', message: 'interval must be hour, day, or week' } },
