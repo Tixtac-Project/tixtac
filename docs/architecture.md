@@ -192,7 +192,7 @@ export const POST = apiHandler(async ({ request, params, locals }) => {
 
 ```
 src/lib/server/services/
-├── auth.service.ts        # Register, login, verify
+├── user.service.ts        # Register, login, profile, verify
 ├── category.service.ts    # CRUD danh mục sự kiện
 ├── event.service.ts       # Tạo sự kiện (3-step flow), lấy danh sách, publish
 ├── show.service.ts        # CRUD suất diễn (shows/sessions)

@@ -82,8 +82,8 @@ async function runQueueWorker() {
   }
 }
 
-const globalForWorker = globalThis as unknown as { 
-  __queueWorkerStarted: boolean; 
+const globalForWorker = globalThis as unknown as {
+  __queueWorkerStarted: boolean;
   __isWorkerRunning: boolean;
 };
 

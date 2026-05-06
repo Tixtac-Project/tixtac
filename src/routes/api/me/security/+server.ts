@@ -1,6 +1,6 @@
 import { requireAuth } from '$lib/server/auth/guards';
 import { apiHandler } from '$lib/server/handler';
-import { userService } from '$lib/server/services/auth.service';
+import { userService } from '$lib/server/services/user.service';
 import { json } from '@sveltejs/kit';
 
 export const PATCH = apiHandler(async ({ request, locals, cookies }) => {

@@ -1,6 +1,6 @@
 import { config } from '$lib/server/config';
 import { apiHandler } from '$lib/server/handler';
-import { userService } from '$lib/server/services/auth.service';
+import { userService } from '$lib/server/services/user.service';
 import { json } from '@sveltejs/kit';
 
 export const POST = apiHandler(async ({ request, cookies }) => {
