@@ -140,9 +140,9 @@
 
       <!-- Right side: search + profile -->
       <div class="flex shrink-0 items-center gap-4">
-        <!-- Animated expandable search -->
-        <div class="relative flex items-center gap-3">
-          <form action={resolve('/')} method="GET" class="flex items-center">
+        <!-- Animated expandable search (desktop only) -->
+        <div class="relative hidden items-center gap-3 md:flex">
+          <form action={resolve('/search')} method="GET" class="flex items-center">
             <div
               class="flex h-10 items-center overflow-hidden rounded-full transition-all duration-300 ease-(--ease-architectural) {isSearchOpen
                 ? 'w-56 border border-outline-variant bg-surface-container-lowest px-3 sm:w-72'
@@ -271,8 +271,8 @@
     </div>
   </div>
 
-  <!-- CATEGORY FILTER BAR -->
-  {#if categories.length > 0}
+  <!-- CATEGORY FILTER BAR — hidden on /search which has its own filter sidebar -->
+  {#if categories.length > 0 && !currentPath.startsWith('/search')}
     <div class="border-b border-outline-variant/10 bg-surface-container-lowest">
       <div class="mx-auto flex h-12 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
         <CategoryFilterBar {categories} bind:activeCategory />

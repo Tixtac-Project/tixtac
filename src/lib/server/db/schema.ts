@@ -155,6 +155,9 @@ export const events = pgTable(
   (table) => [
     check('chk_min_age_non_negative', sql`${table.minAge} >= 0`),
     check('chk_max_tickets_per_user_non_negative', sql`${table.maxTicketsPerUser} >= 0`),
+    index('idx_events_status').on(table.status),
+    index('idx_events_category').on(table.categoryId),
+    index('idx_events_status_created').on(table.status, table.createdAt),
   ],
 );
 
@@ -180,6 +183,8 @@ export const eventShows = pgTable(
   },
   (table) => [
     index('idx_event_shows_event').on(table.eventId),
+    index('idx_event_shows_date').on(table.showDate),
+    index('idx_event_shows_event_date').on(table.eventId, table.showDate),
     uniqueIndex('uq_event_shows_id_event').on(table.id, table.eventId),
     check(
       'chk_show_end_after_start',
@@ -224,11 +229,19 @@ export const seatSections = pgTable(
       startColIndex: 1,
     }),
 
+    // Materialized seat counters — maintained by DB trigger on seats table
+    totalSeats: integer('total_seats').notNull().default(0),
+    availableSeats: integer('available_seats').notNull().default(0),
+    disabledSeats: integer('disabled_seats').notNull().default(0),
+
     salesStartAt: timestamp('sales_start_at', { withTimezone: true }),
     salesEndAt: timestamp('sales_end_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('idx_seat_sections_show').on(table.showId)],
+  (table) => [
+    index('idx_seat_sections_show').on(table.showId),
+    index('idx_seat_sections_show_price').on(table.showId, table.price),
+  ],
 );
 
 // ── Seats (Từng ghế cụ thể) ────────────────────
@@ -260,6 +273,8 @@ export const seats = pgTable(
     uniqueIndex('uq_seats_id_show').on(table.id, table.showId),
     index('idx_seats_show_status').on(table.showId, table.status),
     index('idx_seats_section').on(table.sectionId),
+    index('idx_seats_section_status').on(table.sectionId, table.status),
+    index('idx_seats_section_row_col').on(table.sectionId, table.rowLabel, table.colNumber),
   ],
 );
 
@@ -327,6 +342,7 @@ export const orderItems = pgTable(
       sql`${table.isCheckedIn} = (${table.checkedInAt} IS NOT NULL)`,
     ),
     index('idx_order_items_event').on(table.eventId),
+    index('idx_order_items_event_order').on(table.eventId, table.orderId),
     index('idx_order_items_show').on(table.showId),
     index('idx_order_items_order').on(table.orderId),
   ],

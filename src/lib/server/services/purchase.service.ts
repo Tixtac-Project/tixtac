@@ -40,18 +40,6 @@ const idempotencyByKey = db
   .where(eq(idempotencyKeys.key, sql.placeholder('key')))
   .prepare('pur_idem_by_key');
 
-const showByIdAndEvent = db
-  .select()
-  .from(eventShows)
-  .where(
-    and(
-      eq(eventShows.id, sql.placeholder('showId')),
-      eq(eventShows.eventId, sql.placeholder('eventId')),
-    ),
-  )
-  .limit(1)
-  .prepare('pur_show_by_event');
-
 // ══════════════════════════════════════════════════
 // INTERNAL HELPERS
 // ══════════════════════════════════════════════════
@@ -136,8 +124,21 @@ async function processGaSeats(
   const lockedSeats: { id: number; price: number }[] = [];
   let total = 0;
 
-  // 2. Grab vé GA (Pre-generated rows)
+  // 2. Grab vé GA (Pre-generated rows).
+  // Group identical show+section requests into one query each to avoid repeated
+  // SELECT ... FOR UPDATE round-trips if the cart contains duplicate GA entries.
+  const gaBySection = new Map<string, { showId: number; sectionId: number; quantity: number }>();
   for (const ga of gaRequests) {
+    const key = `${ga.showId}:${ga.sectionId}`;
+    const existing = gaBySection.get(key);
+    if (existing) {
+      existing.quantity += ga.quantity;
+    } else {
+      gaBySection.set(key, { ...ga });
+    }
+  }
+
+  for (const ga of gaBySection.values()) {
     const availableGaSeats = await tx
       .select({
         id: seats.id,
@@ -250,11 +251,6 @@ export const purchaseService = {
         }
         showIdsInCart.add(item.show_id);
 
-        const [show] = await showByIdAndEvent.execute({ showId: item.show_id, eventId });
-        if (!show) {
-          throwError(Errors.SHOW_NOT_AVAILABLE, `Suất diễn ${item.show_id} không thuộc sự kiện.`);
-        }
-
         for (const seatId of item.assigned_seats) {
           assignedSeatRequests.push({ showId: item.show_id, seatId });
         }
@@ -273,6 +269,22 @@ export const purchaseService = {
       const uniqueAssigned = new Set(assignedSeatRequests.map((s) => s.seatId));
       if (uniqueAssigned.size !== assignedSeatRequests.length) {
         throwError(Errors.DUPLICATE_SEAT, 'Có ghế ngồi bị trùng trong giỏ hàng.');
+      }
+
+      if (showIdsInCart.size > 0) {
+        const validShows = await db
+          .select({ id: eventShows.id })
+          .from(eventShows)
+          .where(and(inArray(eventShows.id, [...showIdsInCart]), eq(eventShows.eventId, eventId)));
+
+        if (validShows.length !== showIdsInCart.size) {
+          const validShowIds = new Set(validShows.map((show) => show.id));
+          const invalidShowIds = [...showIdsInCart].filter((showId) => !validShowIds.has(showId));
+          throwError(
+            Errors.SHOW_NOT_AVAILABLE,
+            `Suất diễn ${invalidShowIds.join(', ')} không thuộc sự kiện.`,
+          );
+        }
       }
 
       // ══════════════════════════════════════════════════
@@ -297,11 +309,15 @@ export const purchaseService = {
 
         const pendingOrderId: number | null = existingOrders[0]?.id ?? null;
 
-        // If a pending order exists, release its seats
+        // If a pending order exists, release its seats and restore counters
         if (pendingOrderId) {
           const itemsToRelease = await tx
-            .select({ seatId: orderItems.seatId })
+            .select({
+              seatId: orderItems.seatId,
+              sectionId: seats.sectionId,
+            })
             .from(orderItems)
+            .innerJoin(seats, eq(seats.id, orderItems.seatId))
             .where(eq(orderItems.orderId, pendingOrderId));
 
           if (itemsToRelease.length > 0) {
@@ -314,6 +330,18 @@ export const purchaseService = {
                   itemsToRelease.map((i) => i.seatId),
                 ),
               );
+
+            // Restore availableSeats counters per affected section
+            const sectionDelta = new Map<number, number>();
+            for (const it of itemsToRelease) {
+              sectionDelta.set(it.sectionId, (sectionDelta.get(it.sectionId) ?? 0) + 1);
+            }
+            for (const [sid, delta] of sectionDelta) {
+              await tx
+                .update(seatSections)
+                .set({ availableSeats: sql`${seatSections.availableSeats} + ${delta}` })
+                .where(eq(seatSections.id, sid));
+            }
           }
 
           // Clean up old items, we will recreate them or update the order
@@ -372,7 +400,19 @@ export const purchaseService = {
               lockedSeatsToProcess.map((s) => s.id),
             ),
           )
-          .returning({ id: seats.id, showId: seats.showId });
+          .returning({ id: seats.id, showId: seats.showId, sectionId: seats.sectionId });
+
+        // Decrement availableSeats counters for each affected section
+        const lockSectionDelta = new Map<number, number>();
+        for (const row of lockedSeatRows) {
+          lockSectionDelta.set(row.sectionId, (lockSectionDelta.get(row.sectionId) ?? 0) + 1);
+        }
+        for (const [sid, delta] of lockSectionDelta) {
+          await tx
+            .update(seatSections)
+            .set({ availableSeats: sql`${seatSections.availableSeats} - ${delta}` })
+            .where(eq(seatSections.id, sid));
+        }
 
         let finalOrderId = pendingOrderId;
         if (pendingOrderId) {

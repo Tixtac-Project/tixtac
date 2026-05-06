@@ -5,31 +5,35 @@
 */
 
 import { db } from '$lib/server/db';
-import { eventShows, seatSections, seats } from '$lib/server/db/schema';
+import { events, eventShows, seats, seatSections } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 /*
 1. Lấy sơ đồ ghế của một show
 */
 export const seatService = {
   async getSeatMap(eventId: number, showId: number, userRole: 'admin' | 'customer') {
-    // 1. Kiểm tra xem events và eventShows có tồn tài không?
-    // JOIN/Check events và event_show để đảm bảo tồn tại
-    const show = await db.query.eventShows.findFirst({
-      where: eq(eventShows.id, showId),
-      with: {
-        event: true, // luôn lấy data từ bảng event (cha)
-      },
-    });
+    // 1. Verify show belongs to event in a single narrow query.
+    const [show] = await db
+      .select({
+        id: eventShows.id,
+        eventId: eventShows.eventId,
+        showStatus: eventShows.status,
+        eventStatus: events.status,
+      })
+      .from(eventShows)
+      .innerJoin(events, eq(events.id, eventShows.eventId))
+      .where(and(eq(eventShows.id, showId), eq(eventShows.eventId, eventId)))
+      .limit(1);
 
-    if (!show || show.eventId !== eventId) {
+    if (!show) {
       throwError(Errors.NOT_FOUND, 'Không tìm thấy suất diễn.');
     }
 
     // 2. Check role customer: chỉ cho xem nếu cả event và show đều published
     if (userRole === 'customer') {
-      if (show.status !== 'published' || show.event.status !== 'published') {
+      if (show.showStatus !== 'published' || show.eventStatus !== 'published') {
         throwError(Errors.NOT_FOUND, 'Suất diễn chưa được mở bán.');
       }
     }

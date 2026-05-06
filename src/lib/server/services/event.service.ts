@@ -5,7 +5,6 @@ import {
   eventShows,
   orderItems,
   orders,
-  seats,
   seatSections,
 } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
@@ -17,7 +16,8 @@ import {
   updateBasicInfoSchema,
 } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
-import { and, count, eq, ilike, min, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
+import { and, count, desc, eq, exists, gte, ilike, inArray, lte, min, sql } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 import { insertShowWithSections } from './seatmap.service';
 
@@ -84,85 +84,109 @@ const showsByEventId = db
   .orderBy(eventShows.showDate, eventShows.startTime)
   .prepare('evt_shows_by_event');
 
-const seatCountsByShowId = db
-  .select({
-    sectionId: seats.sectionId,
-    seatCount: count(),
-    availableCount: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
-    disabledCount: count(sql`CASE WHEN ${seats.status} = 'disabled' THEN 1 END`),
-  })
-  .from(seats)
-  .where(eq(seats.showId, sql.placeholder('showId')))
-  .groupBy(seats.sectionId)
-  .prepare('evt_seat_counts_by_show');
-
 export const eventService = {
   async listEvents(params: {
     q?: string;
     category?: string;
+    categoryId?: string | number;
+    startDate?: string;
+    endDate?: string;
     page?: string | number;
     limit?: string | number;
     role?: string;
     userId?: number;
   }) {
-    const { q, category, page, limit } = validateInput(eventQuerySchema, {
-      q: params.q,
-      category: params.category,
-      page: params.page,
-      limit: params.limit,
-    });
+    const { q, category, categoryId, startDate, endDate, page, limit } = validateInput(
+      eventQuerySchema,
+      {
+        q: params.q,
+        category: params.category,
+        categoryId: params.categoryId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        page: params.page,
+        limit: params.limit,
+      },
+    );
     const { role } = params;
     const offset = (page - 1) * limit;
 
     // Build WHERE conditions
-    const conditions = [];
+    const conditions: SQL[] = [];
 
-    // Admin sees all events; non-admins see only non-draft
+    // Non-admin users see only published events
     if (role !== 'admin') {
-      conditions.push(sql`${events.status} != 'draft'`);
+      conditions.push(eq(events.status, 'published'));
     }
 
     if (q) {
       conditions.push(ilike(events.title, `%${q}%`));
     }
 
-    // Filter by category slug
-    if (category) {
+    // Filter by category: ID takes priority over slug.
+    // If slug is invalid → return empty result set.
+    if (categoryId) {
+      conditions.push(eq(events.categoryId, Number(categoryId)));
+    } else if (category) {
       const [cat] = await categoryBySlug.execute({ slug: category });
-      if (cat) {
-        conditions.push(eq(events.categoryId, cat.id));
+      if (!cat) {
+        return {
+          events: [],
+          pagination: { page, limit, total: 0, total_pages: 0 },
+        };
       }
+      conditions.push(eq(events.categoryId, cat.id));
+    }
+
+    // Date range filter using EXISTS — guarantees at least one show falls inside the range
+    if (startDate || endDate) {
+      const showConds: SQL[] = [eq(eventShows.eventId, events.id)];
+      if (startDate) showConds.push(gte(eventShows.showDate, startDate));
+      if (endDate) showConds.push(lte(eventShows.showDate, endDate));
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(eventShows)
+            .where(and(...showConds)),
+        ),
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Count total matching events
-    const [{ total }] = await db.select({ total: count() }).from(events).where(whereClause);
+    // Shared select columns — use materialized counters from seat_sections
+    const selectCols = {
+      id: events.id,
+      title: events.title,
+      venue: events.venue,
+      categoryId: events.categoryId,
+      categoryName: categories.name,
+      categorySlug: categories.slug,
+      bannerImageUrl: events.bannerImageUrl,
+      minAge: events.minAge,
+      maxTicketsPerUser: events.maxTicketsPerUser,
+      status: events.status,
+      earliestShowDate: min(eventShows.showDate),
+      minPrice: min(seatSections.price),
+      totalSeats: sql<number>`COALESCE(SUM(${seatSections.totalSeats}), 0)`,
+      availableSeats: sql<number>`COALESCE(SUM(${seatSections.availableSeats}), 0)`,
+    };
 
-    // Query events with category + show/seat aggregation
+    // Count query — uses real COUNT(*) instead of fetching all rows
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(events)
+      .leftJoin(categories, eq(categories.id, events.categoryId))
+      .where(whereClause);
+
+    // Data query — paginated with full columns
     const rows = await db
-      .select({
-        id: events.id,
-        title: events.title,
-        venue: events.venue,
-        categoryId: events.categoryId,
-        categoryName: categories.name,
-        categorySlug: categories.slug,
-        bannerImageUrl: events.bannerImageUrl,
-        minAge: events.minAge,
-        maxTicketsPerUser: events.maxTicketsPerUser,
-        status: events.status,
-        // Earliest show date for display/sorting
-        earliestShowDate: min(eventShows.showDate),
-        minPrice: min(seatSections.price),
-        totalSeats: count(sql`CASE WHEN ${seats.status} != 'disabled' THEN 1 END`),
-        availableSeats: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
-      })
+      .select(selectCols)
       .from(events)
       .leftJoin(categories, eq(categories.id, events.categoryId))
       .leftJoin(eventShows, eq(eventShows.eventId, events.id))
       .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
-      .leftJoin(seats, eq(seats.sectionId, seatSections.id))
       .where(whereClause)
       .groupBy(events.id, categories.name, categories.slug)
       .orderBy(min(eventShows.showDate))
@@ -195,19 +219,45 @@ export const eventService = {
     };
   },
 
+  /** Get the top N featured (newest published) events with show date & min price */
+  async listFeaturedEvents(limit = 6) {
+    const rows = await db
+      .select({
+        id: events.id,
+        title: events.title,
+        venue: events.venue,
+        bannerImageUrl: events.bannerImageUrl,
+        categoryName: categories.name,
+        categorySlug: categories.slug,
+        earliestShowDate: min(eventShows.showDate),
+        minPrice: min(seatSections.price),
+      })
+      .from(events)
+      .leftJoin(categories, eq(categories.id, events.categoryId))
+      .leftJoin(eventShows, eq(eventShows.eventId, events.id))
+      .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
+      .where(eq(events.status, 'published'))
+      .groupBy(events.id, categories.name, categories.slug)
+      .orderBy(desc(events.createdAt))
+      .limit(limit);
+
+    return rows.map((e) => ({
+      id: e.id,
+      title: e.title,
+      venue: e.venue,
+      bannerImageUrl: e.bannerImageUrl,
+      categoryName: e.categoryName,
+      categorySlug: e.categorySlug,
+      earliestShowDate: e.earliestShowDate,
+      min_price: e.minPrice ? Number(e.minPrice) : 0,
+    }));
+  },
+
   async getEventDetail(rawEventId: string | number, role?: string, userId?: number) {
     const eventId = validateInput(eventIdSchema, rawEventId);
 
-    // 0. Count already-bought (paid) tickets for this user+event
-    let boughtCount = 0;
-    if (userId) {
-      const [bought] = await boughtCountByUserEvent.execute({ userId, eventId });
-      boughtCount = Number(bought?.count ?? 0);
-    }
-
-    // 1. Get event basic info with category
+    // 1. Get event basic info with category (check existence first)
     const [eventRow] = await eventDetailById.execute({ id: eventId });
-
     if (!eventRow) throwError(Errors.NOT_FOUND);
     const event = eventRow;
 
@@ -218,50 +268,28 @@ export const eventService = {
       }
     }
 
-    // 2. Get all shows for this event
+    // 2. Count already-bought (paid) tickets for this user+event
+    let boughtCount = 0;
+    if (userId) {
+      const [bought] = await boughtCountByUserEvent.execute({ userId, eventId });
+      boughtCount = Number(bought?.count ?? 0);
+    }
+
+    // 3. Get all shows for this event
     const shows = await showsByEventId.execute({ eventId });
 
-    // 3. Get all sections across all shows
+    // 4. Get all sections across all shows (uses materialized counters)
     const showIds = shows.map((s) => s.id);
     let allSections: (typeof seatSections.$inferSelect)[] = [];
     if (showIds.length > 0) {
       allSections = await db
         .select()
         .from(seatSections)
-        .where(
-          sql`${seatSections.showId} IN (${sql.join(
-            showIds.map((id) => sql`${id}`),
-            sql`, `,
-          )})`,
-        )
+        .where(inArray(seatSections.showId, showIds))
         .orderBy(seatSections.sortOrder);
     }
 
-    // 4. Aggregate seat counts per section — collect all shows
-    const seatCounts: {
-      sectionId: number;
-      seatCount: number;
-      availableCount: number;
-      disabledCount: number;
-    }[] = [];
-    for (const sid of showIds) {
-      const rows = await seatCountsByShowId.execute({ showId: sid });
-      seatCounts.push(...rows);
-    }
-
-    // 5. Build a map for O(1) lookup
-    const countsMap = new Map(
-      seatCounts.map((sc) => [
-        sc.sectionId,
-        {
-          seat_count: sc.seatCount,
-          available_count: sc.availableCount,
-          disabled_count: sc.disabledCount,
-        },
-      ]),
-    );
-
-    // 6. Group sections by showId
+    // 5. Group sections by showId (counters come from materialized columns)
     const sectionsByShow = new Map<number, typeof allSections>();
     for (const s of allSections) {
       const arr = sectionsByShow.get(s.showId) || [];
@@ -298,27 +326,20 @@ export const eventService = {
           end_time: show.endTime,
           itinerary: show.itinerary,
           status: show.status,
-          sections: showSections.map((s) => {
-            const counts = countsMap.get(s.id) || {
-              seat_count: 0,
-              available_count: 0,
-              disabled_count: 0,
-            };
-            return {
-              id: s.id,
-              name: s.name,
-              type: s.type,
-              price: Number(s.price),
-              capacity: s.capacity,
-              layout_config: s.layoutConfig,
-              seat_config: s.seatConfig,
-              sales_start_at: s.salesStartAt,
-              sales_end_at: s.salesEndAt,
-              seat_count: counts.seat_count,
-              available_count: counts.available_count,
-              disabled_count: counts.disabled_count,
-            };
-          }),
+          sections: showSections.map((s) => ({
+            id: s.id,
+            name: s.name,
+            type: s.type,
+            price: Number(s.price),
+            capacity: s.capacity,
+            layout_config: s.layoutConfig,
+            seat_config: s.seatConfig,
+            sales_start_at: s.salesStartAt,
+            sales_end_at: s.salesEndAt,
+            seat_count: s.totalSeats,
+            available_count: s.availableSeats,
+            disabled_count: s.disabledSeats,
+          })),
         };
       }),
     };
@@ -414,11 +435,6 @@ export const eventService = {
   async updateBasicInfo(adminId: number, data: unknown) {
     const { event_id, ...fields } = validateInput(updateBasicInfoSchema, data);
 
-    const [event] = await eventById.execute({ id: event_id });
-    if (!event) throwError(Errors.NOT_FOUND);
-    if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
-    if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
-
     // Build partial update — only set fields that were provided
     const updates: Record<string, unknown> = {};
     if (fields.category_id !== undefined) updates.categoryId = fields.category_id;
@@ -440,14 +456,31 @@ export const eventService = {
     if (fields.organizer_info !== undefined) updates.organizerInfo = fields.organizer_info;
 
     if (Object.keys(updates).length === 0) {
+      // Still verify the event exists and belongs to this admin
+      const [event] = await eventById.execute({ id: event_id });
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
       return { id: event.id, title: event.title, status: event.status };
     }
 
+    // Race-safe: conditions baked into the UPDATE so another request can't
+    // publish the event between SELECT and UPDATE.
     const [updated] = await db
       .update(events)
       .set(updates)
-      .where(eq(events.id, event_id))
+      .where(
+        and(eq(events.id, event_id), eq(events.createdBy, adminId), eq(events.status, 'draft')),
+      )
       .returning();
+
+    if (!updated) {
+      // Fallback: determine the specific error
+      const [event] = await eventById.execute({ id: event_id });
+      if (!event) throwError(Errors.NOT_FOUND);
+      if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
+      if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
+      throwError(Errors.NOT_FOUND);
+    }
 
     return {
       id: updated.id,
@@ -467,49 +500,42 @@ export const eventService = {
       if (!event) throwError(Errors.NOT_FOUND);
       if (event.createdBy !== adminId) throwError(Errors.FORBIDDEN);
       if (event.status === 'published') throwError(Errors.ALREADY_PUBLISHED);
+      // Only draft events can be published
+      if (event.status !== 'draft') throwError(Errors.EVENT_NOT_DRAFT);
 
-      // Check that at least one show has available seats (assigned) or capacity (GA)
-      const showList = await tx
-        .select({ id: eventShows.id })
+      // Validate every show has inventory — prevent publishing empty shows
+      const inventoryRows = await tx
+        .select({
+          showId: eventShows.id,
+          assignedAvailable: sql<number>`
+            COALESCE(SUM(
+              CASE WHEN ${seatSections.type} = 'assigned'
+                THEN ${seatSections.availableSeats}
+                ELSE 0
+              END
+            ), 0)
+          `,
+          gaCapacity: sql<number>`
+            COALESCE(SUM(
+              CASE WHEN ${seatSections.type} = 'general'
+                THEN ${seatSections.capacity}
+                ELSE 0
+              END
+            ), 0)
+          `,
+        })
         .from(eventShows)
-        .where(eq(eventShows.eventId, eventId));
+        .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
+        .where(eq(eventShows.eventId, eventId))
+        .groupBy(eventShows.id);
 
-      if (showList.length === 0) throwError(Errors.NO_SEATS);
+      if (inventoryRows.length === 0) throwError(Errors.NO_SEATS);
 
-      const showIds = showList.map((s) => s.id);
+      const invalidShow = inventoryRows.find(
+        (s) => Number(s.assignedAvailable) <= 0 && Number(s.gaCapacity) <= 0,
+      );
 
-      // Check for assigned seats availability
-      const [hasAssignedSeats] = await tx
-        .select()
-        .from(seats)
-        .where(
-          and(
-            sql`${seats.showId} IN (${sql.join(
-              showIds.map((id) => sql`${id}`),
-              sql`, `,
-            )})`,
-            eq(seats.status, 'available'),
-          ),
-        )
-        .limit(1);
-
-      // Check for GA sections with capacity > 0
-      const [hasGACapacity] = await tx
-        .select()
-        .from(seatSections)
-        .where(
-          and(
-            sql`${seatSections.showId} IN (${sql.join(
-              showIds.map((id) => sql`${id}`),
-              sql`, `,
-            )})`,
-            eq(seatSections.type, 'general'),
-            sql`${seatSections.capacity} > 0`,
-          ),
-        )
-        .limit(1);
-
-      if (!hasAssignedSeats && !hasGACapacity) throwError(Errors.NO_SEATS);
+      if (invalidShow) throwError(Errors.NO_SEATS);
 
       // Publish the event and all its draft shows
       const [updated] = await tx

@@ -641,7 +641,22 @@ export type FormDraft = z.infer<typeof formDraftSchema>;
 // ── Event Query Schema (Public List API) ───────
 export const eventQuerySchema = z.object({
   q: z.string().optional(),
-  category: z.string().optional(), // Filter by category slug
+  category: z.string().optional(), // Filter by category slug 
+  categoryId: z.coerce.number().int().positive().optional(), // Filter by category ID
+  startDate: z
+    .string()
+    .refine(
+      (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)),
+      'startDate must be YYYY-MM-DD',
+    )
+    .optional(),
+  endDate: z
+    .string()
+    .refine(
+      (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)),
+      'endDate must be YYYY-MM-DD',
+    )
+    .optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(12),
 });
