@@ -285,13 +285,11 @@ export const purchaseService = {
           .select({ id: orders.id })
           .from(orders)
           .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
-          .innerJoin(seats, eq(seats.id, orderItems.seatId))
-          .innerJoin(eventShows, eq(eventShows.id, seats.showId))
           .where(
             and(
               eq(orders.userId, userId),
               eq(orders.status, 'pending'),
-              eq(eventShows.eventId, eventId),
+              eq(orderItems.eventId, eventId),
             ),
           )
           .limit(1)
@@ -329,13 +327,11 @@ export const purchaseService = {
           .select({ count: sql<number>`count(*)` })
           .from(orders)
           .innerJoin(orderItems, eq(orders.id, orderItems.orderId))
-          .innerJoin(seats, eq(seats.id, orderItems.seatId))
-          .innerJoin(eventShows, eq(eventShows.id, seats.showId))
           .where(
             and(
               eq(orders.userId, userId),
               eq(orders.status, 'paid'),
-              eq(eventShows.eventId, eventId),
+              eq(orderItems.eventId, eventId),
             ),
           );
 
@@ -401,11 +397,15 @@ export const purchaseService = {
           finalOrderId = newOrder.id;
         }
 
-        // PHASE 3: Generate Ticket Codes
+        // PHASE 3: Resolve showId for each locked seat, then insert
+        const showIdBySeatId = new Map<number, number>(lockedSeatRows.map((r) => [r.id, r.showId]));
+
         await tx.insert(orderItems).values(
           lockedSeatsToProcess.map((s) => ({
             orderId: finalOrderId!,
             seatId: s.id,
+            eventId,
+            showId: showIdBySeatId.get(s.id)!,
             priceSnapshot: s.price.toString(),
             ticketCode: generateTicketCode(),
           })),

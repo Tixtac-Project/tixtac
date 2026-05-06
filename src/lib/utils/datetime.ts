@@ -1,6 +1,8 @@
 // src/lib/utils/datetime.ts
 import { CalendarDateTime, getLocalTimeZone, toZoned } from '@internationalized/date';
 
+export const isValidDate = (v: string | null) => v === null || !Number.isNaN(Date.parse(v));
+
 /** Convert 12-hour AM/PM to 24-hour number */
 export function get24Hour(hour: string | number, period: 'AM' | 'PM'): number {
   let h = Number(hour);

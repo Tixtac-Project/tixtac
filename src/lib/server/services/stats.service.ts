@@ -3,12 +3,11 @@ import {
   cacheKey,
   l1Cache,
   L2_TTL,
-  normalizeDateStart,
   REFRESH_COOLDOWN_S,
-  refreshRateLimitKey,
+  refreshRateLimitKey
 } from '$lib/server/cache';
 import { db } from '$lib/server/db';
-import { events, eventShows, orderItems, orders, seats, users } from '$lib/server/db/schema';
+import { events, orderItems, orders, users } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { redis } from '$lib/server/redis';
 import type { DemographicsStats, OverviewStats, SalesVelocityPoint } from '$lib/types/stats';
@@ -88,7 +87,6 @@ function ageGroup(dobStr: string, now: Date): string {
   return '> 60';
 }
 
-/** Guard against `new Date(undefined)` / `new Date("")` producing Invalid Date */
 function isValidDate(d: Date): boolean {
   return d instanceof Date && !isNaN(d.getTime());
 }
@@ -98,15 +96,19 @@ async function resolveDateRange(
   startDate: string | null,
   endDate: string | null,
 ): Promise<{ startDate: string; endDate: string }> {
+  // Explicit endDate → use as-is. Default → end of today (23:59:59.999).
   let resolvedEnd: string;
   if (endDate) {
     const d = new Date(endDate);
     if (!isValidDate(d)) throwError(Errors.VALIDATION({ endDate: 'Định dạng ngày không hợp lệ' }));
     resolvedEnd = d.toISOString();
   } else {
-    resolvedEnd = new Date().toISOString();
+    const eod = new Date();
+    eod.setUTCHours(23, 59, 59, 999);
+    resolvedEnd = eod.toISOString();
   }
 
+  // Explicit startDate → use as-is. Default → start of the event's creation day.
   if (startDate) {
     const d = new Date(startDate);
     if (!isValidDate(d))
@@ -124,62 +126,54 @@ async function resolveDateRange(
     throwError(Errors.NOT_FOUND, `Không tìm thấy sự kiện với id ${eventId}`);
   }
 
-  return { startDate: new Date(event.createdAt).toISOString(), endDate: resolvedEnd };
+  const sod = new Date(event.createdAt);
+  sod.setUTCHours(0, 0, 0, 0);
+
+  return { startDate: sod.toISOString(), endDate: resolvedEnd };
 }
 
-/** Build a cache-key-safe date segment: null → sentinel, otherwise UTC start-of-day */
+/** Build a cache-key-safe date segment: null → sentinel, otherwise exact ISO instant */
 function cacheDateSegment(dateStr: string | null): string {
   if (dateStr === null) return 'event_start';
-  return normalizeDateStart(dateStr);
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? dateStr : parsed.toISOString();
 }
 
 // ══════════════════════════════════════════════════
 // PREPARED STATEMENTS (compiled once at startup)
 // ══════════════════════════════════════════════════
 
-/**
- * EXISTS clause shared by overview & velocity to filter orders linked
- * to a specific event WITHOUT multiplying rows via a flat JOIN.
- */
-function existsOrderForEvent() {
-  return sql`EXISTS (
-    SELECT 1 FROM ${orderItems}
-    INNER JOIN ${seats} ON ${seats.id} = ${orderItems.seatId}
-    INNER JOIN ${eventShows} ON ${eventShows.id} = ${seats.showId}
-    WHERE ${orderItems.orderId} = ${orders.id}
-      AND ${eventShows.eventId} = ${sql.placeholder('eventId')}
-  )`;
-}
-
 const overviewStmt = db
   .select({
-    totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orders.totalAmount} ELSE 0 END), '0')`,
-    paidCount: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN 1 END)::int`,
-    cancelledCount: sql<number>`COUNT(CASE WHEN ${orders.status} = 'cancelled' THEN 1 END)::int`,
+    totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.priceSnapshot} ELSE 0 END), '0')`,
+    totalTicketsSold: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.id} END)::int`,
+    paidOrders: sql<number>`COUNT(DISTINCT CASE WHEN ${orders.status} = 'paid' THEN ${orders.id} END)::int`,
+    cancelledOrders: sql<number>`COUNT(DISTINCT CASE WHEN ${orders.status} = 'cancelled' THEN ${orders.id} END)::int`,
   })
   .from(orders)
+  .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
   .where(
     and(
-      existsOrderForEvent(),
+      eq(orderItems.eventId, sql.placeholder('eventId')),
       gte(orders.createdAt, sql.placeholder('startDate')),
       lte(orders.createdAt, sql.placeholder('endDate')),
     ),
   )
   .prepare('stats_overview');
-
 function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
   const format = interval === 'hour' ? `'YYYY-MM-DD"T"HH24:00'` : `'YYYY-MM-DD'`;
   const periodExpr = sql`to_char(date_trunc(${sql.raw(`'${interval}'`)}, ${orders.createdAt}), ${sql.raw(format)})`;
   return db
     .select({
       period: sql<string>`${periodExpr}`,
-      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orders.totalAmount} ELSE 0 END), 0)`,
-      tickets: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN 1 END)::int`,
+      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.priceSnapshot} ELSE 0 END), 0)`,
+      tickets: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.id} END)::int`,
     })
     .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
     .where(
       and(
-        existsOrderForEvent(),
+        eq(orderItems.eventId, sql.placeholder('eventId')),
         gte(orders.createdAt, sql.placeholder('startDate')),
         lte(orders.createdAt, sql.placeholder('endDate')),
       ),
@@ -188,7 +182,6 @@ function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
     .orderBy(periodExpr)
     .prepare(`stats_velocity_${interval}`);
 }
-
 const velocityHourStmt = buildVelocityStmt('hour');
 const velocityDayStmt = buildVelocityStmt('day');
 const velocityWeekStmt = buildVelocityStmt('week');
@@ -199,8 +192,11 @@ function getVelocityStmt(interval: 'hour' | 'day' | 'week') {
   return velocityDayStmt;
 }
 
-// Dedup users in SQL via GROUP BY instead of selectDistinct (incompatible
-// with .prepare()). Multiple orders per user are collapsed by GROUP BY.
+/**
+ * Demographics now joins only 3 tables instead of 5:
+ *   users → orders → order_items
+ * No more seats or event_shows joins needed.
+ */
 const demographicsRowStmt = db
   .select({
     gender: sql<'male' | 'female' | 'other'>`MAX(${users.gender})`,
@@ -209,12 +205,10 @@ const demographicsRowStmt = db
   .from(users)
   .innerJoin(orders, eq(orders.userId, users.id))
   .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
-  .innerJoin(seats, eq(seats.id, orderItems.seatId))
-  .innerJoin(eventShows, eq(eventShows.id, seats.showId))
   .where(
     and(
       eq(orders.status, 'paid'),
-      eq(eventShows.eventId, sql.placeholder('eventId')),
+      eq(orderItems.eventId, sql.placeholder('eventId')),
       gte(orders.createdAt, sql.placeholder('startDate')),
       lte(orders.createdAt, sql.placeholder('endDate')),
     ),
@@ -370,14 +364,14 @@ async function fetchOverview(
     endDate: new Date(e),
   });
 
-  const paidCount = row?.paidCount ?? 0;
-  const cancelledCount = row?.cancelledCount ?? 0;
+  const paidCount = row?.paidOrders ?? 0;
+  const cancelledCount = row?.cancelledOrders ?? 0;
   const total = paidCount + cancelledCount;
   const dropOffRate = total > 0 ? cancelledCount / total : 0;
 
   return {
     totalRevenue: row ? Number(row.totalRevenue) : 0,
-    totalTicketsSold: paidCount,
+    totalTicketsSold: row?.totalTicketsSold ?? 0,
     dropOffRate: Math.round(dropOffRate * 10000) / 10000,
     paidOrders: paidCount,
     cancelledOrders: cancelledCount,

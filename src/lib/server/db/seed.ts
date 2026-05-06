@@ -13,7 +13,7 @@ import {
 } from '$lib/server/db/schema';
 import { getEventSeeds, type ShowSeed } from '$lib/server/db/seed-data';
 import { generateTicketCode } from '$lib/utils/ticket-code';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 // ── Row Label Helper ───────────────────────────
 function getRowLabel(index: number): string {
@@ -45,16 +45,6 @@ function randDate(startYear: number, endYear: number): string {
 function randPhone(): string {
   const prefixes = ['090', '091', '093', '097', '098', '032', '033', '034'] as const;
   return randPick(prefixes) + String(randInt(1000000, 9999999));
-}
-
-function toAscii(str: string): string {
-  return str
-    .replace(/[đ]/g, 'd')
-    .replace(/[Đ]/g, 'D')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
 }
 
 const FIRST_M = [
@@ -99,7 +89,7 @@ function generateUser(index: number) {
   const gender = randPick(['male', 'female', 'other'] as const);
   const first = gender === 'female' ? randPick(FIRST_F) : randPick(FIRST_M);
   const fullName = `${randPick(LAST)} ${randPick(MIDDLE)} ${first}`;
-  const email = `${toAscii(first)}${index}@gmail.com`;
+  const email = `customer${index}@tixtac.io.vn`;
   return { email, fullName, dateOfBirth: randDate(1980, 2005), gender, phone: randPhone() };
 }
 
@@ -239,9 +229,6 @@ export async function seed() {
   }
   console.log('👥 10 random customers seeded');
 
-  // Lấy danh sách customer để tạo orders sau này
-  const allCustomers = await db.select().from(users).where(eq(users.role, 'customer'));
-
   // ── 4. Categories ──
   console.log('📂 Seeding categories…');
   await db.insert(categories).values([
@@ -261,8 +248,17 @@ export async function seed() {
   // ── 5. Events (from seed-data.ts) ──
   const eventSeeds = getEventSeeds(admin.id, catBySlug);
 
+  const seedBaseDate = new Date();
+  seedBaseDate.setDate(seedBaseDate.getDate() - 45); // events "created" 45 days ago
+
   for (const eventSeed of eventSeeds) {
-    const [ev] = await db.insert(events).values(eventSeed.values).returning();
+    const values = eventSeed.values as typeof events.$inferInsert;
+    // So default-date-range queries (omitted startDate) see all 30-day-order spread
+    if (values.createdAt === undefined) {
+      values.createdAt = seedBaseDate;
+    }
+
+    const [ev] = await db.insert(events).values(values).returning();
 
     for (const show of eventSeed.shows) {
       await createShowWithSections(ev.id, show);
@@ -271,64 +267,146 @@ export async function seed() {
     console.log(`🎪 Event: "${ev.title}" (${eventSeed.shows.length} shows)`);
   }
 
-  // ── 6. Sample Orders ──
+  // ── 6. Sample Orders (Stats-Ready) ──
+  // Tạo ~60 orders phân bổ đều vào các event để có dữ liệu thống kê phong phú.
   console.log('🧾 Seeding orders…');
 
-  const allUsers = await db.select().from(users).where(eq(users.role, 'customer'));
-  const availableSeats = await db
-    .select()
-    .from(seats)
-    .where(eq(seats.status, 'available'))
-    .limit(15);
+  const allCustomers = await db.select().from(users).where(eq(users.role, 'customer'));
+  const allShows = await db.select().from(eventShows);
 
-  const PRICE_PER_SEAT = 500000;
-  const SEATS_PER_ORDER = 3;
-  let seatIndex = 0;
+  // Lọc ra các show thuộc event có status 'published'
+  const publishedEvents = await db.select().from(events).where(eq(events.status, 'published'));
+  const publishedEventIds = new Set(publishedEvents.map((e) => e.id));
+  const publishedShows = allShows.filter((s) => publishedEventIds.has(s.eventId));
 
-  for (let i = 0; i < 5; i++) {
-    const user = randPick(allUsers);
-    const isPaid = i % 2 === 0;
-    const pickedSeats = availableSeats.slice(seatIndex, seatIndex + SEATS_PER_ORDER);
-    seatIndex += SEATS_PER_ORDER;
+  if (publishedShows.length === 0) {
+    console.log('⚠️  No published shows found — skipping orders');
+    return;
+  }
 
-    if (pickedSeats.length === 0) break;
+  // Tạo map eventId → showId[] để lookup nhanh
+  const showsByEvent = new Map<number, typeof publishedShows>();
+  for (const sh of publishedShows) {
+    const list = showsByEvent.get(sh.eventId) || [];
+    list.push(sh);
+    showsByEvent.set(sh.eventId, list);
+  }
 
-    const total = pickedSeats.length * PRICE_PER_SEAT;
+  let totalOrders = 0;
+  let totalItems = 0;
+  let totalRevenue = 0;
 
-    const [order] = await db
-      .insert(orders)
-      .values({
-        userId: user.id,
-        totalAmount: String(total),
-        status: isPaid ? 'paid' : 'pending',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        paidAt: isPaid ? new Date() : null,
-      })
-      .returning();
+  const daysBack = 30; // spread paidAt over last 30 days
 
-    for (const s of pickedSeats) {
-      const code = generateTicketCode();
+  for (const [eventId, showList] of showsByEvent) {
+    // Số lượng order mỗi event: 8-15, để tổng ~60-80 orders
+    const orderCount = randInt(6, 14);
 
-      await db.insert(orderItems).values({
-        orderId: order.id,
-        seatId: s.id,
-        priceSnapshot: String(PRICE_PER_SEAT),
-        ticketCode: code,
-        qrCode: code,
-      });
+    for (let i = 0; i < orderCount; i++) {
+      const show = randPick(showList);
+      const user = randPick(allCustomers);
 
+      // Lấy seats của show này (không lấy quá nhiều, giả lập mua thực tế)
+      const seatsForShow = await db
+        .select({
+          id: seats.id,
+          showId: seats.showId,
+          sectionId: seats.sectionId,
+        })
+        .from(seats)
+        .innerJoin(seatSections, eq(seats.sectionId, seatSections.id))
+        .where(and(eq(seats.showId, show.id), eq(seats.status, 'available')))
+        .limit(randInt(1, 4));
+
+      if (seatsForShow.length === 0) continue;
+
+      // Lấy giá thực
+      const sectionIds = [...new Set(seatsForShow.map((s) => s.sectionId))];
+      const prices = await db
+        .select({ id: seatSections.id, price: seatSections.price })
+        .from(seatSections)
+        .where(
+          sql`${seatSections.id} IN (${sql.join(
+            sectionIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+
+      const priceMap = new Map(prices.map((p) => [p.id, Number(p.price)]));
+      let orderTotal = 0;
+      const itemValues: (typeof orderItems.$inferInsert)[] = [];
+
+      for (const s of seatsForShow) {
+        const price = priceMap.get(s.sectionId) || 500000;
+        orderTotal += price;
+        const code = generateTicketCode();
+        itemValues.push({
+          orderId: 0, // placeholder, cập nhật sau
+          seatId: s.id,
+          eventId,
+          showId: show.id,
+          priceSnapshot: String(price),
+          ticketCode: code,
+          qrCode: code,
+        });
+      }
+
+      // Trạng thái: ~75% paid, ~15% cancelled, ~10% pending
+      const roll = Math.random();
+      const status = roll < 0.75 ? 'paid' : roll < 0.9 ? 'cancelled' : 'pending';
+      const paidDate = new Date();
+      paidDate.setDate(paidDate.getDate() - randInt(0, daysBack));
+
+      // Pending orders should be fresh, not backdated 30 days with a stale expiry
+      const createdAt = status === 'pending' ? new Date() : paidDate;
+      const expiresAt = new Date(createdAt.getTime() + 15 * 60 * 1000);
+
+      const [order] = await db
+        .insert(orders)
+        .values({
+          userId: user.id,
+          totalAmount: String(orderTotal),
+          status,
+          expiresAt,
+          paidAt: status === 'paid' ? paidDate : null,
+          createdAt,
+        })
+        .returning();
+
+      // Cập nhật orderId + insert items
+      for (const iv of itemValues) {
+        iv.orderId = order.id;
+      }
+      await db.insert(orderItems).values(itemValues);
+
+      // Cập nhật trạng thái ghế
+      const seatStatus = status === 'paid' ? 'sold' : status === 'pending' ? 'locked' : 'available';
+      const seatIds = seatsForShow.map((s) => s.id);
       await db
         .update(seats)
         .set(
-          isPaid
-            ? { status: 'sold', lockedBy: null, lockedAt: null }
-            : { status: 'locked', lockedBy: user.id, lockedAt: new Date() },
+          seatStatus === 'locked'
+            ? { status: 'locked', lockedBy: user.id, lockedAt: new Date() }
+            : seatStatus === 'sold'
+              ? { status: 'sold', lockedBy: null, lockedAt: null }
+              : { status: 'available', lockedBy: null, lockedAt: null },
         )
-        .where(eq(seats.id, s.id));
+        .where(
+          sql`${seats.id} IN (${sql.join(
+            seatIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        );
+
+      totalOrders++;
+      totalItems += itemValues.length;
+      totalRevenue += orderTotal;
     }
   }
 
-  console.log('🧾 Orders seeded: 5 orders × 3 items');
+  console.log(
+    `🧾 Seeded: ${totalOrders} orders, ${totalItems} items, ${totalRevenue.toLocaleString('vi-VN')} VND revenue`,
+  );
 
   // ── Summary ──
   console.log('');
@@ -338,7 +416,8 @@ export async function seed() {
   console.log(`  📂 ${allCategories.length} categories`);
   console.log('  👤 1 admin + 10 customers');
   console.log(`  🎪 ${eventSeeds.length} events`);
-  console.log('  🧾 5 sample orders');
+  console.log(`  🧾 ${totalOrders} orders (${totalItems} tickets)`);
+  console.log(`  💰 ${totalRevenue.toLocaleString('vi-VN')} VND`);
   console.log('══════════════════════════════════════════');
 }
 

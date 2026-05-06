@@ -1,6 +1,7 @@
 import { requireAdmin } from '$lib/server/auth/guards';
 import { apiHandler } from '$lib/server/handler';
 import { statsService } from '$lib/server/services/stats.service';
+import { isValidDate } from '$lib/utils/datetime';
 import { json } from '@sveltejs/kit';
 
 export const GET = apiHandler(async ({ url, locals }) => {
@@ -14,6 +15,12 @@ export const GET = apiHandler(async ({ url, locals }) => {
   if (!eventId || isNaN(eventId)) {
     return json(
       { error: { code: 'VALIDATION_ERROR', message: 'eventId is required' } },
+      { status: 400 },
+    );
+  }
+  if (!isValidDate(startDate) || !isValidDate(endDate)) {
+    return json(
+      { error: { code: 'VALIDATION_ERROR', message: 'startDate/endDate must be valid ISO dates' } },
       { status: 400 },
     );
   }
