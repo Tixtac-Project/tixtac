@@ -180,7 +180,7 @@ export const eventService = {
       .leftJoin(categories, eq(categories.id, events.categoryId))
       .where(whereClause);
 
-    // Data query — paginated with full columns
+    // Data query — paginated with full columns, includes seat_sections for price/seat counts
     const rows = await db
       .select(selectCols)
       .from(events)
@@ -192,7 +192,6 @@ export const eventService = {
       .orderBy(min(eventShows.showDate))
       .limit(limit)
       .offset(offset);
-
     return {
       events: rows.map((r) => ({
         id: r.id,
