@@ -356,7 +356,10 @@ export async function seed() {
       const status = roll < 0.75 ? 'paid' : roll < 0.9 ? 'cancelled' : 'pending';
       const paidDate = new Date();
       paidDate.setDate(paidDate.getDate() - randInt(0, daysBack));
-      const paidAt = status === 'paid' ? paidDate : null;
+
+      // Pending orders should be fresh, not backdated 30 days with a stale expiry
+      const createdAt = status === 'pending' ? new Date() : paidDate;
+      const expiresAt = new Date(createdAt.getTime() + 15 * 60 * 1000);
 
       const [order] = await db
         .insert(orders)
@@ -364,9 +367,9 @@ export async function seed() {
           userId: user.id,
           totalAmount: String(orderTotal),
           status,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          paidAt,
-          createdAt: paidDate, // align createdAt with paidAt for velocity charts
+          expiresAt,
+          paidAt: status === 'paid' ? paidDate : null,
+          createdAt,
         })
         .returning();
 

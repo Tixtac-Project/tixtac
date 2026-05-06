@@ -143,46 +143,37 @@ function cacheDateSegment(dateStr: string | null): string {
 // PREPARED STATEMENTS (compiled once at startup)
 // ══════════════════════════════════════════════════
 
-/**
- * Simple EXISTS on orderItems.event_id — hits idx_order_items_event directly.
- */
-function existsOrderForEvent() {
-  return sql`EXISTS (
-    SELECT 1 FROM ${orderItems}
-    WHERE ${orderItems.orderId} = ${orders.id}
-      AND ${orderItems.eventId} = ${sql.placeholder('eventId')}
-  )`;
-}
-
 const overviewStmt = db
   .select({
-    totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orders.totalAmount} ELSE 0 END), '0')`,
-    paidCount: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN 1 END)::int`,
-    cancelledCount: sql<number>`COUNT(CASE WHEN ${orders.status} = 'cancelled' THEN 1 END)::int`,
+    totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.priceSnapshot} ELSE 0 END), '0')`,
+    totalTicketsSold: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.id} END)::int`,
+    paidOrders: sql<number>`COUNT(DISTINCT CASE WHEN ${orders.status} = 'paid' THEN ${orders.id} END)::int`,
+    cancelledOrders: sql<number>`COUNT(DISTINCT CASE WHEN ${orders.status} = 'cancelled' THEN ${orders.id} END)::int`,
   })
   .from(orders)
+  .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
   .where(
     and(
-      existsOrderForEvent(),
+      eq(orderItems.eventId, sql.placeholder('eventId')),
       gte(orders.createdAt, sql.placeholder('startDate')),
       lte(orders.createdAt, sql.placeholder('endDate')),
     ),
   )
   .prepare('stats_overview');
-
 function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
   const format = interval === 'hour' ? `'YYYY-MM-DD"T"HH24:00'` : `'YYYY-MM-DD'`;
   const periodExpr = sql`to_char(date_trunc(${sql.raw(`'${interval}'`)}, ${orders.createdAt}), ${sql.raw(format)})`;
   return db
     .select({
       period: sql<string>`${periodExpr}`,
-      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orders.totalAmount} ELSE 0 END), 0)`,
-      tickets: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN 1 END)::int`,
+      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.priceSnapshot} ELSE 0 END), 0)`,
+      tickets: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.id} END)::int`,
     })
     .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
     .where(
       and(
-        existsOrderForEvent(),
+        eq(orderItems.eventId, sql.placeholder('eventId')),
         gte(orders.createdAt, sql.placeholder('startDate')),
         lte(orders.createdAt, sql.placeholder('endDate')),
       ),
@@ -191,7 +182,6 @@ function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
     .orderBy(periodExpr)
     .prepare(`stats_velocity_${interval}`);
 }
-
 const velocityHourStmt = buildVelocityStmt('hour');
 const velocityDayStmt = buildVelocityStmt('day');
 const velocityWeekStmt = buildVelocityStmt('week');
@@ -374,14 +364,14 @@ async function fetchOverview(
     endDate: new Date(e),
   });
 
-  const paidCount = row?.paidCount ?? 0;
-  const cancelledCount = row?.cancelledCount ?? 0;
+  const paidCount = row?.paidOrders ?? 0;
+  const cancelledCount = row?.cancelledOrders ?? 0;
   const total = paidCount + cancelledCount;
   const dropOffRate = total > 0 ? cancelledCount / total : 0;
 
   return {
     totalRevenue: row ? Number(row.totalRevenue) : 0,
-    totalTicketsSold: paidCount,
+    totalTicketsSold: row?.totalTicketsSold ?? 0,
     dropOffRate: Math.round(dropOffRate * 10000) / 10000,
     paidOrders: paidCount,
     cancelledOrders: cancelledCount,

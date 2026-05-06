@@ -180,6 +180,7 @@ export const eventShows = pgTable(
   },
   (table) => [
     index('idx_event_shows_event').on(table.eventId),
+    uniqueIndex('uq_event_shows_id_event').on(table.id, table.eventId),
     check(
       'chk_show_end_after_start',
       sql`${table.endTime} IS NULL OR ${table.endTime} > ${table.startTime}`,
@@ -256,6 +257,7 @@ export const seats = pgTable(
       table.rowLabel,
       table.colNumber,
     ),
+    uniqueIndex('uq_seats_id_show').on(table.id, table.showId),
     index('idx_seats_show_status').on(table.showId, table.status),
     index('idx_seats_section').on(table.sectionId),
   ],
