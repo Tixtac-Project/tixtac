@@ -1,7 +1,7 @@
-import { redis } from '$lib/server/redis';
-import { Errors, throwError } from '$lib/server/errors';
 import { encryptSeatToken } from '$lib/server/auth/jwt';
 import { config } from '$lib/server/config';
+import { Errors, throwError } from '$lib/server/errors';
+import { redis } from '$lib/server/redis';
 
 const withRedisErrorHandling = async <T>(fn: () => Promise<T>): Promise<T> => {
   try {
@@ -30,6 +30,7 @@ export const queueService = {
       const existingScore = await redis.zscore(activeKey, userId);
       if (existingScore && existingScore > now) {
         const expiresInSeconds = Math.max(1, Math.ceil((existingScore - now) / 1000));
+        // Always mint on join — client may not have a token yet
         const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
         return { status: 'active', expiresAt: existingScore, token };
       }
@@ -61,14 +62,21 @@ export const queueService = {
         await redis
           .pipeline()
           .zrem(waitingKey, userId)
-          .set(userCurrentKey, eventId, { ex: 600 })
+          .set(userCurrentKey, eventId, { ex: config.accessTokenDuration })
+          .sadd('active_event_ids', eventId)
           .exec();
 
         const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
         return { status: 'active', expiresAt, token };
       } else {
-        await redis.zadd(waitingKey, { nx: true }, { score: now, member: userId });
-        await redis.set(userCurrentKey, eventId, { ex: 600 });
+        // Waiting branch: long TTL (1h) as failsafe — key is normally cleaned up on
+        // promotion, leaveQueue, or worker eviction. Prevents orphaned keys if worker dies.
+        await redis
+          .pipeline()
+          .zadd(waitingKey, { nx: true }, { score: now, member: userId })
+          .set(userCurrentKey, eventId, { ex: 3600 })
+          .sadd('active_event_ids', eventId)
+          .exec();
 
         const position = await redis.zrank(waitingKey, userId);
         return { status: 'waiting', position: (position ?? 0) + 1 };
@@ -84,7 +92,8 @@ export const queueService = {
 
       // Atomic check & update: Ensures user is strictly active before minting fresh token
       const luaScript = `
-        local currentScore = tonumber(redis.call('ZSCORE', KEYS[1], ARGV[1]) or 0)
+        local raw = redis.call('ZSCORE', KEYS[1], ARGV[1])
+        local currentScore = raw and tonumber(raw) or 0
         if currentScore > tonumber(ARGV[2]) then
           redis.call('ZADD', KEYS[1], 'XX', tonumber(ARGV[3]), ARGV[1])
           return 1
@@ -102,7 +111,7 @@ export const queueService = {
         throwError(Errors.FORBIDDEN, 'Slot của bạn không tồn tại hoặc đã hết hạn');
       }
 
-      await redis.set(`user_current_queue:${userId}`, eventId, { ex: 600 });
+      await redis.set(`user_current_queue:${userId}`, eventId, { ex: config.accessTokenDuration });
 
       const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
       return { expiresAt, token };
@@ -136,7 +145,11 @@ export const queueService = {
       const activeScore = await redis.zscore(activeKey, userId);
       if (activeScore && activeScore > now) {
         const expiresInSeconds = Math.max(1, Math.ceil((activeScore - now) / 1000));
-        const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
+        // Only mint a fresh token when ≤ 30s remain — client keeps previous token otherwise
+        const token =
+          expiresInSeconds <= 30
+            ? await encryptSeatToken({ userId, eventId }, expiresInSeconds)
+            : null;
         return { status: 'active', expiresAt: activeScore, token };
       }
 
