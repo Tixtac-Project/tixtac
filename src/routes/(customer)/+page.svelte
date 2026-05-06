@@ -9,8 +9,6 @@
   interface Pagination {
     currentPage: number;
     totalPages: number;
-    searchQuery: string;
-    categorySlug: string;
   }
 
   let { data } = $props<{
@@ -42,29 +40,18 @@
 
 <!-- Events Section -->
 <section class="mx-auto max-w-7xl px-6 py-16 lg:py-24" id="events">
-  <!-- Section Header -->
-  <SectionHeader
-    title="Sự kiện nổi bật"
-    searchQuery={pagination.searchQuery}
-    viewAllHref="/events"
-  />
+  <SectionHeader title="Sự kiện nổi bật" viewAllHref="/events" />
 
-  <!-- Events Grid or Empty State -->
   {#if events.length === 0}
     <EmptyState
       title="Không tìm thấy sự kiện nào!"
       description="Hãy thử tìm kiếm với từ khóa khác hoặc khám phá tất cả sự kiện."
-      ctaLabel="Xóa tìm kiếm"
-      ctaHref="/"
+      ctaLabel="Khám phá"
+      ctaHref="/events"
     />
   {:else}
     <EventsGrid {events} />
 
-    <!-- Pagination -->
-    <PaginationNav
-      currentPage={pagination.currentPage}
-      totalPages={pagination.totalPages}
-      searchQuery={pagination.searchQuery}
-    />
+    <PaginationNav currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
   {/if}
 </section>

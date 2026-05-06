@@ -17,7 +17,7 @@ import {
   updateBasicInfoSchema,
 } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
-import { and, count, eq, ilike, min, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, min, sql } from 'drizzle-orm';
 import { validateEventRequirements } from '../validators/seat-overlap.validator';
 import { insertShowWithSections } from './seatmap.service';
 
@@ -84,33 +84,30 @@ const showsByEventId = db
   .orderBy(eventShows.showDate, eventShows.startTime)
   .prepare('evt_shows_by_event');
 
-const seatCountsByShowId = db
-  .select({
-    sectionId: seats.sectionId,
-    seatCount: count(),
-    availableCount: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
-    disabledCount: count(sql`CASE WHEN ${seats.status} = 'disabled' THEN 1 END`),
-  })
-  .from(seats)
-  .where(eq(seats.showId, sql.placeholder('showId')))
-  .groupBy(seats.sectionId)
-  .prepare('evt_seat_counts_by_show');
-
 export const eventService = {
   async listEvents(params: {
     q?: string;
     category?: string;
+    categoryId?: string | number;
+    startDate?: string;
+    endDate?: string;
     page?: string | number;
     limit?: string | number;
     role?: string;
     userId?: number;
   }) {
-    const { q, category, page, limit } = validateInput(eventQuerySchema, {
-      q: params.q,
-      category: params.category,
-      page: params.page,
-      limit: params.limit,
-    });
+    const { q, category, categoryId, startDate, endDate, page, limit } = validateInput(
+      eventQuerySchema,
+      {
+        q: params.q,
+        category: params.category,
+        categoryId: params.categoryId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        page: params.page,
+        limit: params.limit,
+      },
+    );
     const { role } = params;
     const offset = (page - 1) * limit;
 
@@ -126,49 +123,71 @@ export const eventService = {
       conditions.push(ilike(events.title, `%${q}%`));
     }
 
-    // Filter by category slug
-    if (category) {
+    // Filter by category: ID takes priority over slug
+    if (categoryId) {
+      conditions.push(eq(events.categoryId, categoryId));
+    } else if (category) {
       const [cat] = await categoryBySlug.execute({ slug: category });
       if (cat) {
         conditions.push(eq(events.categoryId, cat.id));
       }
     }
-
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Count total matching events
-    const [{ total }] = await db.select({ total: count() }).from(events).where(whereClause);
+    // Build HAVING conditions for date range filter
+    const havingConds: ReturnType<typeof sql>[] = [];
+    if (startDate) {
+      havingConds.push(sql`MAX(${eventShows.showDate}) >= ${new Date(startDate)}`);
+    }
+    if (endDate) {
+      havingConds.push(sql`MIN(${eventShows.showDate}) <= ${new Date(endDate)}`);
+    }
+    const havingClause = havingConds.length > 0 ? and(...havingConds) : undefined;
 
-    // Query events with category + show/seat aggregation
-    const rows = await db
-      .select({
-        id: events.id,
-        title: events.title,
-        venue: events.venue,
-        categoryId: events.categoryId,
-        categoryName: categories.name,
-        categorySlug: categories.slug,
-        bannerImageUrl: events.bannerImageUrl,
-        minAge: events.minAge,
-        maxTicketsPerUser: events.maxTicketsPerUser,
-        status: events.status,
-        // Earliest show date for display/sorting
-        earliestShowDate: min(eventShows.showDate),
-        minPrice: min(seatSections.price),
-        totalSeats: count(sql`CASE WHEN ${seats.status} != 'disabled' THEN 1 END`),
-        availableSeats: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
-      })
+    // Shared select columns
+    const selectCols = {
+      id: events.id,
+      title: events.title,
+      venue: events.venue,
+      categoryId: events.categoryId,
+      categoryName: categories.name,
+      categorySlug: categories.slug,
+      bannerImageUrl: events.bannerImageUrl,
+      minAge: events.minAge,
+      maxTicketsPerUser: events.maxTicketsPerUser,
+      status: events.status,
+      earliestShowDate: min(eventShows.showDate),
+      minPrice: min(seatSections.price),
+      totalSeats: count(sql`CASE WHEN ${seats.status} != 'disabled' THEN 1 END`),
+      availableSeats: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
+    };
+
+    // Lightweight count query — only fetches event IDs
+    const countBase = db
+      .select({ id: events.id })
+      .from(events)
+      .leftJoin(categories, eq(categories.id, events.categoryId))
+      .leftJoin(eventShows, eq(eventShows.eventId, events.id))
+      .where(whereClause)
+      .groupBy(events.id, categories.name, categories.slug);
+
+    const countQuery = havingClause ? countBase.having(havingClause) : countBase;
+    const countRows = await countQuery;
+    const total = countRows.length;
+
+    // Data query — paginated with full columns
+    const dataBase = db
+      .select(selectCols)
       .from(events)
       .leftJoin(categories, eq(categories.id, events.categoryId))
       .leftJoin(eventShows, eq(eventShows.eventId, events.id))
       .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
       .leftJoin(seats, eq(seats.sectionId, seatSections.id))
       .where(whereClause)
-      .groupBy(events.id, categories.name, categories.slug)
-      .orderBy(min(eventShows.showDate))
-      .limit(limit)
-      .offset(offset);
+      .groupBy(events.id, categories.name, categories.slug);
 
+    const dataQuery = havingClause ? dataBase.having(havingClause) : dataBase;
+    const rows = await dataQuery.orderBy(min(eventShows.showDate)).limit(limit).offset(offset);
     return {
       events: rows.map((r) => ({
         id: r.id,
@@ -193,6 +212,40 @@ export const eventService = {
         total_pages: Math.ceil(total / limit),
       },
     };
+  },
+
+  /** Get the top N featured (newest published) events with show date & min price */
+  async listFeaturedEvents(limit = 6) {
+    const rows = await db
+      .select({
+        id: events.id,
+        title: events.title,
+        venue: events.venue,
+        bannerImageUrl: events.bannerImageUrl,
+        categoryName: categories.name,
+        categorySlug: categories.slug,
+        earliestShowDate: min(eventShows.showDate),
+        minPrice: min(seatSections.price),
+      })
+      .from(events)
+      .leftJoin(categories, eq(categories.id, events.categoryId))
+      .leftJoin(eventShows, eq(eventShows.eventId, events.id))
+      .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
+      .where(eq(events.status, 'published'))
+      .groupBy(events.id, categories.name, categories.slug)
+      .orderBy(desc(events.createdAt))
+      .limit(limit);
+
+    return rows.map((e) => ({
+      id: e.id,
+      title: e.title,
+      venue: e.venue,
+      bannerImageUrl: e.bannerImageUrl,
+      categoryName: e.categoryName,
+      categorySlug: e.categorySlug,
+      earliestShowDate: e.earliestShowDate,
+      min_price: e.minPrice ? Number(e.minPrice) : 0,
+    }));
   },
 
   async getEventDetail(rawEventId: string | number, role?: string, userId?: number) {
@@ -237,15 +290,29 @@ export const eventService = {
         .orderBy(seatSections.sortOrder);
     }
 
-    // 4. Aggregate seat counts per section — collect all shows
+    // 4. Aggregate seat counts per section — single query for all shows
     const seatCounts: {
       sectionId: number;
       seatCount: number;
       availableCount: number;
       disabledCount: number;
     }[] = [];
-    for (const sid of showIds) {
-      const rows = await seatCountsByShowId.execute({ showId: sid });
+    if (showIds.length > 0) {
+      const rows = await db
+        .select({
+          sectionId: seats.sectionId,
+          seatCount: count(),
+          availableCount: count(sql`CASE WHEN ${seats.status} = 'available' THEN 1 END`),
+          disabledCount: count(sql`CASE WHEN ${seats.status} = 'disabled' THEN 1 END`),
+        })
+        .from(seats)
+        .where(
+          sql`${seats.showId} IN (${sql.join(
+            showIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        )
+        .groupBy(seats.sectionId);
       seatCounts.push(...rows);
     }
 

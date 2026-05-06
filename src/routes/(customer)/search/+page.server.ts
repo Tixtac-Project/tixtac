@@ -2,24 +2,30 @@ import { categoryService } from '$lib/server/services/category.service';
 import { eventService } from '$lib/server/services/event.service';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ url }) => {
-  const categorySlug = url.searchParams.get('category') || '';
+export const load: PageServerLoad = async ({ url, locals }) => {
+  const q = url.searchParams.get('q') || undefined;
+  const category = url.searchParams.get('category') || undefined;
+  const startDate = url.searchParams.get('startDate') || undefined;
+  const endDate = url.searchParams.get('endDate') || undefined;
   const rawPage = parseInt(url.searchParams.get('page') || '1', 10);
   const page = rawPage > 0 ? rawPage : 1;
 
-  const [categories, featuredEvents, eventsResult] = await Promise.all([
+  const [categories, eventsResult] = await Promise.all([
     categoryService.listCategories(),
-    eventService.listFeaturedEvents(6),
     eventService.listEvents({
-      category: categorySlug || undefined,
+      q,
+      category,
+      startDate,
+      endDate,
       page,
-      limit: 8,
+      limit: 12,
+      role: locals.user?.role,
+      userId: locals.user?.id,
     }),
   ]);
 
   return {
     categories,
-    featuredEvents,
     events: eventsResult.events.map((e) => ({
       id: e.id,
       title: e.title,
@@ -35,6 +41,13 @@ export const load: PageServerLoad = async ({ url }) => {
     pagination: {
       currentPage: eventsResult.pagination.page,
       totalPages: eventsResult.pagination.total_pages,
+      totalItems: eventsResult.pagination.total,
+    },
+    filters: {
+      q: q || '',
+      category: category || '',
+      startDate: startDate || '',
+      endDate: endDate || '',
     },
   };
 };
