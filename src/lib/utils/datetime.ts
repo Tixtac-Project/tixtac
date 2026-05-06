@@ -139,3 +139,34 @@ export function getDayInTZ(dateStr: string): string {
     day: 'numeric',
   }).format(d);
 }
+
+/** Format a Date to short date string (e.g. "06/05") in Asia/Ho_Chi_Minh */
+export function formatPeriodShort(date: Date): string {
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: TZ,
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date);
+}
+
+/** Format a Date to full date string (e.g. "06/05/2026") in Asia/Ho_Chi_Minh */
+export function formatPeriodFull(date: Date): string {
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: TZ,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+/** Convert a YYYY-MM-DD date string to ISO string at local start-of-day (Asia/Ho_Chi_Minh) */
+export function localStartOfDay(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00+07:00');
+  return d.toISOString();
+}
+
+/** Convert a YYYY-MM-DD date string to ISO string at local end-of-day (Asia/Ho_Chi_Minh 23:59:59.999) */
+export function localEndOfDay(dateStr: string): string {
+  const d = new Date(dateStr + 'T23:59:59.999+07:00');
+  return d.toISOString();
+}

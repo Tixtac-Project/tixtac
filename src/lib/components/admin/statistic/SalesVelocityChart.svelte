@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SalesVelocityPoint } from '$lib/types/stats';
+  import { formatPeriodFull, formatPeriodShort } from '$lib/utils/datetime';
   import { formatFullVND } from '$lib/utils/price';
   import { scaleBand, scaleLinear } from 'd3-scale';
   import { Area, Axis, Bars, Chart, Highlight, Layer, Tooltip } from 'layerchart';
@@ -16,12 +17,6 @@
       tickets: d.tickets,
     })),
   );
-
-  const formatPeriod = (date: Date) =>
-    date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-
-  const formatPeriodFull = (date: Date) =>
-    date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   // Shorten large VND values for axis: 1.2tr, 500tr, 1.2tỷ
   function formatAxisVND(value: number): string {
@@ -68,7 +63,7 @@
           placement="bottom"
           rule
           tickSpacing={60}
-          format={(v) => formatPeriod(v)}
+          format={(v: Date) => formatPeriodShort(v)}
           tickLabelProps={{ rotate: 315, textAnchor: 'end' }}
         />
 
@@ -89,12 +84,12 @@
 
       <Tooltip.Root {context}>
         {#snippet children({ data: d })}
-          <Tooltip.Header value={d?.period} format={(v) => formatPeriodFull(v)} />
+          <Tooltip.Header value={d?.period} format={(v: Date) => formatPeriodFull(v)} />
           <Tooltip.List>
             <Tooltip.Item
               label="Doanh thu"
               value={d?.revenue ?? 0}
-              format={(v) => formatFullVND(v)}
+              format={(v: number) => formatFullVND(v)}
               color="var(--color-cta)"
             />
             <Tooltip.Item label="Số vé" value={d?.tickets ?? 0} color="var(--color-info)" />

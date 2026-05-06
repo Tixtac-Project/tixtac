@@ -14,9 +14,9 @@ export function formatPrice(price: number): string {
 }
 
 /**
- * @description Format price to VND currency format without "₫" symbol
- * @param {number} price - The price to format
- * @returns {string} The formatted price string without currency symbol
+ * Format a number as VND currency with symbol included.
+ * @param n - The number to format
+ * @returns VND currency string with "₫" symbol (e.g. "351.900.000 ₫")
  */
 export function formatFullVND(n: number): string {
   return new Intl.NumberFormat('vi-VN', {

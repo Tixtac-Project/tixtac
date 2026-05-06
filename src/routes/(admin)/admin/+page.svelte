@@ -10,6 +10,7 @@
   import * as Tooltip from '$lib/components/ui/tooltip';
   import type { DemographicsStats, OverviewStats, SalesVelocityPoint } from '$lib/types/stats';
   import { cn } from '$lib/utils';
+  import { localEndOfDay, localStartOfDay } from '$lib/utils/datetime';
   import {
     ChartColumn,
     DollarSign,
@@ -96,8 +97,8 @@
 
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const params = new URLSearchParams({
-      startDate: new Date(sd).toISOString(),
-      endDate: new Date(ed + 'T23:59:59.999').toISOString(),
+      startDate: localStartOfDay(sd),
+      endDate: localEndOfDay(ed),
     });
     if (eventId !== null) {
       params.set('eventId', String(eventId));

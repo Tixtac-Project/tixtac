@@ -8,19 +8,18 @@
     loading = false,
   }: { data: DemographicsStats | null; loading: boolean } = $props();
 
+  const total = $derived(data ? Object.values(data.ageGroups).reduce((a, b) => a + b, 0) : 0);
+
   const chartData = $derived(
     data
       ? Object.entries(data.ageGroups)
           .filter(([, count]) => count > 0)
-          .map(([key, count]) => ({ key, count }))
+          .map(([key, count]) => {
+            const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
+            return { key, count, label: `${count} (${pct})` };
+          })
       : [],
   );
-
-  const total = $derived(data?.total ?? 0);
-
-  function pct(v: number): string {
-    return total > 0 ? ((v / total) * 100).toFixed(1) + '%' : '0%';
-  }
 
   const BAR_HEIGHT = 36;
   const BAR_PADDING = 0.35;
@@ -29,7 +28,6 @@
     Math.max(80, Math.ceil((BAR_HEIGHT + BAR_HEIGHT * BAR_PADDING) * chartData.length + 20)),
   );
 
-  // Container width drives adaptive padding
   let containerWidth = $state(0);
 
   const leftPad = $derived(
@@ -38,10 +36,7 @@
       : 32,
   );
 
-  // On narrow containers, drop the outside label — show count only inside or skip
   const isNarrow = $derived(containerWidth > 0 && containerWidth < 360);
-
-  // Right pad: enough for "999  99.9%" (~88px) on wide, minimal on narrow
   const rightPad = $derived(isNarrow ? 8 : 96);
 </script>
 
@@ -74,7 +69,7 @@
           grid
           ticks={isNarrow ? 3 : 4}
           tickLength={0}
-          format={(v) => (total > 0 ? Math.round((v / total) * 100) + '%' : '0%')}
+          format={(v: number) => (total > 0 ? Math.round((v / total) * 100) + '%' : '0%')}
           classes={{ tickLabel: 'text-xs fill-muted-foreground' }}
         />
 
@@ -87,23 +82,15 @@
         <Highlight area bar={{ rx: 3, style: 'fill: var(--color-primary)', class: 'opacity-85' }} />
 
         {#if !isNarrow}
-          <!-- Outside labels only when there's room -->
           <Labels
-            format={(d) => {
-              const count = (d as { count: number }).count;
-              return count != null ? `${count}  ${pct(count)}` : '';
-            }}
+            value="label"
             placement="outside"
             offset={10}
             class="fill-muted-foreground text-xs tabular-nums"
           />
         {:else}
-          <!-- On narrow: count inside the bar end -->
           <Labels
-            format={(d) => {
-              const count = (d as { count: number }).count;
-              return count != null ? String(count) : '';
-            }}
+            value="count"
             placement="inside"
             offset={6}
             class="text-xs tabular-nums"

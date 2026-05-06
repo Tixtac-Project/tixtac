@@ -13,7 +13,11 @@
     other: 'Khác',
   };
 
-  const GENDER_COLORS = ['var(--color-info)', 'var(--color-purple)', 'var(--color-neutral)'];
+  const GENDER_COLORS: Record<string, string> = {
+    male: 'var(--color-info)',
+    female: 'var(--color-purple)',
+    other: 'var(--color-neutral)',
+  };
 
   const chartData = $derived(
     data
@@ -23,9 +27,12 @@
             key,
             label: GENDER_LABELS[key] ?? key,
             value: count,
+            color: GENDER_COLORS[key] ?? 'var(--color-primary)',
           }))
       : [],
   );
+
+  const cRange = $derived(chartData.map((d) => d.color));
 
   const total = $derived(data?.total ?? 0);
 
@@ -48,7 +55,7 @@
       data={chartData}
       key="key"
       value="value"
-      cRange={GENDER_COLORS}
+      {cRange}
       innerRadius={-36}
       cornerRadius={3}
       padAngle={0.02}
@@ -109,7 +116,7 @@
           <div class="flex items-center gap-1.5">
             <span
               class="size-2 shrink-0 rounded-full"
-              style="background-color: {GENDER_COLORS[i] ?? 'var(--color-primary)'}"
+              style="background-color: {item.color}"
             ></span>
             <span class="text-xs text-muted-foreground">{item.label}</span>
             <span class="text-xs font-semibold tabular-nums">{item.value}</span>
@@ -129,7 +136,7 @@
             <div class="flex min-w-0 items-center gap-2">
               <span
                 class="size-2.5 shrink-0 rounded-full"
-                style="background-color: {GENDER_COLORS[i] ?? 'var(--color-primary)'}"
+                style="background-color: {item.color}"
               ></span>
               <span class="truncate text-sm font-medium">{item.label}</span>
             </div>
