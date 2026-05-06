@@ -13,6 +13,7 @@ const envSchema = z.object({
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
   UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -25,6 +26,7 @@ const result = envSchema.safeParse({
   CLOUDAMQP_URL: env.CLOUDAMQP_URL,
   UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
+  RESEND_API_KEY: env.RESEND_API_KEY,
 });
 
 if (!result.success) {
@@ -58,4 +60,6 @@ export const config = {
   upstashUrl: parsed.UPSTASH_REDIS_REST_URL,
   /** Upstash Redis REST token */
   upstashToken: parsed.UPSTASH_REDIS_REST_TOKEN,
+  /** Resend API key */
+  resendApiKey: parsed.RESEND_API_KEY,
 } as const;
