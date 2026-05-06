@@ -4,7 +4,7 @@ import {
   l1Cache,
   L2_TTL,
   REFRESH_COOLDOWN_S,
-  refreshRateLimitKey
+  refreshRateLimitKey,
 } from '$lib/server/cache';
 import { db } from '$lib/server/db';
 import { events, orderItems, orders, users } from '$lib/server/db/schema';
