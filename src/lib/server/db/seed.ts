@@ -248,11 +248,17 @@ export async function seed() {
   // ── 5. Events (from seed-data.ts) ──
   const eventSeeds = getEventSeeds(admin.id, catBySlug);
 
+  const seedBaseDate = new Date();
+  seedBaseDate.setDate(seedBaseDate.getDate() - 45); // events "created" 45 days ago
+
   for (const eventSeed of eventSeeds) {
-    const [ev] = await db
-      .insert(events)
-      .values(eventSeed.values as typeof events.$inferInsert)
-      .returning();
+    const values = eventSeed.values as typeof events.$inferInsert;
+    // So default-date-range queries (omitted startDate) see all 30-day-order spread
+    if (values.createdAt === undefined) {
+      values.createdAt = seedBaseDate;
+    }
+
+    const [ev] = await db.insert(events).values(values).returning();
 
     for (const show of eventSeed.shows) {
       await createShowWithSections(ev.id, show);

@@ -97,15 +97,19 @@ async function resolveDateRange(
   startDate: string | null,
   endDate: string | null,
 ): Promise<{ startDate: string; endDate: string }> {
+  // Explicit endDate → use as-is. Default → end of today (23:59:59.999).
   let resolvedEnd: string;
   if (endDate) {
     const d = new Date(endDate);
     if (!isValidDate(d)) throwError(Errors.VALIDATION({ endDate: 'Định dạng ngày không hợp lệ' }));
     resolvedEnd = d.toISOString();
   } else {
-    resolvedEnd = new Date().toISOString();
+    const eod = new Date();
+    eod.setUTCHours(23, 59, 59, 999);
+    resolvedEnd = eod.toISOString();
   }
 
+  // Explicit startDate → use as-is. Default → start of the event's creation day.
   if (startDate) {
     const d = new Date(startDate);
     if (!isValidDate(d))
@@ -123,7 +127,10 @@ async function resolveDateRange(
     throwError(Errors.NOT_FOUND, `Không tìm thấy sự kiện với id ${eventId}`);
   }
 
-  return { startDate: new Date(event.createdAt).toISOString(), endDate: resolvedEnd };
+  const sod = new Date(event.createdAt);
+  sod.setUTCHours(0, 0, 0, 0);
+
+  return { startDate: sod.toISOString(), endDate: resolvedEnd };
 }
 
 /** Build a cache-key-safe date segment: null → sentinel, otherwise UTC start-of-day */
