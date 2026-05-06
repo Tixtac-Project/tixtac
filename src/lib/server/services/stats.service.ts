@@ -26,6 +26,8 @@ function generatePeriodRange(
   const start = new Date(startDate);
   const end = new Date(endDate);
 
+  if (start > end) return []; // Guard against inverted date range
+
   if (interval === 'hour') {
     const current = new Date(start);
     current.setUTCMinutes(0, 0, 0);
@@ -255,12 +257,32 @@ async function withTwoTierCache<T>(cacheKey: string, dbFetcher: () => Promise<T>
   return data;
 }
 
+// In-memory rate limit fallback when Redis is unavailable — prevents DB hammering
+const inMemoryRL = new Map<number, number>();
+
+// Periodically purge stale entries so the map doesn't leak
+const _purgeTimer = setInterval(() => {
+  const cutoff = Date.now() - REFRESH_COOLDOWN_S * 1000;
+  for (const [id, ts] of inMemoryRL) {
+    if (ts < cutoff) inMemoryRL.delete(id);
+  }
+}, REFRESH_COOLDOWN_S * 1000);
+if (_purgeTimer.unref) _purgeTimer.unref();
+
 async function withForceRefresh<T>(
   key: string,
   adminId: number,
   fetcher: () => Promise<T>,
 ): Promise<T> {
   const rlKey = refreshRateLimitKey(adminId);
+
+  const checkAndSetRateLimit = (): boolean => {
+    const last = inMemoryRL.get(adminId);
+    if (last && Date.now() - last < REFRESH_COOLDOWN_S * 1000) return true;
+    inMemoryRL.set(adminId, Date.now());
+    return false;
+  };
+
   try {
     // Single round-trip: atomically check-and-set rate limit via SET NX
     const acquired = await redis.set(rlKey, '1', { nx: true, ex: REFRESH_COOLDOWN_S });
@@ -268,7 +290,10 @@ async function withForceRefresh<T>(
       return withTwoTierCache(key, fetcher);
     }
   } catch {
-    // Redis down — skip rate limiting, proceed with refresh
+    // Redis down — fall back to in-memory rate limit to avoid DB hammering
+    if (checkAndSetRateLimit()) {
+      return withTwoTierCache(key, fetcher);
+    }
   }
 
   const data = await fetcher();
