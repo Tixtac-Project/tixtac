@@ -262,13 +262,13 @@ async function withForceRefresh<T>(
 ): Promise<T> {
   const rlKey = refreshRateLimitKey(adminId);
   try {
-    const exists = await redis.get(rlKey);
-    if (exists) {
+    // Single round-trip: atomically check-and-set rate limit via SET NX
+    const acquired = await redis.set(rlKey, '1', { nx: true, ex: REFRESH_COOLDOWN_S });
+    if (!acquired) {
       return withTwoTierCache(key, fetcher);
     }
-    await redis.set(rlKey, '1', { ex: REFRESH_COOLDOWN_S });
   } catch {
-    // Redis down — skip rate limiting
+    // Redis down — skip rate limiting, proceed with refresh
   }
 
   const data = await fetcher();

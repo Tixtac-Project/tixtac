@@ -1,7 +1,7 @@
-import { redis } from '$lib/server/redis';
-import { Errors, throwError } from '$lib/server/errors';
 import { encryptSeatToken } from '$lib/server/auth/jwt';
 import { config } from '$lib/server/config';
+import { Errors, throwError } from '$lib/server/errors';
+import { redis } from '$lib/server/redis';
 
 const withRedisErrorHandling = async <T>(fn: () => Promise<T>): Promise<T> => {
   try {
@@ -61,14 +61,19 @@ export const queueService = {
         await redis
           .pipeline()
           .zrem(waitingKey, userId)
-          .set(userCurrentKey, eventId, { ex: 600 })
+          .set(userCurrentKey, eventId, { ex: config.accessTokenDuration })
+          .sadd('active_event_ids', eventId)
           .exec();
 
         const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
         return { status: 'active', expiresAt, token };
       } else {
-        await redis.zadd(waitingKey, { nx: true }, { score: now, member: userId });
-        await redis.set(userCurrentKey, eventId, { ex: 600 });
+        await redis
+          .pipeline()
+          .zadd(waitingKey, { nx: true }, { score: now, member: userId })
+          .set(userCurrentKey, eventId, { ex: config.accessTokenDuration })
+          .sadd('active_event_ids', eventId)
+          .exec();
 
         const position = await redis.zrank(waitingKey, userId);
         return { status: 'waiting', position: (position ?? 0) + 1 };
@@ -102,7 +107,7 @@ export const queueService = {
         throwError(Errors.FORBIDDEN, 'Slot của bạn không tồn tại hoặc đã hết hạn');
       }
 
-      await redis.set(`user_current_queue:${userId}`, eventId, { ex: 600 });
+      await redis.set(`user_current_queue:${userId}`, eventId, { ex: config.accessTokenDuration });
 
       const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
       return { expiresAt, token };

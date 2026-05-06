@@ -12,39 +12,29 @@ await mqInitPromise;
 await startWorker();
 
 async function runQueueWorker() {
+  let lockAcquired = false;
   try {
-    // Phân tán (Distributed lock) để tránh race condition khi chạy nhiều instance
-    const lockAcquired = await redis.set('worker_lock:queue', '1', { nx: true, ex: 10 });
-    if (!lockAcquired) return;
+    // Distributed lock to prevent race conditions across instances.
+    // ex: 10 is a failsafe — lock is explicitly released in finally.
+    const lockResult = await redis.set('worker_lock:queue', '1', { nx: true, ex: 10 });
+    if (!lockResult) return;
+    lockAcquired = true;
 
-    let cursor = '0';
-    const eventIds = new Set<string>();
+    // O(1) lookup via dedicated tracking set instead of O(N) SCAN over all keys.
+    const eventIdsArray = await redis.smembers('active_event_ids');
 
-    // Tìm tất cả các sự kiện đang có active
-    do {
-      const [nextCursor, keys] = await redis.scan(cursor, { match: 'active_users:*', count: 100 });
-      cursor = nextCursor;
-      keys.forEach((k) => eventIds.add(k.split(':')[1]));
-    } while (cursor !== '0');
+    if (eventIdsArray.length === 0) return;
 
-    // Tìm tất cả các sự kiện đang có waiting
-    cursor = '0';
-    do {
-      const [nextCursor, keys] = await redis.scan(cursor, { match: 'waiting_queue:*', count: 100 });
-      cursor = nextCursor;
-      keys.forEach((k) => eventIds.add(k.split(':')[1]));
-    } while (cursor !== '0');
-
-    console.log(`[QueueWorker] Found eventIds:`, Array.from(eventIds));
-
-    if (eventIds.size === 0) return;
+    console.log(`[QueueWorker] Found eventIds:`, eventIdsArray);
 
     const now = Date.now();
+    const slotDurationMs = config.accessTokenDuration * 1000;
 
-    for (const eventId of eventIds) {
+    for (const eventId of eventIdsArray) {
       const activeKey = `active_users:${eventId}`;
       const waitingKey = `waiting_queue:${eventId}`;
 
+      // A. Evict expired users
       const expiredUserIds = await redis.zrange(activeKey, 0, now, { byScore: true });
 
       if (expiredUserIds.length > 0) {
@@ -57,6 +47,7 @@ async function runQueueWorker() {
         console.log(`[QueueWorker] 🧹 Đuổi ${expiredUserIds.length} users khỏi Event ${eventId}`);
       }
 
+      // B. Promote waiting users into available slots
       const currentActiveCount = await redis.zcount(activeKey, now, '+inf');
       const availableSlots = (config.maxConcurrentUsers ?? 200) - currentActiveCount;
 
@@ -66,9 +57,9 @@ async function runQueueWorker() {
         if (nextUserIds.length > 0) {
           const pipeline = redis.pipeline();
           for (const uId of nextUserIds) {
-            pipeline.zadd(activeKey, { score: now + 60000, member: uId });
+            pipeline.zadd(activeKey, { score: now + slotDurationMs, member: uId });
             pipeline.zrem(waitingKey, uId);
-            pipeline.set(`user_current_queue:${uId}`, eventId, { ex: 600 });
+            pipeline.set(`user_current_queue:${uId}`, eventId, { ex: config.accessTokenDuration });
           }
           await pipeline.exec();
           console.log(
@@ -76,9 +67,24 @@ async function runQueueWorker() {
           );
         }
       }
+
+      // C. Garbage-collect event from tracking set when both queues are empty
+      if (availableSlots === (config.maxConcurrentUsers ?? 200)) {
+        // All slots free — check if anyone is waiting
+        const waitingCount = await redis.zcard(waitingKey);
+        if (waitingCount === 0) {
+          await redis.srem('active_event_ids', eventId);
+          console.log(`[QueueWorker] 🗑️ Removed idle event ${eventId} from tracking set`);
+        }
+      }
     }
   } catch (error) {
     console.error('[QueueWorker] Error:', error);
+  } finally {
+    // Release the lock so the next tick can run on schedule (every 3s).
+    if (lockAcquired) {
+      await redis.del('worker_lock:queue').catch(() => {});
+    }
   }
 }
 
