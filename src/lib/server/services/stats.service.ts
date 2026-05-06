@@ -3,9 +3,8 @@ import {
   cacheKey,
   l1Cache,
   L2_TTL,
-  normalizeDateStart,
   REFRESH_COOLDOWN_S,
-  refreshRateLimitKey,
+  refreshRateLimitKey
 } from '$lib/server/cache';
 import { db } from '$lib/server/db';
 import { events, orderItems, orders, users } from '$lib/server/db/schema';
@@ -133,10 +132,11 @@ async function resolveDateRange(
   return { startDate: sod.toISOString(), endDate: resolvedEnd };
 }
 
-/** Build a cache-key-safe date segment: null → sentinel, otherwise UTC start-of-day */
+/** Build a cache-key-safe date segment: null → sentinel, otherwise exact ISO instant */
 function cacheDateSegment(dateStr: string | null): string {
   if (dateStr === null) return 'event_start';
-  return normalizeDateStart(dateStr);
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? dateStr : parsed.toISOString();
 }
 
 // ══════════════════════════════════════════════════
