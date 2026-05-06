@@ -21,5 +21,12 @@ export const GET = apiHandler(async ({ url, locals }) => {
   }
 
   const data = await statsService.getOverview(eventId, startDate, endDate, forceRefresh, admin.id);
-  return json({ data });
+  return json(
+    { data },
+    {
+      headers: {
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=30',
+      },
+    },
+  );
 });

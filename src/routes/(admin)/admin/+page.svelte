@@ -9,10 +9,12 @@
   import { Skeleton } from '$lib/components/ui/skeleton';
   import * as Tooltip from '$lib/components/ui/tooltip';
   import type { DemographicsStats, OverviewStats, SalesVelocityPoint } from '$lib/types/stats';
+  import { cn } from '$lib/utils';
   import {
     ChartColumn,
     DollarSign,
     Percent,
+    RefreshCw,
     RotateCcw,
     Ticket,
     TrendingUp,
@@ -78,11 +80,17 @@
   // STATS FETCHING (reacts to filter changes)
   $effect(() => {
     if (startDate && endDate) {
-      loadStats(selectedEventId ? Number(selectedEventId) : null, startDate, endDate);
+      loadStats(selectedEventId ? Number(selectedEventId) : null, startDate, endDate, false);
     }
   });
 
-  async function loadStats(eventId: number | null, sd: string, ed: string) {
+  function forceRefresh() {
+    if (startDate && endDate) {
+      loadStats(selectedEventId ? Number(selectedEventId) : null, startDate, endDate, true);
+    }
+  }
+
+  async function loadStats(eventId: number | null, sd: string, ed: string, force: boolean) {
     statsLoading = true;
     statsError = null;
 
@@ -93,6 +101,9 @@
     });
     if (eventId !== null) {
       params.set('eventId', String(eventId));
+    }
+    if (force) {
+      params.set('forceRefresh', 'true');
     }
 
     try {
@@ -146,71 +157,85 @@
 
 <div class="space-y-4 md:space-y-6">
   <!-- PAGE HEADER -->
-  <div class="flex flex-col gap-0.5">
-    <h1 class="text-xl font-bold tracking-tight md:text-2xl">Tổng quan</h1>
-    <p class="text-sm text-muted-foreground">Theo dõi hiệu suất bán vé và xu hướng khách hàng</p>
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex flex-col gap-0.5">
+      <h1 class="text-xl font-bold tracking-tight md:text-2xl">Tổng quan</h1>
+      <p class="text-sm text-muted-foreground">Theo dõi hiệu suất bán vé và xu hướng khách hàng</p>
+    </div>
+
+    <Button
+      variant="outline"
+      size="sm"
+      class="shrink-0 gap-2"
+      onclick={forceRefresh}
+      disabled={statsLoading}
+    >
+      <RefreshCw class={cn('size-3.5', statsLoading && 'animate-spin')} />
+      Làm mới
+    </Button>
   </div>
 
   <!-- FILTERS BAR -->
-<div class="rounded-xl bg-surface-container-lowest p-3 md:p-5">
-  <div class="flex flex-col gap-2.5">
-    <!-- Event Select -->
-    <div class="flex flex-col gap-1.5">
-      <Label class="text-xs font-medium">Sự kiện</Label>
-      {#if eventsLoading}
-        <Skeleton class="h-10 w-full rounded-lg" />
-      {:else if events.length === 0}
-        <p class="py-2 text-sm text-muted-foreground">Không có sự kiện nào</p>
-      {:else}
-        <Select.Root type="single" bind:value={selectedEventId}>
-          <Select.Trigger class="w-full overflow-hidden">
-            <span class="block truncate">
-              {selectedEventId
-                ? (events.find((e) => String(e.id) === selectedEventId)?.title ?? 'Chọn sự kiện...')
-                : 'Tất cả sự kiện'}
-            </span>
-          </Select.Trigger>
-          <Select.Content class="max-w-[calc(100vw-2rem)]">
-            <Select.Group>
-              <Select.Label>Sự kiện</Select.Label>
-              <Select.Item value="" label="Tất cả sự kiện">Tất cả sự kiện</Select.Item>
-              {#each events as event (event.id)}
-                <Select.Item value={String(event.id)} label={event.title}>
-                  <span class="truncate">{event.title}</span>
-                </Select.Item>
-              {/each}
-            </Select.Group>
-          </Select.Content>
-        </Select.Root>
-      {/if}
-    </div>
-
-    <!-- Mobile: dates stacked 2-col, reset full-width below -->
-    <!-- Desktop (md+): all three in one row -->
-    <div class="flex flex-col gap-2 md:flex-row md:items-end">
-      <div class="grid grid-cols-2 gap-2 md:contents">
-        <div class="flex flex-col gap-1.5">
-          <Label for="stats-start-date" class="text-xs font-medium">Từ ngày</Label>
-          <Input id="stats-start-date" type="date" bind:value={startDate} class="w-full" />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="stats-end-date" class="text-xs font-medium">Đến ngày</Label>
-          <Input id="stats-end-date" type="date" bind:value={endDate} class="w-full" />
-        </div>
+  <div class="rounded-xl bg-surface-container-lowest p-3 md:p-5">
+    <div class="flex flex-col gap-2.5">
+      <!-- Event Select -->
+      <div class="flex flex-col gap-1.5">
+        <Label class="text-xs font-medium">Sự kiện</Label>
+        {#if eventsLoading}
+          <Skeleton class="h-10 w-full rounded-lg" />
+        {:else if events.length === 0}
+          <p class="py-2 text-sm text-muted-foreground">Không có sự kiện nào</p>
+        {:else}
+          <Select.Root type="single" bind:value={selectedEventId}>
+            <Select.Trigger class="w-full overflow-hidden">
+              <span class="block truncate">
+                {selectedEventId
+                  ? (events.find((e) => String(e.id) === selectedEventId)?.title ??
+                    'Chọn sự kiện...')
+                  : 'Tất cả sự kiện'}
+              </span>
+            </Select.Trigger>
+            <Select.Content class="max-w-[calc(100vw-2rem)]">
+              <Select.Group>
+                <Select.Label>Sự kiện</Select.Label>
+                <Select.Item value="" label="Tất cả sự kiện">Tất cả sự kiện</Select.Item>
+                {#each events as event (event.id)}
+                  <Select.Item value={String(event.id)} label={event.title}>
+                    <span class="truncate">{event.title}</span>
+                  </Select.Item>
+                {/each}
+              </Select.Group>
+            </Select.Content>
+          </Select.Root>
+        {/if}
       </div>
 
-      <Button
-        variant="outline"
-        size="sm"
-        class="w-full gap-2 md:w-auto md:shrink-0"
-        onclick={setDefaultDates}
-      >
-        <RotateCcw class="size-3.5" />
-        Đặt lại ngày theo mặc định
-      </Button>
+      <!-- Mobile: dates stacked 2-col, reset full-width below -->
+      <!-- Desktop (md+): all three in one row -->
+      <div class="flex flex-col gap-2 md:flex-row md:items-end">
+        <div class="grid grid-cols-2 gap-2 md:contents">
+          <div class="flex flex-col gap-1.5">
+            <Label for="stats-start-date" class="text-xs font-medium">Từ ngày</Label>
+            <Input id="stats-start-date" type="date" bind:value={startDate} class="w-full" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <Label for="stats-end-date" class="text-xs font-medium">Đến ngày</Label>
+            <Input id="stats-end-date" type="date" bind:value={endDate} class="w-full" />
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          class="w-full gap-2 md:w-auto md:shrink-0"
+          onclick={setDefaultDates}
+        >
+          <RotateCcw class="size-3.5" />
+          Đặt lại ngày theo mặc định
+        </Button>
+      </div>
     </div>
   </div>
-</div>
 
   <!-- OVERVIEW CARDS -->
   <div class="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">

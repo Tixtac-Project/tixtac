@@ -35,5 +35,12 @@ export const GET = apiHandler(async ({ url, locals }) => {
     forceRefresh,
     admin.id,
   );
-  return json({ data });
+  return json(
+    { data },
+    {
+      headers: {
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=30',
+      },
+    },
+  );
 });
