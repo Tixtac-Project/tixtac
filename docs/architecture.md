@@ -201,7 +201,7 @@ src/lib/server/services/
 ├── purchase.service.ts    # Hold seats (row lock), cart replacement, idempotency
 ├── order.service.ts       # Checkout (payment), my tickets
 ├── queue.service.ts       # (Planned) Virtual queue: join, check status, grant access
-└── stats.service.ts       # (Planned) Revenue, occupancy, demographics
+└── stats.service.ts       # Revenue, velocity, demographics (3-tier cache: L0 HTTP → L1 LRU → L2 Redis)
 ```
 
 **Nguyên tắc:**
@@ -234,6 +234,7 @@ src/lib/server/
 │   ├── seat-overlap.validator.ts   # Section overlap & requirement checks
 │   └── disabled-seats.validator.ts # Disabled seat validation
 ├── redis.ts               # Upstash Redis client (Singleton)
+├── cache.ts               # L1 LRU cache (tiny-lru) + cache key builder + date utilities
 ├── push.ts                # PushForge Builder config
 ├── config.ts              # Env validation via Zod (fail-fast)
 ├── errors.ts              # AppError class + predefined error catalog
@@ -537,21 +538,23 @@ CREATE TYPE order_status   AS ENUM ('pending', 'paid', 'cancelled');
 
 ### 3.4 Index Strategy
 
-| Index                             | Bảng             | Cột                                             | Mục đích                         |
-| --------------------------------- | ---------------- | ----------------------------------------------- | -------------------------------- |
-| `users_email_unique`              | users            | email (UNIQUE)                                  | Đăng nhập, check trùng           |
-| `idx_event_shows_event`           | event_shows      | (event_id)                                      | Lấy shows theo event             |
-| `idx_seat_sections_show`          | seat_sections    | (show_id)                                       | Lấy sections theo show           |
-| `uq_seat_label_per_show`          | seats            | (show_id, prefix, row_label, col_number) UNIQUE | Không trùng label ghế trong show |
-| `idx_seats_show_status`           | seats            | (show_id, status)                               | Lấy sơ đồ ghế theo show          |
-| `idx_seats_section`               | seats            | (section_id)                                    | Lấy ghế theo section             |
-| `idx_orders_user`                 | orders           | (user_id, status)                               | "Vé của tôi"                     |
-| `idx_orders_expires`              | orders           | (status, expires_at) WHERE pending              | Worker nhả ghế hết hạn           |
-| `uq_ticket_code`                  | order_items      | (ticket_code) UNIQUE                            | Lookup vé theo mã                |
-| `idx_idempotency_keys_created_at` | idempotency_keys | (created_at)                                    | Cleanup old keys                 |
-| `idx_orders_analytics`            | orders           | `(status, created_at)` WHERE `paid`             | Tối ưu đếm Doanh thu / Velocity  |
-| `idx_orders_dropoff`              | orders           | `(status)` WHERE `paid` OR `cancelled`          | Tối ưu tính tỉ lệ rớt giỏ hàng   |
-| `idx_users_demographics`          | users            | `(gender, date_of_birth)`                       | Tối ưu biểu đồ Nhân khẩu học     |
+| Index                             | Bảng             | Cột                                             | Mục đích                                                                                     |
+| --------------------------------- | ---------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `users_email_unique`              | users            | email (UNIQUE)                                  | Đăng nhập, check trùng                                                                       |
+| `idx_event_shows_event`           | event_shows      | (event_id)                                      | Lấy shows theo event                                                                         |
+| `idx_seat_sections_show`          | seat_sections    | (show_id)                                       | Lấy sections theo show                                                                       |
+| `uq_seat_label_per_show`          | seats            | (show_id, prefix, row_label, col_number) UNIQUE | Không trùng label ghế trong show                                                             |
+| `idx_seats_show_status`           | seats            | (show_id, status)                               | Lấy sơ đồ ghế theo show                                                                      |
+| `idx_seats_section`               | seats            | (section_id)                                    | Lấy ghế theo section                                                                         |
+| `idx_orders_created_at`           | orders           | (created_at)                                    | Global stats: time-bounded queries (overview, velocity, demographics without eventId filter) |
+| `idx_order_items_order`           | order_items      | (order_id)                                      | JOIN orders → order_items (all stats queries)                                                |
+| `idx_orders_user`                 | orders           | (user_id, status)                               | "Vé của tôi"                                                                                 |
+| `idx_orders_expires`              | orders           | (status, expires_at) WHERE pending              | Worker nhả ghế hết hạn                                                                       |
+| `uq_ticket_code`                  | order_items      | (ticket_code) UNIQUE                            | Lookup vé theo mã                                                                            |
+| `idx_idempotency_keys_created_at` | idempotency_keys | (created_at)                                    | Cleanup old keys                                                                             |
+| `idx_orders_analytics`            | orders           | `(status, created_at)` WHERE `paid`             | Tối ưu đếm Doanh thu / Velocity                                                              |
+| `idx_orders_dropoff`              | orders           | `(status)` WHERE `paid` OR `cancelled`          | Tối ưu tính tỉ lệ rớt giỏ hàng                                                               |
+| `idx_users_demographics`          | users            | `(gender, date_of_birth)`                       | Tối ưu biểu đồ Nhân khẩu học                                                                 |
 
 **Tại sao chọn những index này:**
 
@@ -1090,16 +1093,25 @@ export const handle = sequence(securityHeaders, auth);
 | DELETE | `/api/events/[id]/shows/[showId]` | Xóa show (cascade sections & seats)             |
 | PUT    | `/api/events/[id]/sections`       | Thay thế toàn bộ sections & seats (draft only)  |
 
-### 6.5 Planned
+### 6.5 Stats (Admin Dashboard)
+
+| Method | Endpoint                    | Mô tả                                                                | Cache          |
+| ------ | --------------------------- | -------------------------------------------------------------------- | -------------- |
+| GET    | `/api/stats/overview`       | Tổng doanh thu, số vé, tỉ lệ rớt giỏ hàng (theo event hoặc toàn sàn) | L0: max-age=60 |
+| GET    | `/api/stats/sales-velocity` | Tốc độ bán vé theo giờ/ngày/tuần (theo event hoặc toàn sàn)          | L0: max-age=60 |
+| GET    | `/api/stats/demographics`   | Phân bổ giới tính + độ tuổi người mua (theo event hoặc toàn sàn)     | L0: max-age=60 |
+
+**Query params:** `eventId` (optional — thiếu → toàn sàn, mặc định 30 ngày), `startDate`, `endDate`, `forceRefresh` (bypass cache).
+**Cache:** L0 HTTP (`Cache-Control: private, max-age=60, stale-while-revalidate=30`) → L1 LRU in-memory (3 min, 500 entries) → L2 Redis (15 min).
+**Nút "Làm mới"** thêm `?forceRefresh=true` → bypass toàn bộ 3 tầng cache, query DB trực tiếp.
+
+### 6.6 Planned
 
 | Method | Endpoint                                       | Mô tả                                   |
 | ------ | ---------------------------------------------- | --------------------------------------- |
 | POST   | `/api/events/[id]/queue`                       | Đăng ký hàng chờ chung cho toàn sự kiện |
 | GET    | `/api/events/[id]/queue`                       | Check vị trí hàng chờ (Polling)         |
 | GET    | `/api/events/[id]/shows/[showId]/seats/stream` | SSE realtime cho suất diễn đang xem     |
-| GET    | `/api/stats/revenue`                           | Doanh thu (admin)                       |
-| GET    | `/api/stats/occupancy`                         | Tỉ lệ lấp đầy (admin)                   |
-| GET    | `/api/stats/demographics`                      | Demographics (admin)                    |
 
 ---
 
@@ -1383,6 +1395,7 @@ src/
 ├── lib/
 │   ├── components/
 │   │   ├── admin/              # Admin-specific components (event editor, seatmap builder)
+│   │   │   └── statistic/      # Dashboard chart components (SalesVelocity, Gender, Age — LayerChart v2)
 │   │   ├── customer/           # Customer-specific components (event cards, ticket cards)
 │   │   ├── seat-map/           # Shared seat map viewer (SeatItem, SectionBlock, SummaryBar)
 │   │   └── ui/                 # shadcn-svelte primitives (button, badge, popover, etc.)

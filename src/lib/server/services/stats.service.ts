@@ -4,7 +4,7 @@ import {
   l1Cache,
   L2_TTL,
   REFRESH_COOLDOWN_S,
-  refreshRateLimitKey
+  refreshRateLimitKey,
 } from '$lib/server/cache';
 import { db } from '$lib/server/db';
 import { events, orderItems, orders, users } from '$lib/server/db/schema';
@@ -91,8 +91,16 @@ function isValidDate(d: Date): boolean {
   return d instanceof Date && !isNaN(d.getTime());
 }
 
+/** Default start date for global queries: 30 days ago at UTC midnight */
+function globalDefaultStartDate(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 30);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 async function resolveDateRange(
-  eventId: number,
+  eventId: number | null,
   startDate: string | null,
   endDate: string | null,
 ): Promise<{ startDate: string; endDate: string }> {
@@ -116,20 +124,24 @@ async function resolveDateRange(
     return { startDate: d.toISOString(), endDate: resolvedEnd };
   }
 
-  const [event] = await db
-    .select({ createdAt: events.createdAt })
-    .from(events)
-    .where(eq(events.id, eventId))
-    .limit(1);
+  // No startDate: for single event → event creation day; for global → 30 days ago
+  if (eventId !== null) {
+    const [event] = await db
+      .select({ createdAt: events.createdAt })
+      .from(events)
+      .where(eq(events.id, eventId))
+      .limit(1);
 
-  if (!event?.createdAt) {
-    throwError(Errors.NOT_FOUND, `Không tìm thấy sự kiện với id ${eventId}`);
+    if (!event?.createdAt) {
+      throwError(Errors.NOT_FOUND, `Không tìm thấy sự kiện với id ${eventId}`);
+    }
+
+    const sod = new Date(event.createdAt);
+    sod.setUTCHours(0, 0, 0, 0);
+    return { startDate: sod.toISOString(), endDate: resolvedEnd };
   }
 
-  const sod = new Date(event.createdAt);
-  sod.setUTCHours(0, 0, 0, 0);
-
-  return { startDate: sod.toISOString(), endDate: resolvedEnd };
+  return { startDate: globalDefaultStartDate(), endDate: resolvedEnd };
 }
 
 /** Build a cache-key-safe date segment: null → sentinel, otherwise exact ISO instant */
@@ -143,6 +155,7 @@ function cacheDateSegment(dateStr: string | null): string {
 // PREPARED STATEMENTS (compiled once at startup)
 // ══════════════════════════════════════════════════
 
+// ── Single-event statements ──
 const overviewStmt = db
   .select({
     totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.priceSnapshot} ELSE 0 END), '0')`,
@@ -160,9 +173,35 @@ const overviewStmt = db
     ),
   )
   .prepare('stats_overview');
-function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
+
+// ── Global statements (no eventId filter) ──
+const overviewGlobalStmt = db
+  .select({
+    totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.priceSnapshot} ELSE 0 END), '0')`,
+    totalTicketsSold: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN ${orderItems.id} END)::int`,
+    paidOrders: sql<number>`COUNT(DISTINCT CASE WHEN ${orders.status} = 'paid' THEN ${orders.id} END)::int`,
+    cancelledOrders: sql<number>`COUNT(DISTINCT CASE WHEN ${orders.status} = 'cancelled' THEN ${orders.id} END)::int`,
+  })
+  .from(orders)
+  .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+  .where(
+    and(
+      gte(orders.createdAt, sql.placeholder('startDate')),
+      lte(orders.createdAt, sql.placeholder('endDate')),
+    ),
+  )
+  .prepare('stats_overview_global');
+
+function buildVelocityStmt(interval: 'hour' | 'day' | 'week', global: boolean = false) {
   const format = interval === 'hour' ? `'YYYY-MM-DD"T"HH24:00'` : `'YYYY-MM-DD'`;
   const periodExpr = sql`to_char(date_trunc(${sql.raw(`'${interval}'`)}, ${orders.createdAt}), ${sql.raw(format)})`;
+  const conditions = [
+    gte(orders.createdAt, sql.placeholder('startDate')),
+    lte(orders.createdAt, sql.placeholder('endDate')),
+  ];
+  if (!global) {
+    conditions.unshift(eq(orderItems.eventId, sql.placeholder('eventId')));
+  }
   return db
     .select({
       period: sql<string>`${periodExpr}`,
@@ -171,22 +210,24 @@ function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
     })
     .from(orders)
     .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(
-      and(
-        eq(orderItems.eventId, sql.placeholder('eventId')),
-        gte(orders.createdAt, sql.placeholder('startDate')),
-        lte(orders.createdAt, sql.placeholder('endDate')),
-      ),
-    )
+    .where(and(...conditions))
     .groupBy(periodExpr)
     .orderBy(periodExpr)
-    .prepare(`stats_velocity_${interval}`);
+    .prepare(`stats_velocity_${interval}${global ? '_global' : ''}`);
 }
 const velocityHourStmt = buildVelocityStmt('hour');
 const velocityDayStmt = buildVelocityStmt('day');
 const velocityWeekStmt = buildVelocityStmt('week');
+const velocityHourGlobalStmt = buildVelocityStmt('hour', true);
+const velocityDayGlobalStmt = buildVelocityStmt('day', true);
+const velocityWeekGlobalStmt = buildVelocityStmt('week', true);
 
-function getVelocityStmt(interval: 'hour' | 'day' | 'week') {
+function getVelocityStmt(interval: 'hour' | 'day' | 'week', global: boolean = false) {
+  if (global) {
+    if (interval === 'hour') return velocityHourGlobalStmt;
+    if (interval === 'week') return velocityWeekGlobalStmt;
+    return velocityDayGlobalStmt;
+  }
   if (interval === 'hour') return velocityHourStmt;
   if (interval === 'week') return velocityWeekStmt;
   return velocityDayStmt;
@@ -215,6 +256,24 @@ const demographicsRowStmt = db
   )
   .groupBy(users.id)
   .prepare('stats_demographics');
+
+const demographicsGlobalStmt = db
+  .select({
+    gender: sql<'male' | 'female' | 'other'>`MAX(${users.gender})`,
+    dateOfBirth: sql<string>`MAX(${users.dateOfBirth})`,
+  })
+  .from(users)
+  .innerJoin(orders, eq(orders.userId, users.id))
+  .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+  .where(
+    and(
+      eq(orders.status, 'paid'),
+      gte(orders.createdAt, sql.placeholder('startDate')),
+      lte(orders.createdAt, sql.placeholder('endDate')),
+    ),
+  )
+  .groupBy(users.id)
+  .prepare('stats_demographics_global');
 
 // ══════════════════════════════════════════════════
 // TWO-TIER CACHE HELPERS
@@ -283,7 +342,7 @@ async function withForceRefresh<T>(
 
 export const statsService = {
   async getOverview(
-    eventId: number,
+    eventId: number | null,
     startDate: string | null,
     endDate: string | null,
     forceRefresh: boolean,
@@ -291,7 +350,7 @@ export const statsService = {
   ): Promise<OverviewStats> {
     const key = cacheKey(
       'overview',
-      eventId,
+      eventId ?? 'all',
       cacheDateSegment(startDate),
       cacheDateSegment(endDate),
     );
@@ -303,7 +362,7 @@ export const statsService = {
   },
 
   async getSalesVelocity(
-    eventId: number,
+    eventId: number | null,
     interval: 'hour' | 'day' | 'week',
     startDate: string | null,
     endDate: string | null,
@@ -312,7 +371,7 @@ export const statsService = {
   ): Promise<SalesVelocityPoint[]> {
     const key = cacheKey(
       'velocity',
-      eventId,
+      eventId ?? 'all',
       interval,
       cacheDateSegment(startDate),
       cacheDateSegment(endDate),
@@ -327,7 +386,7 @@ export const statsService = {
   },
 
   async getDemographics(
-    eventId: number,
+    eventId: number | null,
     startDate: string | null,
     endDate: string | null,
     forceRefresh: boolean,
@@ -335,7 +394,7 @@ export const statsService = {
   ): Promise<DemographicsStats> {
     const key = cacheKey(
       'demographics',
-      eventId,
+      eventId ?? 'all',
       cacheDateSegment(startDate),
       cacheDateSegment(endDate),
     );
@@ -352,17 +411,19 @@ export const statsService = {
 // ══════════════════════════════════════════════════
 
 async function fetchOverview(
-  eventId: number,
+  eventId: number | null,
   startDate: string | null,
   endDate: string | null,
 ): Promise<OverviewStats> {
   const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
+  const params = { startDate: new Date(s), endDate: new Date(e) };
 
-  const [row] = await overviewStmt.execute({
-    eventId,
-    startDate: new Date(s),
-    endDate: new Date(e),
-  });
+  let row: Awaited<ReturnType<typeof overviewStmt.execute>>[number] | undefined;
+  if (eventId !== null) {
+    [row] = await overviewStmt.execute({ ...params, eventId });
+  } else {
+    [row] = await overviewGlobalStmt.execute(params);
+  }
 
   const paidCount = row?.paidOrders ?? 0;
   const cancelledCount = row?.cancelledOrders ?? 0;
@@ -379,18 +440,18 @@ async function fetchOverview(
 }
 
 async function fetchVelocity(
-  eventId: number,
+  eventId: number | null,
   interval: 'hour' | 'day' | 'week',
   startDate: string | null,
   endDate: string | null,
 ): Promise<SalesVelocityPoint[]> {
   const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
+  const params = { startDate: new Date(s), endDate: new Date(e) };
 
-  const rows = await getVelocityStmt(interval).execute({
-    eventId,
-    startDate: new Date(s),
-    endDate: new Date(e),
-  });
+  const rows =
+    eventId !== null
+      ? await getVelocityStmt(interval).execute({ ...params, eventId })
+      : await getVelocityStmt(interval, true).execute(params);
 
   const rawMap = new Map<string, { revenue: number; tickets: number }>();
   for (const row of rows) {
@@ -402,17 +463,17 @@ async function fetchVelocity(
 }
 
 async function fetchDemographics(
-  eventId: number,
+  eventId: number | null,
   startDate: string | null,
   endDate: string | null,
 ): Promise<DemographicsStats> {
   const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
+  const params = { startDate: new Date(s), endDate: new Date(e) };
 
-  const rows = await demographicsRowStmt.execute({
-    eventId,
-    startDate: new Date(s),
-    endDate: new Date(e),
-  });
+  const rows =
+    eventId !== null
+      ? await demographicsRowStmt.execute({ ...params, eventId })
+      : await demographicsGlobalStmt.execute(params);
 
   const gender = { male: 0, female: 0, other: 0 };
   const ageGroups = {

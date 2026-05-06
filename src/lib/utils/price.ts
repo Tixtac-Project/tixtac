@@ -12,3 +12,16 @@ export function formatPrice(price: number): string {
     maximumFractionDigits: 0,
   }).format(price);
 }
+
+/**
+ * Format a number as VND currency with symbol included.
+ * @param n - The number to format
+ * @returns VND currency string with "₫" symbol (e.g. "351.900.000 ₫")
+ */
+export function formatFullVND(n: number): string {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(n);
+}

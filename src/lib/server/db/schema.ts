@@ -292,6 +292,7 @@ export const orders = pgTable(
     index('idx_orders_dropoff')
       .on(table.status)
       .where(sql`${table.status} IN ('paid', 'cancelled')`),
+    index('idx_orders_created_at').on(table.createdAt),
   ],
 );
 
@@ -327,6 +328,7 @@ export const orderItems = pgTable(
     ),
     index('idx_order_items_event').on(table.eventId),
     index('idx_order_items_show').on(table.showId),
+    index('idx_order_items_order').on(table.orderId),
   ],
 );
 
