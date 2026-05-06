@@ -180,31 +180,18 @@ export const eventService = {
       .leftJoin(categories, eq(categories.id, events.categoryId))
       .where(whereClause);
 
-    // Data query — paginated with full columns
+    // Data query — paginated with full columns, includes seat_sections for price/seat counts
     const rows = await db
-      .select(selectCols)
-      .from(events)
-      .leftJoin(categories, eq(categories.id, events.categoryId))
-      .leftJoin(eventShows, eq(eventShows.eventId, events.id))
-      .where(whereClause)
-      .groupBy(events.id, categories.name, categories.slug);
-
-    const countQuery = havingClause ? countBase.having(havingClause) : countBase;
-    const countRows = await countQuery;
-    const total = countRows.length;
-
-    // Data query — paginated with full columns
-    const dataBase = db
       .select(selectCols)
       .from(events)
       .leftJoin(categories, eq(categories.id, events.categoryId))
       .leftJoin(eventShows, eq(eventShows.eventId, events.id))
       .leftJoin(seatSections, eq(seatSections.showId, eventShows.id))
       .where(whereClause)
-      .groupBy(events.id, categories.name, categories.slug);
-
-    const dataQuery = havingClause ? dataBase.having(havingClause) : dataBase;
-    const rows = await dataQuery.orderBy(min(eventShows.showDate)).limit(limit).offset(offset);
+      .groupBy(events.id, categories.name, categories.slug)
+      .orderBy(min(eventShows.showDate))
+      .limit(limit)
+      .offset(offset);
     return {
       events: rows.map((r) => ({
         id: r.id,
