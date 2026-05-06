@@ -15,7 +15,7 @@
 
   interface Filters {
     q: string;
-    categoryId: string;
+    category: string;
     startDate: string;
     endDate: string;
   }
@@ -34,8 +34,8 @@
   let pagination = $derived(data.pagination);
   let filters = $derived(data.filters);
 
-  // Show skeleton loading when navigating between filter states
-  let isLoading = $derived(navigating !== null);
+  // Show skeleton loading only during active navigations.
+  let isLoading = $derived(navigating.to !== null);
 </script>
 
 <svelte:head>

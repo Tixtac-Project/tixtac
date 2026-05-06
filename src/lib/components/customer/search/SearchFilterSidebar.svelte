@@ -32,7 +32,7 @@
   let isMobileOpen = $state(false);
   let keyword = $state('');
 
-  // Initialize keyword from URL on mount and sync on back/forward navigation
+  // Sync keyword from URL only on completed navigations (back/forward/popstate).
   $effect(() => {
     const urlQ = pageState.url.searchParams.get('q') ?? '';
     const focused = document.activeElement;
