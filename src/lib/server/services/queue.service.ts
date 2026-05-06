@@ -54,11 +54,12 @@ export const queueService = {
       const addedToActive = await redis.eval<[number, number, number, number], number>(
         luaScript,
         [activeKey],
-        [now, maxUsers, expiresAt, userId]
+        [now, maxUsers, expiresAt, userId],
       );
 
       if (addedToActive === 1) {
-        await redis.pipeline()
+        await redis
+          .pipeline()
           .zrem(waitingKey, userId)
           .set(userCurrentKey, eventId, { ex: 600 })
           .exec();
@@ -94,7 +95,7 @@ export const queueService = {
       const updated = await redis.eval<[number, number, number], number>(
         luaScript,
         [activeKey],
-        [userId, now, expiresAt]
+        [userId, now, expiresAt],
       );
 
       if (updated !== 1) {
@@ -112,10 +113,11 @@ export const queueService = {
     return await withRedisErrorHandling(async () => {
       const userCurrentKey = `user_current_queue:${userId}`;
       const currentQueuedEvent = await redis.get<number | string>(userCurrentKey);
-      
+
       // Prevents Cross-queue lock bypass: Only delete if user is actually in THIS event
       if (currentQueuedEvent && Number(currentQueuedEvent) === eventId) {
-        await redis.pipeline()
+        await redis
+          .pipeline()
           .del(userCurrentKey)
           .zrem(`active_users:${eventId}`, userId)
           .zrem(`waiting_queue:${eventId}`, userId)
