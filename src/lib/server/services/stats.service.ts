@@ -3,7 +3,6 @@ import {
   cacheKey,
   l1Cache,
   L2_TTL,
-  normalizeDateStart,
   REFRESH_COOLDOWN_S,
   refreshRateLimitKey,
 } from '$lib/server/cache';
@@ -47,10 +46,7 @@ function generatePeriodRange(
     current.setUTCDate(current.getUTCDate() - diff);
     current.setUTCHours(0, 0, 0, 0);
     while (current <= end) {
-      const year = current.getUTCFullYear();
-      const month = String(current.getUTCMonth() + 1).padStart(2, '0');
-      const dayOfMonth = String(current.getUTCDate()).padStart(2, '0');
-      periods.push(`${year}-${month}-${dayOfMonth}`);
+      periods.push(current.toISOString().slice(0, 10));
       current.setUTCDate(current.getUTCDate() + 7);
     }
   }
@@ -60,40 +56,36 @@ function generatePeriodRange(
 function fillVelocityData(
   rawData: Map<string, { revenue: number; tickets: number }>,
   fullPeriods: string[],
-  interval: 'hour' | 'day' | 'week',
 ): SalesVelocityPoint[] {
   return fullPeriods.map((p) => {
-    const displayPeriod =
-      interval === 'hour' ? p.slice(0, 13).replace('T', ' ') + ':00' : p.slice(0, 10);
     const data = rawData.get(p);
     return {
-      period: displayPeriod,
+      period: p,
       revenue: data ? Number(data.revenue) : 0,
       tickets: data ? data.tickets : 0,
     };
   });
 }
 
-function ageGroup(dobStr: string): string {
+function ageGroup(dobStr: string, now: Date): string {
   const dob = new Date(dobStr);
-  const now = new Date();
   let age = now.getUTCFullYear() - dob.getUTCFullYear();
   const m = now.getUTCMonth() - dob.getUTCMonth();
   if (m < 0 || (m === 0 && now.getUTCDate() < dob.getUTCDate())) {
     age--;
   }
-  if (age < 13) return '13-17';
-  if (age <= 17) return '13-17';
-  if (age <= 24) return '18-24';
-  if (age <= 34) return '25-34';
-  if (age <= 44) return '35-44';
-  return '45+';
+  if (age < 6) return '< 6';
+  if (age <= 11) return '6-11';
+  if (age <= 15) return '12-15';
+  if (age <= 18) return '16-18';
+  if (age <= 22) return '19-22';
+  if (age <= 29) return '23-29';
+  if (age <= 39) return '30-39';
+  if (age <= 49) return '40-49';
+  if (age <= 60) return '50-60';
+  return '> 60';
 }
 
-/**
- * Resolve startDate: use the provided value, or fall back to the event's
- * createdAt timestamp from the database. End date defaults to now.
- */
 async function resolveDateRange(
   eventId: number,
   startDate: string | null,
@@ -142,10 +134,11 @@ const overviewStmt = db
   .prepare('stats_overview');
 
 function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
-  const trunc = sql`date_trunc(${sql.raw(`'${interval}'`)}, ${orders.createdAt})`;
+  const format = interval === 'hour' ? `'YYYY-MM-DD"T"HH24:00'` : `'YYYY-MM-DD'`;
+  const periodExpr = sql`to_char(date_trunc(${sql.raw(`'${interval}'`)}, ${orders.createdAt}), ${sql.raw(format)})`;
   return db
     .select({
-      period: sql<string>`${trunc}::text`,
+      period: sql<string>`${periodExpr}`,
       revenue: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'paid' THEN ${orders.totalAmount} ELSE 0 END), 0)`,
       tickets: sql<number>`COUNT(CASE WHEN ${orders.status} = 'paid' THEN 1 END)::int`,
     })
@@ -160,8 +153,8 @@ function buildVelocityStmt(interval: 'hour' | 'day' | 'week') {
         lte(orders.createdAt, sql.placeholder('endDate')),
       ),
     )
-    .groupBy(trunc)
-    .orderBy(trunc)
+    .groupBy(periodExpr)
+    .orderBy(periodExpr)
     .prepare(`stats_velocity_${interval}`);
 }
 
@@ -175,11 +168,12 @@ function getVelocityStmt(interval: 'hour' | 'day' | 'week') {
   return velocityDayStmt;
 }
 
+// Dedup users in SQL via GROUP BY instead of selectDistinct (incompatible
+// with .prepare()) + TypeScript Set loop
 const demographicsRowStmt = db
   .select({
-    gender: users.gender,
-    dateOfBirth: users.dateOfBirth,
-    userId: users.id,
+    gender: sql<'male' | 'female' | 'other'>`MAX(${users.gender})`,
+    dateOfBirth: sql<string>`MAX(${users.dateOfBirth})`,
   })
   .from(users)
   .innerJoin(orders, eq(orders.userId, users.id))
@@ -194,6 +188,7 @@ const demographicsRowStmt = db
       lte(orders.createdAt, sql.placeholder('endDate')),
     ),
   )
+  .groupBy(users.id)
   .prepare('stats_demographics');
 
 // ══════════════════════════════════════════════════
@@ -202,9 +197,7 @@ const demographicsRowStmt = db
 
 async function getFromL2<T>(key: string): Promise<T | null> {
   try {
-    const raw = await redis.get<string>(key);
-    if (raw === null || raw === undefined) return null;
-    return JSON.parse(raw) as T;
+    return (await redis.get<T>(key)) ?? null;
   } catch (err) {
     console.error('[L2 Redis] get error:', err);
     return null;
@@ -213,7 +206,7 @@ async function getFromL2<T>(key: string): Promise<T | null> {
 
 async function setToL2(key: string, data: unknown): Promise<void> {
   try {
-    await redis.set(key, JSON.stringify(data), { ex: L2_TTL });
+    await redis.set(key, data, { ex: L2_TTL });
   } catch (err) {
     console.error('[L2 Redis] set error:', err);
   }
@@ -237,6 +230,28 @@ async function withTwoTierCache<T>(cacheKey: string, dbFetcher: () => Promise<T>
   return data;
 }
 
+async function withForceRefresh<T>(
+  key: string,
+  adminId: number,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  const rlKey = refreshRateLimitKey(adminId);
+  try {
+    const exists = await redis.get(rlKey);
+    if (exists) {
+      return withTwoTierCache(key, fetcher);
+    }
+    await redis.set(rlKey, '1', { ex: REFRESH_COOLDOWN_S });
+  } catch {
+    // Redis down — skip rate limiting
+  }
+
+  const data = await fetcher();
+  await setToL2(key, data);
+  l1Cache.set(key, data);
+  return data;
+}
+
 // ══════════════════════════════════════════════════
 // SERVICE
 // ══════════════════════════════════════════════════
@@ -249,36 +264,12 @@ export const statsService = {
     forceRefresh: boolean,
     adminId: number,
   ): Promise<OverviewStats> {
-    const { startDate: resolvedStart, endDate: resolvedEnd } = await resolveDateRange(
-      eventId,
-      startDate,
-      endDate,
-    );
-    const normalizedStart = normalizeDateStart(resolvedStart);
-    const normalizedEnd = normalizeDateStart(resolvedEnd);
-    const key = cacheKey('overview', eventId, normalizedStart, normalizedEnd);
+    const key = cacheKey('overview', eventId, startDate ?? 'event_start', endDate ?? 'now');
 
     if (forceRefresh) {
-      const rlKey = refreshRateLimitKey(adminId);
-      try {
-        const exists = await redis.get(rlKey);
-        if (exists) {
-          return withTwoTierCache(key, () =>
-            fetchOverviewFromDB(eventId, resolvedStart, resolvedEnd),
-          );
-        }
-        await redis.set(rlKey, '1', { ex: REFRESH_COOLDOWN_S });
-      } catch {
-        // Redis down — skip rate limiting
-      }
-
-      const data = await fetchOverviewFromDB(eventId, resolvedStart, resolvedEnd);
-      await setToL2(key, data);
-      l1Cache.set(key, data);
-      return data;
+      return withForceRefresh(key, adminId, () => fetchOverview(eventId, startDate, endDate));
     }
-
-    return withTwoTierCache(key, () => fetchOverviewFromDB(eventId, resolvedStart, resolvedEnd));
+    return withTwoTierCache(key, () => fetchOverview(eventId, startDate, endDate));
   },
 
   async getSalesVelocity(
@@ -289,38 +280,20 @@ export const statsService = {
     forceRefresh: boolean,
     adminId: number,
   ): Promise<SalesVelocityPoint[]> {
-    const { startDate: resolvedStart, endDate: resolvedEnd } = await resolveDateRange(
+    const key = cacheKey(
+      'velocity',
       eventId,
-      startDate,
-      endDate,
+      interval,
+      startDate ?? 'event_start',
+      endDate ?? 'now',
     );
-    const normalizedStart = normalizeDateStart(resolvedStart);
-    const normalizedEnd = normalizeDateStart(resolvedEnd);
-    const key = cacheKey('velocity', eventId, interval, normalizedStart, normalizedEnd);
 
     if (forceRefresh) {
-      const rlKey = refreshRateLimitKey(adminId);
-      try {
-        const exists = await redis.get(rlKey);
-        if (exists) {
-          return withTwoTierCache(key, () =>
-            fetchVelocityFromDB(eventId, interval, resolvedStart, resolvedEnd),
-          );
-        }
-        await redis.set(rlKey, '1', { ex: REFRESH_COOLDOWN_S });
-      } catch {
-        // Redis down — proceed
-      }
-
-      const data = await fetchVelocityFromDB(eventId, interval, resolvedStart, resolvedEnd);
-      await setToL2(key, data);
-      l1Cache.set(key, data);
-      return data;
+      return withForceRefresh(key, adminId, () =>
+        fetchVelocity(eventId, interval, startDate, endDate),
+      );
     }
-
-    return withTwoTierCache(key, () =>
-      fetchVelocityFromDB(eventId, interval, resolvedStart, resolvedEnd),
-    );
+    return withTwoTierCache(key, () => fetchVelocity(eventId, interval, startDate, endDate));
   },
 
   async getDemographics(
@@ -330,38 +303,12 @@ export const statsService = {
     forceRefresh: boolean,
     adminId: number,
   ): Promise<DemographicsStats> {
-    const { startDate: resolvedStart, endDate: resolvedEnd } = await resolveDateRange(
-      eventId,
-      startDate,
-      endDate,
-    );
-    const normalizedStart = normalizeDateStart(resolvedStart);
-    const normalizedEnd = normalizeDateStart(resolvedEnd);
-    const key = cacheKey('demographics', eventId, normalizedStart, normalizedEnd);
+    const key = cacheKey('demographics', eventId, startDate ?? 'event_start', endDate ?? 'now');
 
     if (forceRefresh) {
-      const rlKey = refreshRateLimitKey(adminId);
-      try {
-        const exists = await redis.get(rlKey);
-        if (exists) {
-          return withTwoTierCache(key, () =>
-            fetchDemographicsFromDB(eventId, resolvedStart, resolvedEnd),
-          );
-        }
-        await redis.set(rlKey, '1', { ex: REFRESH_COOLDOWN_S });
-      } catch {
-        // Redis down — proceed
-      }
-
-      const data = await fetchDemographicsFromDB(eventId, resolvedStart, resolvedEnd);
-      await setToL2(key, data);
-      l1Cache.set(key, data);
-      return data;
+      return withForceRefresh(key, adminId, () => fetchDemographics(eventId, startDate, endDate));
     }
-
-    return withTwoTierCache(key, () =>
-      fetchDemographicsFromDB(eventId, resolvedStart, resolvedEnd),
-    );
+    return withTwoTierCache(key, () => fetchDemographics(eventId, startDate, endDate));
   },
 };
 
@@ -369,15 +316,17 @@ export const statsService = {
 // DB FETCHERS (Private, non-cached)
 // ══════════════════════════════════════════════════
 
-async function fetchOverviewFromDB(
+async function fetchOverview(
   eventId: number,
-  startDate: string,
-  endDate: string,
+  startDate: string | null,
+  endDate: string | null,
 ): Promise<OverviewStats> {
+  const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
+
   const [row] = await overviewStmt.execute({
     eventId,
-    startDate: new Date(startDate),
-    endDate: new Date(endDate),
+    startDate: new Date(s),
+    endDate: new Date(e),
   });
 
   const paidCount = row?.paidCount ?? 0;
@@ -394,16 +343,18 @@ async function fetchOverviewFromDB(
   };
 }
 
-async function fetchVelocityFromDB(
+async function fetchVelocity(
   eventId: number,
   interval: 'hour' | 'day' | 'week',
-  startDate: string,
-  endDate: string,
+  startDate: string | null,
+  endDate: string | null,
 ): Promise<SalesVelocityPoint[]> {
+  const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
+
   const rows = await getVelocityStmt(interval).execute({
     eventId,
-    startDate: new Date(startDate),
-    endDate: new Date(endDate),
+    startDate: new Date(s),
+    endDate: new Date(e),
   });
 
   const rawMap = new Map<string, { revenue: number; tickets: number }>();
@@ -411,43 +362,47 @@ async function fetchVelocityFromDB(
     rawMap.set(row.period, { revenue: Number(row.revenue), tickets: row.tickets });
   }
 
-  const allPeriods = generatePeriodRange(startDate, endDate, interval);
-  return fillVelocityData(rawMap, allPeriods, interval);
+  const allPeriods = generatePeriodRange(s, e, interval);
+  return fillVelocityData(rawMap, allPeriods);
 }
 
-async function fetchDemographicsFromDB(
+async function fetchDemographics(
   eventId: number,
-  startDate: string,
-  endDate: string,
+  startDate: string | null,
+  endDate: string | null,
 ): Promise<DemographicsStats> {
+  const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
+
   const rows = await demographicsRowStmt.execute({
     eventId,
-    startDate: new Date(startDate),
-    endDate: new Date(endDate),
+    startDate: new Date(s),
+    endDate: new Date(e),
   });
 
-  // Deduplicate in TypeScript (selectDistinct incompatible with .prepare())
-  const seenUserIds = new Set<number>();
-  const uniqueRows: typeof rows = [];
-  for (const row of rows) {
-    if (!seenUserIds.has(row.userId)) {
-      seenUserIds.add(row.userId);
-      uniqueRows.push(row);
-    }
-  }
-
   const gender = { male: 0, female: 0, other: 0 };
-  const ageGroups = { '13-17': 0, '18-24': 0, '25-34': 0, '35-44': 0, '45+': 0 };
+  const ageGroups = {
+    '< 6': 0,
+    '6-11': 0,
+    '12-15': 0,
+    '16-18': 0,
+    '19-22': 0,
+    '23-29': 0,
+    '30-39': 0,
+    '40-49': 0,
+    '50-60': 0,
+    '> 60': 0,
+  };
+  const now = new Date();
 
-  for (const row of uniqueRows) {
+  for (const row of rows) {
     gender[row.gender as keyof typeof gender]++;
-    const group = ageGroup(row.dateOfBirth) as keyof typeof ageGroups;
+    const group = ageGroup(row.dateOfBirth, now) as keyof typeof ageGroups;
     ageGroups[group]++;
   }
 
   return {
     gender,
     ageGroups,
-    total: uniqueRows.length,
+    total: rows.length,
   };
 }

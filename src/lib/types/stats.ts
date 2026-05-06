@@ -14,6 +14,17 @@ export interface SalesVelocityPoint {
 
 export interface DemographicsStats {
   gender: { male: number; female: number; other: number };
-  ageGroups: { '13-17': number; '18-24': number; '25-34': number; '35-44': number; '45+': number };
+  ageGroups: {
+    '< 6': number; // Preschooler
+    '6-11': number; // Children
+    '12-15': number; // Young Teens
+    '16-18': number; // Older Teens
+    '19-22': number; // Uni Students
+    '23-29': number; // Early Career
+    '30-39': number; // Established
+    '40-49': number; // Middle-aged
+    '50-60': number; // Mature
+    '> 60': number; // Seniors
+  };
   total: number;
 }
