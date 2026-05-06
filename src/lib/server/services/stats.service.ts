@@ -4,7 +4,7 @@ import {
   l1Cache,
   L2_TTL,
   REFRESH_COOLDOWN_S,
-  refreshRateLimitKey
+  refreshRateLimitKey,
 } from '$lib/server/cache';
 import { db } from '$lib/server/db';
 import { events, orderItems, orders, users } from '$lib/server/db/schema';
@@ -448,9 +448,10 @@ async function fetchVelocity(
   const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
   const params = { startDate: new Date(s), endDate: new Date(e) };
 
-  const rows = eventId !== null
-    ? await getVelocityStmt(interval).execute({ ...params, eventId })
-    : await getVelocityStmt(interval, true).execute(params);
+  const rows =
+    eventId !== null
+      ? await getVelocityStmt(interval).execute({ ...params, eventId })
+      : await getVelocityStmt(interval, true).execute(params);
 
   const rawMap = new Map<string, { revenue: number; tickets: number }>();
   for (const row of rows) {
@@ -469,9 +470,10 @@ async function fetchDemographics(
   const { startDate: s, endDate: e } = await resolveDateRange(eventId, startDate, endDate);
   const params = { startDate: new Date(s), endDate: new Date(e) };
 
-  const rows = eventId !== null
-    ? await demographicsRowStmt.execute({ ...params, eventId })
-    : await demographicsGlobalStmt.execute(params);
+  const rows =
+    eventId !== null
+      ? await demographicsRowStmt.execute({ ...params, eventId })
+      : await demographicsGlobalStmt.execute(params);
 
   const gender = { male: 0, female: 0, other: 0 };
   const ageGroups = {
