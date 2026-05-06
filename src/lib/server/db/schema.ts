@@ -77,23 +77,27 @@ export type SectionSeatConfig = {
 // ══════════════════════════════════════════════════
 
 // ── Users ──────────────────────────────────────
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-  fullName: varchar('full_name', { length: 100 }).notNull(),
-  phone: varchar('phone', { length: 20 }),
-  dateOfBirth: date('date_of_birth').notNull(),
-  gender: genderEnum('gender').notNull(),
-  avatarUrl: varchar('avatar_url', { length: 500 }),
-  role: roleEnum('role').notNull().default('customer'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    email: varchar('email', { length: 255 }).notNull().unique(),
+    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    fullName: varchar('full_name', { length: 100 }).notNull(),
+    phone: varchar('phone', { length: 20 }),
+    dateOfBirth: date('date_of_birth').notNull(),
+    gender: genderEnum('gender').notNull(),
+    avatarUrl: varchar('avatar_url', { length: 500 }),
+    role: roleEnum('role').notNull().default('customer'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index('idx_users_demographics').on(table.gender, table.dateOfBirth)],
+);
 
 // ── Categories ──────────────────────────────────
 export const categories = pgTable('categories', {
@@ -280,6 +284,12 @@ export const orders = pgTable(
     index('idx_orders_expires')
       .on(table.status, table.expiresAt)
       .where(sql`${table.status} = 'pending'`),
+    index('idx_orders_analytics')
+      .on(table.status, table.createdAt)
+      .where(sql`${table.status} = 'paid'`),
+    index('idx_orders_dropoff')
+      .on(table.status)
+      .where(sql`${table.status} IN ('paid', 'cancelled')`),
   ],
 );
 

@@ -110,7 +110,7 @@ Mở file `.env` và điền các thông tin sau:
 - **UPSTASH_REDIS (Queue & Cache):**
   Đăng ký tại [Upstash.com](https://upstash.com) -> Tạo Redis Database -> Copy `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`.
 - **RESEND_API_KEY (Email):**
-  Đăng ký tại[Resend.com](https://resend.com) -> Mục API Keys -> Create API Key.
+  Đăng ký tại [Resend.com](https://resend.com) -> Mục API Keys -> Create API Key.
 
 ### 3. Database Migration & Seed
 
