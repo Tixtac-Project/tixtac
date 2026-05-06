@@ -21,6 +21,7 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -35,6 +36,7 @@ const result = envSchema.safeParse({
   UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
   ENABLE_QUEUE_WORKER: env.ENABLE_QUEUE_WORKER,
   ENABLE_BACKGROUND_WORKERS: env.ENABLE_BACKGROUND_WORKERS,
+  RESEND_API_KEY: env.RESEND_API_KEY,
 });
 
 if (!result.success) {
@@ -72,4 +74,6 @@ export const config = {
   enableQueueWorker: parsed.ENABLE_QUEUE_WORKER,
   /** Whether to start MQ consumers & background workers (default: true) */
   enableBackgroundWorkers: parsed.ENABLE_BACKGROUND_WORKERS,
+  /** Resend API key */
+  resendApiKey: parsed.RESEND_API_KEY,
 } as const;
