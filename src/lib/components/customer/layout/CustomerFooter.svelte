@@ -156,7 +156,7 @@
               <span class="font-semibold">Email:</span>
               <a
                 href="mailto:support@tixtac.io.vn"
-                class="text-primary transition-colors hover:text-primary-foreground"
+                class="text-primary transition-colors hover:text-primary-container"
               >
                 support@tixtac.io.vn
               </a>
@@ -165,7 +165,7 @@
               <span class="font-semibold">Điện thoại:</span>
               <a
                 href="tel:+84123456789"
-                class="text-primary transition-colors hover:text-primary-foreground"
+                class="text-primary transition-colors hover:text-primary-container"
               >
                 +84 123 456 789
               </a>

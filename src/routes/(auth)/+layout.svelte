@@ -28,13 +28,13 @@
 <div class="relative grid min-h-dvh w-full place-items-center bg-surface p-4 py-8 font-sans lg:p-8">
   <!-- Dot Pattern -->
   <DotPattern
-    width={24}
-    height={24}
-    cx={2}
-    cy={2}
-    cr={1}
+    width={40}
+    height={40}
+    cx={4}
+    cy={4}
+    cr={1.5}
     glow
-    class={cn('text-primary', 'mask-[radial-gradient(800px_circle_at_center,transparent,white)]')}
+    class={cn('text-tertiary', 'mask-[radial-gradient(1200px_circle_at_center,transparent,white)]')}
   />
 
   <!-- ═══════════════════════════════════════════════ -->
