@@ -86,10 +86,13 @@ async function runQueueWorker(): Promise<WorkerResult> {
     console.log(`[QueueWorker] Found eventIds:`, eventIdsArray);
 
     const now = Date.now();
-    const slotDurationMs = config.accessTokenDuration * 1000;
+    // Workers promote from the waiting list with only the grace period (60s) so
+    // users must explicitly confirm before receiving the full holding duration.
+    const gracePeriodSeconds = 60;
+    const slotDurationMs = gracePeriodSeconds * 1000;
     const maxUsers = config.maxConcurrentUsers ?? 200;
     const waitingTtlMs = 3600 * 1000;
-    const activeTtl = config.accessTokenDuration + 5;
+    const activeTtl = gracePeriodSeconds + 5;
 
     let didWork = false;
     let hasWaitingUsers = false;
@@ -98,8 +101,8 @@ async function runQueueWorker(): Promise<WorkerResult> {
       const activeKey = `active_users:${eventId}`;
       const waitingKey = `waiting_queue:${eventId}`;
 
-      // A1. Evict expired active users — safe delete: only remove user_current_queue
-      //     if it still points to this event.
+      // Step A1: Evict expired active users — conditionally removes `user_current_queue`
+      //          only if it still points to this event (safe delete).
       const expiredUserIds = await redis.zrange(activeKey, 0, now, { byScore: true });
 
       if (expiredUserIds.length > 0) {
@@ -114,11 +117,13 @@ async function runQueueWorker(): Promise<WorkerResult> {
         }
         pipeline.zremrangebyscore(activeKey, 0, now);
         await pipeline.exec();
-        console.log(`[QueueWorker] 🧹 Đuổi ${expiredUserIds.length} users khỏi Event ${eventId}`);
+        console.log(
+          `[QueueWorker] 🧹 Evicted ${expiredUserIds.length} expired users from Event ${eventId}`,
+        );
       }
 
-      // A2. Evict stale waiting users whose user_current_queue TTL (1h) has expired.
-      //     Ensures users don't linger in waiting_queue after their tracking key is gone.
+      // Step A2: Evict stale waiting users whose 1-hour tracking TTL has elapsed.
+      //          Prevents ghost entries in the waiting sorted set.
       const staleBefore = now - waitingTtlMs;
       const staleWaitingUserIds = await redis.zrange(waitingKey, 0, staleBefore, {
         byScore: true,
@@ -141,8 +146,8 @@ async function runQueueWorker(): Promise<WorkerResult> {
         );
       }
 
-      // B. Promote waiting users into available slots — safe: only promote if
-      //     user_current_queue still maps to this event.
+      // Step B: Promote waiting users into available slots — atomically checks
+      //         `user_current_queue` to ensure the user hasn’t left in the meantime.
       const currentActiveCount = await redis.zcount(activeKey, now, '+inf');
       const availableSlots = Math.max(0, maxUsers - currentActiveCount);
 
@@ -168,7 +173,7 @@ async function runQueueWorker(): Promise<WorkerResult> {
         }
       }
 
-      // C. Recompute after eviction + promotion before deciding GC
+      // Step C: Recompute counts after eviction and promotion to decide on GC.
       const [activeCountAfterRaw, waitingCountAfterRaw] = await redis
         .pipeline()
         .zcount(activeKey, now, '+inf')

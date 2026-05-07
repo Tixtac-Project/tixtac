@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { queueStore } from '$lib/stores/queue.svelte';
+  import CrossQueueModal from '$lib/components/customer/queue/CrossQueueModal.svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -38,6 +40,9 @@
   let earliestShow = $derived(visibleShows.length > 0 ? visibleShows[0] : null);
 
   let selectedShowId = $state<number | null>(null);
+  // Cross-queue modal state
+  let showCrossQueueModal = $state(false);
+  let pendingShowId = $state<number | null>(null);
   let activeShow = $derived<EventDetailShow | null>(
     visibleShows.length === 0
       ? null
@@ -109,12 +114,68 @@
     return 'border-t-primary';
   }
 
-  function handleBuyTicket(showId: number) {
+  async function joinQueue(showId: number) {
+    const seatsPath = resolve(`/events/${event.id}/shows/${showId}/seats`);
+    try {
+      const res = await fetch(`/api/events/${event.id}/queue`, { method: 'POST' });
+      const result = await res.json();
+
+      if (res.status === 403) {
+        // Server-side cross-queue guard (Redis Lua) đã chặn
+        // → Hiện CrossQueueModal để user chọn rời cũ hoặc ở lại
+        pendingShowId = showId;
+        showCrossQueueModal = true;
+        return;
+      }
+
+      if (!res.ok) {
+        alert(result.message || 'Có lỗi xảy ra khi tham gia hàng chờ.');
+        return;
+      }
+
+      queueStore.eventId = event.id;
+      queueStore.eventTitle = event.title;
+      queueStore.showId = showId;
+
+      if (result.data.status === 'waiting') {
+        queueStore.status = 'waiting';
+        queueStore.position = result.data.position;
+        goto(`/events/${event.id}/queue`);
+      } else if (result.data.status === 'active') {
+        queueStore.status = 'holding';
+        queueStore.expiresAt = result.data.expiresAt;
+        queueStore.token = result.data.token;
+        goto(seatsPath);
+      }
+    } catch (error) {
+      console.error('Lỗi khi join queue:', error);
+      alert('Không thể kết nối đến hệ thống hàng chờ.');
+    }
+  }
+
+  async function handleBuyTicket(showId: number) {
     const seatsPath = resolve(`/events/${event.id}/shows/${showId}/seats`);
     if (!user) {
       goto(resolve(`/login?redirect=${encodeURIComponent(seatsPath)}`));
-    } else {
-      goto(seatsPath);
+      return;
+    }
+
+    // Kiểm tra xung đột hàng chờ
+    if (queueStore.hasConflict(event.id)) {
+      pendingShowId = showId;
+      showCrossQueueModal = true;
+      return;
+    }
+
+    await joinQueue(showId);
+  }
+
+  async function handleLeaveAndJoin() {
+    showCrossQueueModal = false;
+    await queueStore.leaveForNewEvent();
+    if (pendingShowId) {
+      await joinQueue(pendingShowId);
+      pendingShowId = null;
     }
   }
 
@@ -621,3 +682,12 @@
     </div>
   {/if}
 </div>
+
+<!-- Cross-Queue Modal -->
+<CrossQueueModal
+  open={showCrossQueueModal}
+  currentEventTitle={queueStore.eventTitle}
+  newEventTitle={event.title}
+  onStay={() => (showCrossQueueModal = false)}
+  onLeaveAndJoin={handleLeaveAndJoin}
+/>

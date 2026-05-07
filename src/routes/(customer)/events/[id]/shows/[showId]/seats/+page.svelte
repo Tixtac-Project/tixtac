@@ -6,6 +6,7 @@
   import SeatMap from '$lib/components/seat-map/SeatMap.svelte';
   import SummaryBar from '$lib/components/seat-map/SummaryBar.svelte';
   import { createSeatSelectionStore } from '$lib/stores/cart-store.svelte';
+  import { queueStore } from '$lib/stores/queue.svelte';
   import { toast } from '$lib/stores/toast';
   import type { ShowSummary } from '$lib/types/event-detail';
   import type { PendingOrder } from '$lib/types/purchase';
@@ -13,7 +14,8 @@
   import { api } from '$lib/utils/api';
   import { formatDate, formatShortDate, formatTime, getDayInTZ } from '$lib/utils/datetime';
   import { ArrowLeft, Calendar, ChevronDown, Clock, LoaderCircle } from 'lucide-svelte';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+
   import { fly } from 'svelte/transition';
 
   interface PageData {
@@ -64,6 +66,12 @@
 
   $effect(() => {
     store.updateLimits(data.event.max_tickets_per_user, data.event.bought_count);
+  });
+
+  // Commit trạng thái holding ngay khi trang /seats mount
+  // Được gọi sau khi navigate từ /queue — tránh flash widget cam
+  onMount(() => {
+    queueStore.commitHolding();
   });
 
   // Sync from server data whenever the route's event/show changes
@@ -324,9 +332,10 @@
     });
 
     if (res.status === 201 && res.data) {
-      // Success: Clear cart and redirect
+      // Success: Clear cart + queue state, then redirect
       const orderId = res.data.order_id;
       store.clearAll();
+      queueStore.clear(); // Xóa trạng thái holding — Widget không hiện nữa
       goto(resolve(`/orders/${orderId}/checkout`));
       return;
     }
