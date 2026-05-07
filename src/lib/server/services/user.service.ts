@@ -337,7 +337,7 @@ export const userService = {
       .returning();
 
     if (!record) {
-      throw new Error('INVALID_TOKEN');
+      throwError(Errors.INVALID_TOKEN, 'Token không hợp lệ hoặc đã hết hạn');
     }
 
     const hashedPassword = await hashPassword(password);
