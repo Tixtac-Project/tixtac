@@ -308,44 +308,46 @@ export const userService = {
     await db
       .insert(passwordResetTokens)
       .values({
-        token_hash: hmacToken,
-        user_id: user.id,
-        expires_at: expiresAt,
+        tokenHash: hmacToken,
+        userId: user.id,
+        expiresAt: expiresAt,
       })
       .onConflictDoUpdate({
-        target: passwordResetTokens.user_id,
+        target: passwordResetTokens.userId,
         set: {
-          token_hash: hmacToken,
-          expires_at: expiresAt,
+          tokenHash: hmacToken,
+          expiresAt: expiresAt,
         },
       });
 
-    const resetLink = `${origin}/reset-password?token=${rawToken}`;
+    const resetLink = `${origin}/reset-password?token=${encodeURIComponent(rawToken)}`;
     await sendResetPasswordEmail(user.email, resetLink);
   },
 
   async resetPassword(token: string, password: string) {
     const hashed = hashExistingToken(token);
 
-    const [record] = await db
-      .delete(passwordResetTokens)
-      .where(
-        and(
-          eq(passwordResetTokens.token_hash, hashed),
-          gt(passwordResetTokens.expires_at, new Date()),
-        ),
-      )
-      .returning();
+    await db.transaction(async (tx) => {
+      const [record] = await tx
+        .delete(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.tokenHash, hashed),
+            gt(passwordResetTokens.expiresAt, new Date()),
+          ),
+        )
+        .returning();
 
-    if (!record) {
-      throwError(Errors.INVALID_TOKEN, 'Token không hợp lệ hoặc đã hết hạn');
-    }
+      if (!record) {
+        throwError(Errors.INVALID_TOKEN, 'Token không hợp lệ hoặc đã hết hạn');
+      }
 
-    const hashedPassword = await hashPassword(password);
+      const hashedPassword = await hashPassword(password);
 
-    await db
-      .update(users)
-      .set({ passwordHash: hashedPassword })
-      .where(eq(users.id, record.user_id));
+      await db
+        .update(users)
+        .set({ passwordHash: hashedPassword })
+        .where(eq(users.id, record.userId));
+    });
   },
 };

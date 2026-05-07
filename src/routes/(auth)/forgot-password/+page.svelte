@@ -16,16 +16,21 @@
     loading = true;
     error = null;
 
-    const { error: apiError } = await api.post('/auth/forgot-password', { email });
-    loading = false;
+    try {
+      const { error: apiError } = await api.post('/auth/forgot-password', { email });
+      loading = false;
 
-    if (apiError) {
-      error = apiError;
-      return;
+      if (apiError) {
+        error = apiError;
+        return;
+      }
+
+      success = true;
+      toast.success('Vui lòng kiểm tra email để nhận hướng dẫn đặt lại mật khẩu');
+    } catch {
+      loading = false;
+      error = 'Lỗi không xác định. Vui lòng thử lại.';
     }
-
-    success = true;
-    toast.success('Vui lòng kiểm tra email để nhận hướng dẫn đặt lại mật khẩu');
   }
 </script>
 

@@ -12,5 +12,5 @@ export function generateResetToken() {
 }
 
 export function hashExistingToken(rawToken: string) {
-  return new Bun.CryptoHasher('sha256', config.jwtSecret).update(rawToken).digest('hex');
+  return new Bun.CryptoHasher('sha256', config.resetTokenSecret).update(rawToken).digest('hex');
 }

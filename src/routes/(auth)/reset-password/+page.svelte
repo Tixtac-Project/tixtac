@@ -26,6 +26,7 @@
     const validation = passwordSchema.safeParse({ password, confirmPassword });
 
     if (!validation.success) {
+      serverError = null;
       clientErrors = validation.error.issues.map((i) => i.message);
       return;
     }
@@ -108,7 +109,6 @@
           type="button"
           class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           onclick={() => (showPassword = !showPassword)}
-          tabindex={-1}
           aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
         >
           {#if showPassword}<EyeOff class="size-5" />{:else}<Eye class="size-5" />{/if}

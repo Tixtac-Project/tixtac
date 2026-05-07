@@ -23,7 +23,10 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
   EMAIL_FROM: z.string().email().min(1, 'EMAIL_FROM is required'),
-  APP_URL: z.string().url().default('http://localhost:5173'),
+  APP_URL: dev
+    ? z.string().url().default('http://localhost:5173')
+    : z.string().url().min(1, 'APP_URL is required'),
+  RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -41,6 +44,7 @@ const result = envSchema.safeParse({
   RESEND_API_KEY: env.RESEND_API_KEY,
   EMAIL_FROM: env.EMAIL_FROM,
   APP_URL: env.APP_URL,
+  RESET_TOKEN_SECRET: env.RESET_TOKEN_SECRET,
 });
 
 if (!result.success) {
@@ -84,4 +88,6 @@ export const config = {
   emailFrom: parsed.EMAIL_FROM,
   /** Base URL of the app, used for constructing links in emails (e.g. password reset) */
   appUrl: parsed.APP_URL,
+  /** Secret for signing password reset tokens */
+  resetTokenSecret: parsed.RESET_TOKEN_SECRET,
 } as const;
