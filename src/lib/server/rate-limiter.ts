@@ -11,3 +11,9 @@ export const forgotPasswordLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(3, '1 h'),
 });
+
+export const forgotPasswordIpLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  prefix: 'forgot-pw-ip',
+});

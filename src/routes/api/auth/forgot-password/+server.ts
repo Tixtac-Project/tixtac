@@ -1,12 +1,22 @@
 import { apiHandler } from '$lib/server/handler';
-import { forgotPasswordLimiter } from '$lib/server/rate-limiter';
+import { forgotPasswordIpLimiter, forgotPasswordLimiter } from '$lib/server/rate-limiter';
 import { userService } from '$lib/server/services/user.service';
 import { json } from '@sveltejs/kit';
+import { z } from 'zod';
+
+const forgotBodySchema = z.object({ email: z.string().email() });
 
 export const POST = apiHandler(async ({ request, url, getClientAddress }) => {
-  const { email } = await request.json();
+  const body = await request.json();
+  const parsed = forgotBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return json({ error: 'Invalid input' }, { status: 400 });
+  }
+  const { email } = parsed.data;
   const key = `${email}:${getClientAddress()}`;
-  const { success } = await forgotPasswordLimiter.limit(key);
+  const { success } =
+    (await forgotPasswordLimiter.limit(key)) &&
+    (await forgotPasswordIpLimiter.limit(getClientAddress()));
 
   if (!success) {
     return json({ error: 'Too many requests' }, { status: 429 });
