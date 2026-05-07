@@ -177,7 +177,9 @@
 
             <!-- Right: stats + action -->
             <div class="flex shrink-0 flex-col items-end gap-3 md:w-56">
-              <div class="w-full rounded-2xl border border-border/50 bg-muted/30 p-4">
+              <div
+                class="w-full rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4"
+              >
                 <div class="mb-2.5 flex items-center justify-between text-xs text-muted-foreground">
                   <span class="flex items-center gap-1.5">
                     <Users class="h-3.5 w-3.5 opacity-60" />
@@ -187,7 +189,7 @@
                     {hp}% trống
                   </span>
                 </div>
-                <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
                   <div
                     class="h-full rounded-full {seatBarColor(hp)}"
                     style="width: {Math.max(hp, 2)}%; transition: width 0.5s var(--ease-bento);"
@@ -331,7 +333,7 @@
 
             <!-- Seat progress -->
             <div class="mt-auto">
-              <div class="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div class="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
                 <div
                   class="h-full rounded-full {seatBarColor(ap)}"
                   style="width: {Math.max(ap, 2)}%; transition: width 0.5s var(--ease-bento);"
@@ -348,7 +350,7 @@
 
             <!-- Publish action -->
             {#if event.status === 'draft'}
-              <div class="mt-4 flex gap-2 border-t border-border/50 pt-4">
+              <div class="mt-4 flex gap-2 border-t border-outline-variant/30 pt-4">
                 <Button
                   variant="outline"
                   size="sm"

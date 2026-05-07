@@ -19,28 +19,29 @@
 <div
   class="bento-stat bento-fade-in {className}"
   style="
-  background: oklch(96.5% 0.015 {hue});
-  border: 1px solid oklch(92% 0.02 {hue});
-"
+    --stat-hue: {hue};
+    background: oklch(from var(--surface-container-lowest) l calc(c + 0.01) h);
+    border: 1px solid oklch(from var(--border) l c h);
+  "
   {...restProps}
 >
   <!-- Decorative blob -->
   <div
     class="absolute -top-5 -right-5 h-16 w-16 rounded-full"
-    style="background: oklch(88% 0.05 {hue} / 40%); filter: blur(12px);"
+    style="background: oklch(58% 0.08 var(--stat-hue) / 15%); filter: blur(12px);"
   ></div>
 
   <div class="relative">
     <!-- Accent bar -->
     <div
       class="mb-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5"
-      style="background: oklch(88% 0.06 {hue} / 50%);"
+      style="background: oklch(58% 0.1 var(--stat-hue) / 12%);"
     >
-      <div class="h-1.5 w-1.5 rounded-full" style="background: oklch(55% 0.15 {hue});"></div>
-      <span
-        class="text-[10px] font-semibold tracking-wider uppercase"
-        style="color: oklch(45% 0.12 {hue});"
-      >
+      <div
+        class="h-1.5 w-1.5 rounded-full"
+        style="background: oklch(58% 0.16 var(--stat-hue));"
+      ></div>
+      <span class="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
         {label}
       </span>
     </div>
