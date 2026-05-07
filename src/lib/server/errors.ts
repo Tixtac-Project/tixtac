@@ -46,6 +46,7 @@ export const Errors = {
   EMAIL_EXISTS: new AppError('EMAIL_EXISTS', 409, 'Email đã được sử dụng'),
   INVALID_CREDENTIALS: new AppError('INVALID_CREDENTIALS', 401, 'Email hoặc mật khẩu không đúng'),
   USER_INACTIVE: new AppError('USER_INACTIVE', 404, 'Không tìm thấy user'),
+  INVALID_TOKEN: new AppError('INVALID_TOKEN', 400, 'Token không hợp lệ hoặc đã hết hạn'),
 
   // Events
   ALREADY_PUBLISHED: new AppError('ALREADY_PUBLISHED', 400, 'Sự kiện đã xuất bản'),

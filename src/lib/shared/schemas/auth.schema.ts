@@ -125,7 +125,18 @@ export const updateSecuritySchema = z
     path: ['new_password'],
   });
 
+export const passwordSchema = z
+  .object({
+    password: registerSchema.shape.password,
+    confirmPassword: registerSchema.shape.password,
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Mật khẩu không khớp',
+    path: ['confirmPassword'],
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UpdateSecurityInput = z.infer<typeof updateSecuritySchema>;
+export type PasswordInput = z.infer<typeof passwordSchema>;
