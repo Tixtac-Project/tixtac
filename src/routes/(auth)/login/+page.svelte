@@ -10,12 +10,21 @@
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { Eye, EyeOff, Loader } from 'lucide-svelte';
+  import { onMount } from 'svelte';
 
   let loading = $state(false);
   let showPassword = $state(false);
   let email = $state('');
   let password = $state('');
   let authError = $state<string | null>(null);
+
+  // Show toast when redirected to login page with a target page
+  onMount(() => {
+    const redirectTo = page.url.searchParams.get('redirect');
+    if (redirectTo && redirectTo.startsWith('/')) {
+      toast.info('Vui lòng đăng nhập để tiếp tục.');
+    }
+  });
 
   let errors = $state<Record<string, string>>({});
 

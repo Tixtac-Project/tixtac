@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ fetch, locals }) => {
   const user = locals.user;
 
   if (!user) {
-    throw redirect(302, '/login');
+    throw redirect(302, '/login?redirect=/me/profile');
   }
 
   if (user.role !== 'customer') {

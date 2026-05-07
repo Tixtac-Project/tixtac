@@ -83,7 +83,7 @@ async function fetchWrapper<T>(
       ) {
         isRedirectingToLogin = true;
         toast.error('Phiên đăng nhập đã hết hạn.');
-        await redirect(302, '/login');
+        await redirect(302, `/login?redirect=${encodeURIComponent(window.location.pathname)}`);
         setTimeout(() => {
           isRedirectingToLogin = false;
         }, 2_000);

@@ -7,7 +7,7 @@ import { json, redirect } from '@sveltejs/kit';
 
 export const POST = apiHandler(async ({ params, locals }) => {
   if (!locals.user) {
-    redirect(302, `/login?redirectTo=/orders/${params.id}/checkout`);
+    redirect(302, `/login?redirect=/orders/${params.id}/checkout`);
   }
   const customer = requireCustomer(locals);
 

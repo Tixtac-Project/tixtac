@@ -103,7 +103,7 @@
 
   --info: oklch(0.6 0.15 240);
   --info-foreground: oklch(1 0 0);
-  --info-muted: oklch(0.96 0.04 240);
+  --info-muted: oklch(94.431% 0.01395 219.971);
   --info-muted-foreground: oklch(0.4 0.12 240);
   --info-border: oklch(0.6 0.15 240 / 0.15);
 
@@ -202,7 +202,7 @@
   --warning-muted-foreground: oklch(0.9 0.1 80);
   --warning-border: oklch(0.85 0.12 80 / 0.15);
 
-  --info: oklch(0.75 0.12 240);
+  --info: oklch(80.576% 0.08457 237.984);
   --info-foreground: oklch(0.15 0.04 240);
   --info-muted: oklch(0.22 0.04 240);
   --info-muted-foreground: oklch(0.85 0.1 240);
