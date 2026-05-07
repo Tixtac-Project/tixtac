@@ -4,6 +4,7 @@
   import { page } from '$app/state';
   import MarkdownViewer from '$lib/components/admin/event/MarkdownViewer.svelte';
   import AmenityBadge from '$lib/components/customer/event/AmenityBadge.svelte';
+  import EventTimeline from '$lib/components/customer/event/EventTimeline.svelte';
   import SeatMapPreview from '$lib/components/customer/event/SeatMapPreview.svelte';
   import * as Accordion from '$lib/components/ui/accordion';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index';
@@ -57,18 +58,40 @@
   // ── Mobile floating CTA visibility ──
   let showMobileCta = $state(false);
   let eventInfoEl = $state<HTMLElement | null>(null);
+  let isFooterVisible = $state(false);
 
   onMount(() => {
-    if (!eventInfoEl) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Show the floating CTA when the event info sidebar is no longer intersecting
-        showMobileCta = !entry.isIntersecting;
-      },
-      { threshold: 0 },
-    );
-    observer.observe(eventInfoEl);
-    return () => observer.disconnect();
+    const observers: IntersectionObserver[] = [];
+
+    if (eventInfoEl) {
+      const ctaObserver = new IntersectionObserver(
+        ([entry]) => {
+          showMobileCta = !entry.isIntersecting && !isFooterVisible;
+        },
+        { threshold: 0 },
+      );
+      ctaObserver.observe(eventInfoEl);
+      observers.push(ctaObserver);
+    }
+
+    const footer = document.querySelector('footer');
+    if (footer) {
+      const footerObserver = new IntersectionObserver(
+        ([entry]) => {
+          isFooterVisible = entry.isIntersecting;
+          if (eventInfoEl) {
+            const rect = eventInfoEl.getBoundingClientRect();
+            const sidebarPast = rect.bottom < 0;
+            showMobileCta = sidebarPast && !entry.isIntersecting;
+          }
+        },
+        { threshold: 0 },
+      );
+      footerObserver.observe(footer);
+      observers.push(footerObserver);
+    }
+
+    return () => observers.forEach((o) => o.disconnect());
   });
 
   function getAvailable(s: EventDetailSection): number {
@@ -139,15 +162,15 @@
 </svelte:head>
 
 <div class="min-h-screen bg-surface">
-  <main class="px-4 pt-4 pb-24 sm:px-6 sm:pt-6 lg:px-8">
+  <main class="px-3 pt-3 pb-[7rem] md:px-6 md:pt-6 lg:px-8">
     <div class="mx-auto max-w-7xl">
       <!-- BENTO GRID -->
       <div
-        class="grid grid-cols-1 gap-4 sm:gap-5 md:auto-rows-[minmax(140px,auto)] md:grid-cols-12"
+        class="grid grid-cols-1 gap-3 md:auto-rows-[minmax(140px,auto)] md:grid-cols-12 md:gap-5"
       >
         <!-- ── Hero Banner ── -->
         <header
-          class="arch-enter group relative min-h-56 overflow-hidden rounded-xl bg-surface-container-low sm:min-h-72 md:col-span-8 md:row-span-3"
+          class="arch-enter group relative min-h-48 overflow-hidden rounded-xl bg-surface-container-low md:col-span-8 md:row-span-3 md:min-h-72"
         >
           {#if event.banner_image_url}
             <img
@@ -168,25 +191,25 @@
           ></div>
 
           {#if event.status === 'published'}
-            <div class="absolute top-4 left-4 sm:top-6 sm:left-6">
+            <div class="absolute top-3 left-3 md:top-6 md:left-6">
               <span
-                class="rounded-full bg-primary-container px-3 py-0.5 text-[0.6rem] font-bold tracking-widest text-primary-foreground uppercase"
+                class="rounded-full bg-primary px-2.5 py-0.5 text-[0.55rem] font-bold tracking-widest text-primary-foreground uppercase md:px-3 md:text-[0.6rem]"
               >
                 Đang mở bán
               </span>
             </div>
           {/if}
 
-          <div class="absolute right-4 bottom-4 left-4 sm:right-6 sm:bottom-6 sm:left-6">
+          <div class="absolute right-3 bottom-3 left-3 md:right-6 md:bottom-6 md:left-6">
             {#if event.category_name}
               <p
-                class="mb-1 text-xs font-semibold tracking-widest text-white/70 uppercase sm:text-sm"
+                class="mb-1 text-xs font-semibold tracking-widest text-white/70 uppercase md:text-sm"
               >
                 {event.category_name}
               </p>
             {/if}
             <h1
-              class="font-heading text-2xl leading-tight font-extrabold tracking-tight text-white sm:text-4xl md:text-5xl"
+              class="font-heading text-xl leading-tight font-extrabold tracking-tight text-white md:text-4xl lg:text-5xl"
             >
               {event.title}
             </h1>
@@ -197,12 +220,12 @@
         <section
           bind:this={eventInfoEl}
           id="event-info-sidebar"
-          class="arch-enter flex flex-col justify-between rounded-xl bg-surface-container p-5 sm:p-6 md:col-span-4 md:row-span-2"
+          class="arch-enter flex flex-col justify-between rounded-xl bg-surface-container p-4 md:col-span-4 md:row-span-2 md:p-6"
           style="animation-delay: 100ms"
         >
           <div>
-            <span class="label-overline mb-3 block text-primary">Thông tin sự kiện</span>
-            <div class="space-y-4">
+            <span class="label-overline mb-2 block text-primary md:mb-3">Thông tin sự kiện</span>
+            <div class="space-y-3">
               {#if earliestShow}
                 <div class="flex items-start gap-3">
                   <Calendar class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -236,10 +259,10 @@
           </div>
 
           {#if earliestShow}
-            <div class="mt-5">
+            <div class="mt-3 md:mt-5">
               <button
                 onclick={() => handleBuyTicket(activeShow?.id ?? earliestShow.id)}
-                class="btn-primary-gradient w-full rounded-lg py-3 text-sm"
+                class="btn-primary-gradient w-full rounded-lg py-2.5 text-sm md:py-3"
               >
                 Mua vé ngay
               </button>
@@ -250,25 +273,27 @@
         <!-- ── Amenities ── -->
         {#if event.amenities.length > 0 || event.min_age > 0 || event.max_tickets_per_user > 0}
           <section
-            class="arch-enter rounded-xl bg-surface-container-low p-5 sm:p-6 md:col-span-4 md:row-span-1"
+            class="arch-enter rounded-xl bg-surface-container p-4 md:col-span-4 md:row-span-1 md:p-6"
             style="animation-delay: 200ms"
           >
-            <span class="label-overline mb-4 block text-tertiary">Lưu ý</span>
+            <span class="label-overline mb-3 block text-tertiary md:mb-4">Lưu ý</span>
             <div class="flex flex-wrap gap-2">
               {#if event.min_age > 0}
                 <div
-                  class="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1.5"
+                  class="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-2.5 py-1 md:px-3 md:py-1.5"
                 >
-                  <Shield class="h-3.5 w-3.5" />
-                  <span class="text-[11px] font-semibold">{event.min_age}+ tuổi</span>
+                  <Shield class="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  <span class="text-[10px] font-semibold md:text-[11px]">
+                    {event.min_age}+ tuổi
+                  </span>
                 </div>
               {/if}
               {#if event.max_tickets_per_user > 0}
                 <div
-                  class="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1.5"
+                  class="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-2.5 py-1 md:px-3 md:py-1.5"
                 >
-                  <Ticket class="h-3.5 w-3.5" />
-                  <span class="text-[11px] font-semibold">
+                  <Ticket class="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  <span class="text-[10px] font-semibold md:text-[11px]">
                     Tối đa {event.max_tickets_per_user} vé
                   </span>
                 </div>
@@ -283,7 +308,7 @@
         <!-- ── About & Terms (Accordion card) ── -->
         {#if event.description || event.terms_and_conditions}
           <section
-            class="arch-enter rounded-xl bg-surface-container p-5 sm:p-8 md:col-span-full"
+            class="arch-enter rounded-xl bg-surface-container p-4 md:col-span-full md:p-8"
             style="animation-delay: 250ms"
           >
             <Accordion.Root type="multiple" bind:value={aboutTermsValue}>
@@ -292,7 +317,7 @@
                   value="about"
                   class="border-b-0 not-last:border-b not-last:border-outline-variant/15"
                 >
-                  <Accordion.Trigger class="py-3">
+                  <Accordion.Trigger class="py-2.5 md:py-3">
                     <div class="flex items-center gap-2.5">
                       <Info class="h-4 w-4 text-primary" />
                       <span class="label-overline text-primary">Giới thiệu sự kiện</span>
@@ -307,7 +332,7 @@
               {/if}
               {#if event.terms_and_conditions}
                 <Accordion.Item value="terms" class="border-b-0">
-                  <Accordion.Trigger class="py-3">
+                  <Accordion.Trigger class="py-2.5 md:py-3">
                     <div class="flex items-center gap-2.5">
                       <FileText class="h-4 w-4 text-primary" />
                       <span class="label-overline text-primary">Điều khoản & Điều kiện</span>
@@ -330,26 +355,26 @@
         {#if visibleShows.length > 0}
           <div
             id="shows-section"
-            class="arch-enter grid scroll-mt-20 grid-cols-1 gap-5 md:col-span-12 lg:grid-cols-12"
+            class="arch-enter grid scroll-mt-20 grid-cols-1 gap-3 md:col-span-12 md:gap-5 lg:grid-cols-12"
             style="animation-delay: 300ms"
           >
             <!-- ── Left Column: Shows + Ticket Info ── -->
-            <div class="space-y-5 lg:col-span-8">
+            <div class="space-y-3 md:space-y-5 lg:col-span-8">
               <!-- Show Picker -->
-              <section class="rounded-xl bg-surface-container-low p-4 sm:p-8">
-                <div class="mb-4 flex items-end justify-between sm:mb-6">
+              <section class="rounded-xl bg-surface-container-low p-3 md:p-8">
+                <div class="mb-3 flex items-end justify-between md:mb-6">
                   <div>
                     <span
-                      class="text-[0.65rem] font-bold tracking-widest text-primary uppercase sm:text-[0.7rem]"
+                      class="text-[0.6rem] font-bold tracking-widest text-primary uppercase md:text-[0.7rem]"
                     >
                       Bước 01
                     </span>
-                    <h2 class="font-heading text-xl font-bold text-foreground sm:text-3xl">
+                    <h2 class="font-heading text-lg font-bold text-foreground md:text-3xl">
                       Suất diễn
                     </h2>
                   </div>
                   {#if activeShow}
-                    <span class="text-xs font-medium text-muted-foreground sm:text-sm">
+                    <span class="text-xs font-medium text-muted-foreground md:text-sm">
                       <span class="font-semibold text-gray-600">Đã chọn:</span>
                       {formatDate(activeShow.show_date)}
                     </span>
@@ -357,7 +382,7 @@
                 </div>
 
                 <ScrollArea class="w-full whitespace-nowrap" orientation="horizontal">
-                  <div class="flex w-max gap-2 p-3 sm:gap-4 sm:p-5">
+                  <div class="flex w-max gap-2 p-2 md:gap-4 md:p-5">
                     {#each visibleShows as show (show.id)}
                       {@const isActive = activeShow?.id === show.id}
                       {@const available = show.sections.reduce(
@@ -371,23 +396,23 @@
                       {@const avail = getAvailabilityLabel(available, total)}
                       <button
                         onclick={() => selectShow(show.id)}
-                        class="flex min-w-[110px] shrink-0 cursor-pointer flex-col items-center gap-1 rounded-lg px-3.5 py-3 transition-all duration-300 sm:min-w-[150px] sm:gap-2 sm:rounded-xl sm:p-5 {isActive
-                          ? 'scale-105 bg-primary-container text-white shadow-lg ring-2 ring-primary-container/20 sm:ring-4'
+                        class="flex min-w-[85px] shrink-0 cursor-pointer flex-col items-center gap-1 rounded-lg px-2.5 py-2 transition-all duration-300 md:min-w-[150px] md:gap-2 md:rounded-xl md:p-5 {isActive
+                          ? 'scale-105 bg-primary-container text-white shadow-lg ring-2 ring-primary-container/20 md:ring-4'
                           : 'bg-surface-container text-foreground hover:bg-surface-container-high active:scale-95'}"
                       >
                         <span
-                          class="text-[11px] font-medium sm:text-sm {isActive
+                          class="text-[10px] font-medium md:text-sm {isActive
                             ? 'opacity-80'
                             : 'text-muted-foreground'}"
                         >
                           {formatShortDate(show.show_date)}
                         </span>
-                        <span class="font-heading text-lg font-bold sm:text-2xl">
+                        <span class="font-heading text-base font-bold md:text-2xl">
                           {formatTime(show.start_time)}
                         </span>
                         <span
-                          class="text-[0.6rem] font-bold uppercase sm:text-[0.65rem] {isActive
-                            ? 'rounded-full bg-white/20 px-1.5 py-0.5 sm:px-2'
+                          class="text-[0.55rem] font-bold uppercase md:text-[0.65rem] {isActive
+                            ? 'rounded-full bg-white/20 px-1.5 py-0.5 md:px-2'
                             : avail.class}"
                         >
                           {avail.text}
@@ -408,29 +433,29 @@
                   'height' in event.map_config}
                 {@const hasStageLayout =
                   Array.isArray(event.stage_layout) && event.stage_layout.length > 0}
-                <section class="relative rounded-xl bg-surface-container-low p-4 sm:p-8">
-                  <div class="mb-4 flex items-center justify-between sm:mb-6">
+                <section class="relative rounded-xl bg-surface-container-low p-3 md:p-8">
+                  <div class="mb-3 flex items-center justify-between md:mb-6">
                     <div>
                       <span
-                        class="text-[0.65rem] font-bold tracking-widest text-primary uppercase sm:text-[0.7rem]"
+                        class="text-[0.6rem] font-bold tracking-widest text-primary uppercase md:text-[0.7rem]"
                       >
                         Bước 02
                       </span>
-                      <h2 class="font-heading text-xl font-semibold text-foreground sm:text-3xl">
+                      <h2 class="font-heading text-lg font-semibold text-foreground md:text-3xl">
                         Thông tin vé
                       </h2>
                     </div>
                     <div
-                      class="flex items-center gap-1.5 rounded-full bg-primary-light px-2.5 py-0.5 font-semibold text-accent-foreground sm:px-3 sm:py-1"
+                      class="flex items-center gap-1.5 rounded-full bg-primary-light px-2 py-0.5 font-semibold text-accent-foreground md:px-3 md:py-1"
                     >
-                      <Lock class="size-3.5 sm:size-4" />
-                      <span class="text-xs sm:text-sm">Xem trước</span>
+                      <Lock class="size-3 md:size-4" />
+                      <span class="text-xs md:text-sm">Xem trước</span>
                     </div>
                   </div>
 
                   <!-- Seat Map Area Preview -->
                   {#if hasMapConfig && hasStageLayout}
-                    <div class="mb-5">
+                    <div class="mb-4 md:mb-5">
                       <SeatMapPreview
                         mapConfig={event.map_config as { width: number; height: number }}
                         stageLayout={event.stage_layout as {
@@ -459,7 +484,7 @@
                   {/if}
 
                   <div
-                    class="pointer-events-none grid grid-cols-2 gap-3 opacity-60 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3"
+                    class="pointer-events-none grid grid-cols-2 gap-2 opacity-60 md:grid-cols-2 md:gap-5 lg:grid-cols-3"
                   >
                     {#each show.sections as section, sIdx (section.id)}
                       {@const available = getAvailable(section)}
@@ -468,12 +493,12 @@
                       {@const tierColor = getTierColor(sIdx, show.sections.length)}
 
                       <div
-                        class="rounded-lg border-t-4 {tierColor} bg-surface-container p-3 sm:rounded-xl sm:p-6"
+                        class="rounded-lg border-t-4 {tierColor} bg-surface-container p-2.5 md:rounded-xl md:p-6"
                       >
-                        <h3 class="font-heading text-sm font-bold text-foreground sm:text-lg">
+                        <h3 class="font-heading text-xs font-bold text-foreground md:text-lg">
                           {section.name}
                         </h3>
-                        <p class="mt-0.5 text-[11px] text-muted-foreground sm:mt-1 sm:text-xs">
+                        <p class="mt-0.5 text-[10px] text-muted-foreground md:mt-1 md:text-xs">
                           Vé {seatTypeLabel(section.type)} •
                           {#if soldOut}
                             <span class="font-semibold text-destructive">Hết vé</span>
@@ -481,19 +506,19 @@
                             Còn {available}/{total}
                           {/if}
                         </p>
-                        <div class="mt-2 flex items-baseline gap-1 sm:mt-4">
-                          <span class="text-sm font-bold text-primary sm:text-xl">
+                        <div class="mt-1.5 flex items-baseline gap-1 md:mt-4">
+                          <span class="text-xs font-bold text-primary md:text-xl">
                             {formatPrice(section.price)}
                           </span>
                           {#if section.price > 0}
-                            <span class="text-[10px] text-muted-foreground sm:text-xs">/ vé</span>
+                            <span class="text-[9px] text-muted-foreground md:text-xs">/ vé</span>
                           {/if}
                         </div>
                       </div>
                     {/each}
                   </div>
 
-                  <p class="mt-4 text-center text-xs text-muted-foreground">
+                  <p class="mt-3 text-center text-xs text-muted-foreground md:mt-4">
                     Nhấn <span class="font-semibold text-primary">Tiếp tục chọn chỗ</span>
                     để đặt vé
                   </p>
@@ -525,48 +550,7 @@
 
               <!-- Event Timeline -->
               {#if activeShow}
-                {@const show = activeShow}
-                {#if Array.isArray(show.itinerary) && show.itinerary.length > 0}
-                  <div class="mt-5 rounded-xl bg-surface-container-lowest p-6 shadow-sm sm:p-8">
-                    <h3 class="mb-6 font-heading text-xl font-bold text-foreground">
-                      Lịch trình sự kiện
-                    </h3>
-                    <div class="space-y-0">
-                      {#each show.itinerary as item, i (i)}
-                        {@const isFirst = i < Math.ceil(show.itinerary.length / 2)}
-                        {@const isLast = i === show.itinerary.length - 1}
-                        <div
-                          class="relative ml-2 flex gap-6 {isLast
-                            ? ''
-                            : 'border-l-2 border-primary/20 pb-7'}"
-                        >
-                          <div
-                            class="absolute top-0 -left-2.25 h-4 w-4 rounded-full {isFirst
-                              ? 'bg-primary'
-                              : 'bg-surface-container-highest'} ring-4 ring-background"
-                          ></div>
-                          <div class="pl-4">
-                            <span
-                              class="text-xs font-bold tracking-widest uppercase {isFirst
-                                ? 'text-primary'
-                                : 'text-muted-foreground'}"
-                            >
-                              {item.time || item.time_start || ''}{item.time_end
-                                ? ` — ${item.time_end}`
-                                : ''}
-                            </span>
-                            <h4 class="mt-0.5 font-semibold text-foreground">
-                              {item.activity || item.title || ''}
-                            </h4>
-                            {#if item.description}
-                              <p class="mt-1 text-sm text-muted-foreground">{item.description}</p>
-                            {/if}
-                          </div>
-                        </div>
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
+                <EventTimeline show={activeShow} class="mt-3 md:mt-5" />
               {/if}
             </aside>
           </div>
@@ -576,16 +560,16 @@
         <!-- ORGANIZER                                  -->
         <!-- ═══════════════════════════════════════════ -->
         {#if organizerName}
-          <section class="arch-enter rounded-xl bg-surface-container-low p-5 sm:p-6 md:col-span-12">
-            <div class="mb-3 flex items-center gap-2.5">
+          <section class="arch-enter rounded-xl bg-surface-container-low p-4 md:col-span-12 md:p-6">
+            <div class="mb-2 flex items-center gap-2.5 md:mb-3">
               <Building class="h-4 w-4 text-primary" />
               <span class="label-overline text-primary">Ban tổ chức</span>
             </div>
             <div class="flex items-center gap-3">
               <div
-                class="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-container-highest"
+                class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container-highest md:h-11 md:w-11"
               >
-                <Users class="h-5 w-5 text-primary" />
+                <Users class="h-4 w-4 text-primary md:h-5 md:w-5" />
               </div>
               <div>
                 <p class="text-sm font-semibold text-foreground">{organizerName}</p>
@@ -605,14 +589,14 @@
   <!-- ═══════════════════════════════════════════════════ -->
   {#if activeShow && visibleShows.length > 0}
     <div
-      class="fixed right-0 bottom-18 left-0 z-40 transition-transform duration-300 ease-(--ease-architectural) lg:hidden {showMobileCta
+      class="fixed right-0 bottom-[4.25rem] left-0 z-40 transition-transform duration-300 ease-(--ease-architectural) lg:hidden {showMobileCta
         ? 'translate-y-0'
-        : 'translate-y-full'}"
+        : 'translate-y-[calc(100%+4.25rem)]'}"
     >
       <div class="mx-auto max-w-lg px-4 pb-2">
         <button
           onclick={() => handleBuyTicket(activeShow!.id)}
-          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3.5 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98]"
+          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98] md:py-3.5"
         >
           <Ticket class="size-4" />
           Tiếp tục chọn chỗ

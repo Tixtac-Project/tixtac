@@ -46,7 +46,7 @@
 
 <div class="min-h-dvh bg-surface">
   <!-- Events Listing -->
-  <section class="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16 lg:py-20" id="events">
+  <section class="mx-auto max-w-7xl px-4 py-8 sm:py-12 md:px-6 md:py-16 lg:py-20" id="events">
     <SectionHeader
       title="Tất cả sự kiện"
       searchQuery={pagination.searchQuery}

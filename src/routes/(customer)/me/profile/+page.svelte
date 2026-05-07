@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import {
     Card,
@@ -13,13 +13,22 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
-  import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
+  import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+  } from '$lib/components/ui/select';
   import { updateProfileSchema, updateSecuritySchema } from '$lib/shared/schemas/auth.schema';
   import { cn } from '$lib/utils';
   import {
     AlertCircle,
     Calendar as CalendarIcon,
     CheckCircle,
+    Eye,
+    EyeOff,
     Key,
     Lock,
     Mail,
@@ -30,7 +39,7 @@
   } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
 
-  const profile = $derived($page.data.profile);
+  const profile = $derived(page.data.profile);
 
   // ─── Profile Form ──────────────────────────
   let profileForm = $state({
@@ -97,6 +106,12 @@
       isProfileLoading = false;
     }
   }
+
+  // ─── Password visibility toggles ──────────
+  let showEmailPwd = $state(false);
+  let showCurPwd = $state(false);
+  let showNewPwd = $state(false);
+  let showCfPwd = $state(false);
 
   // ─── Email Form ──────────────────────────
   let emailForm = $state({ new_email: '', current_password: '' });
@@ -218,144 +233,151 @@
   <title>Quản lý tài khoản</title>
 </svelte:head>
 
-<div
-  class="min-h-screen bg-linear-to-br from-slate-50 to-slate-100/50 py-8 sm:py-12 dark:from-slate-950 dark:to-slate-900"
->
-  <div class="mx-auto max-w-3xl px-4 sm:px-6">
+<div class="min-h-screen bg-surface py-8 md:py-14">
+  <div class="mx-auto max-w-2xl px-4 md:px-6">
     <!-- Header -->
-    <div class="mb-8 flex items-center gap-3">
-      <div class="rounded-full bg-primary/10 p-2 text-primary">
-        <ShieldCheck class="h-6 w-6" />
+    <div class="mb-8 flex items-center gap-3.5 md:mb-10">
+      <div class="rounded-xl bg-primary/10 p-2.5 text-primary">
+        <ShieldCheck class="size-5 md:size-6" />
       </div>
       <div>
-        <h1 class="text-3xl font-bold tracking-tight">Quản lý tài khoản</h1>
-        <p class="mt-1 text-muted-foreground">Cập nhật thông tin cá nhân, email và bảo mật</p>
+        <h1 class="text-xl font-bold tracking-tight md:text-2xl">Quản lý tài khoản</h1>
+        <p class="mt-0.5 text-sm text-muted-foreground">
+          Cập nhật thông tin cá nhân, email và bảo mật
+        </p>
       </div>
     </div>
 
-    <div class="space-y-8">
-      <!-- Profile Card -->
-      <Card class="overflow-hidden border shadow-sm transition-shadow duration-200 hover:shadow-md">
+    <div class="space-y-5 md:space-y-6">
+      <!-- ═══ Profile Card ═══ -->
+      <Card class="overflow-hidden py-0!">
         <form onsubmit={handleProfileSubmit}>
-          <CardHeader class="border-b bg-muted/20 pb-4">
-            <div class="flex items-center gap-2">
-              <User class="h-5 w-5 text-primary" />
-              <CardTitle>Thông tin cá nhân</CardTitle>
+          <CardHeader class="border-b bg-muted/30 px-5 py-4 md:px-6">
+            <div class="flex items-center gap-2.5">
+              <User class="size-4 text-primary md:size-5" />
+              <CardTitle class="text-base md:text-lg">Thông tin cá nhân</CardTitle>
             </div>
-            <CardDescription>Họ tên, số điện thoại, ngày sinh và giới tính</CardDescription>
+            <CardDescription class="mt-1 text-xs md:text-sm">
+              Họ tên, số điện thoại, ngày sinh và giới tính
+            </CardDescription>
           </CardHeader>
-          <CardContent class="space-y-5 pt-6">
-            <!-- Full name -->
-            <div class="space-y-2">
-              <Label for="fn" class="text-sm font-medium">Họ và tên</Label>
-              <div class="relative">
-                <User
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="fn"
-                  bind:value={profileForm.full_name}
-                  class="pl-10"
-                  placeholder={profileForm.full_name}
-                />
-              </div>
-              {#if profileErrors.full_name}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{profileErrors.full_name}</span>
-                </div>
-              {/if}
-            </div>
 
-            <!-- Phone -->
-            <div class="space-y-2">
-              <Label for="phone" class="text-sm font-medium">Số điện thoại</Label>
-              <div class="relative">
-                <Phone
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="phone"
-                  bind:value={profileForm.phone}
-                  class="pl-10"
-                  placeholder={profileForm.phone}
-                />
-              </div>
-              {#if profileErrors.phone}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{profileErrors.phone}</span>
+          <CardContent class="px-5 py-5 md:px-6 md:py-6">
+            <div class="space-y-5">
+              <!-- Full name -->
+              <div class="space-y-2">
+                <Label for="fn" class="text-sm font-medium">Họ và tên</Label>
+                <div class="relative">
+                  <User
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="fn"
+                    bind:value={profileForm.full_name}
+                    class="pl-10"
+                    placeholder="Nguyễn Văn A"
+                  />
                 </div>
-              {/if}
-            </div>
+                {#if profileErrors.full_name}
+                  <p class="flex items-center gap-1.5 text-xs text-destructive">
+                    <AlertCircle class="size-3.5 shrink-0" />{profileErrors.full_name}
+                  </p>
+                {/if}
+              </div>
 
-            <!-- Date of birth -->
-            <div class="space-y-2">
-              <Label class="text-sm font-medium">Ngày sinh</Label>
-              <Popover>
-                <PopoverTrigger>
-                  <Button
-                    variant="outline"
-                    class={cn(
-                      'w-full justify-start gap-2 font-normal',
-                      !profileForm.date_of_birth && 'text-muted-foreground',
-                    )}
+              <!-- Phone -->
+              <div class="space-y-2">
+                <Label for="phone" class="text-sm font-medium">Số điện thoại</Label>
+                <div class="relative">
+                  <Phone
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="phone"
+                    bind:value={profileForm.phone}
+                    class="pl-10"
+                    placeholder="0912 345 678"
+                  />
+                </div>
+                {#if profileErrors.phone}
+                  <p class="flex items-center gap-1.5 text-xs text-destructive">
+                    <AlertCircle class="size-3.5 shrink-0" />{profileErrors.phone}
+                  </p>
+                {/if}
+              </div>
+
+              <!-- Date of birth + Gender (side-by-side on desktop) -->
+              <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <!-- Date of birth -->
+                <div class="space-y-2">
+                  <Label class="text-sm font-medium">Ngày sinh</Label>
+                  <Popover>
+                    <PopoverTrigger>
+                      <Button
+                        variant="outline"
+                        class={cn(
+                          'w-full justify-start gap-2 font-normal',
+                          !profileForm.date_of_birth && 'text-muted-foreground',
+                        )}
+                      >
+                        <CalendarIcon class="size-4 shrink-0" />
+                        {profileForm.date_of_birth
+                          ? new Date(profileForm.date_of_birth).toLocaleDateString('vi-VN')
+                          : 'Chọn ngày'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-auto p-0">
+                      <Input type="date" bind:value={profileForm.date_of_birth} />
+                    </PopoverContent>
+                  </Popover>
+                  {#if profileErrors.date_of_birth}
+                    <p class="flex items-center gap-1.5 text-xs text-destructive">
+                      <AlertCircle class="size-3.5 shrink-0" />{profileErrors.date_of_birth}
+                    </p>
+                  {/if}
+                </div>
+
+                <!-- Gender -->
+                <div class="space-y-2">
+                  <Label for="gender" class="text-sm font-medium">Giới tính</Label>
+                  <Select
+                    type="single"
+                    value={profileForm.gender}
+                    onValueChange={(value: string) => {
+                      profileForm.gender = value as 'male' | 'female' | 'other';
+                    }}
                   >
-                    <CalendarIcon class="h-4 w-4" />
-                    {profileForm.date_of_birth
-                      ? new Date(profileForm.date_of_birth).toLocaleDateString('vi-VN')
-                      : 'Chọn ngày'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent class="w-auto p-0">
-                  <Input type="date" bind:value={profileForm.date_of_birth} />
-                </PopoverContent>
-              </Popover>
-              {#if profileErrors.date_of_birth}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{profileErrors.date_of_birth}</span>
+                    <SelectTrigger id="gender" class="gap-2">
+                      <Users class="size-4 text-muted-foreground" />
+                      <span>{genderLabel(profileForm.gender)}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Giới tính</SelectLabel>
+                        <SelectItem value="male">Nam</SelectItem>
+                        <SelectItem value="female">Nữ</SelectItem>
+                        <SelectItem value="other">Khác</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {#if profileErrors.gender}
+                    <p class="flex items-center gap-1.5 text-xs text-destructive">
+                      <AlertCircle class="size-3.5 shrink-0" />{profileErrors.gender}
+                    </p>
+                  {/if}
                 </div>
-              {/if}
+              </div>
             </div>
-
-            <!-- Gender -->
-            <div class="space-y-2">
-              <Label for="gender" class="text-sm font-medium">Giới tính</Label>
-              <Select
-                type="single"
-                value={profileForm.gender}
-                onValueChange={(value: string) => {
-                  profileForm.gender = value as 'male' | 'female' | 'other';
-                }}
-              >
-                <SelectTrigger id="gender" class="gap-2">
-                  <Users class="h-4 w-4 text-muted-foreground" />
-                  <span>{genderLabel(profileForm.gender)}</span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Nam</SelectItem>
-                  <SelectItem value="female">Nữ</SelectItem>
-                  <SelectItem value="other">Khác</SelectItem>
-                </SelectContent>
-              </Select>
-              {#if profileErrors.gender}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{profileErrors.gender}</span>
-                </div>
-              {/if}
-            </div>
-            <div class="space-y-2"></div>
           </CardContent>
-          <CardFooter class="border-t bg-muted/10 px-6 py-4">
-            <Button type="submit" disabled={isProfileLoading} class="w-full gap-2 sm:w-auto">
+
+          <CardFooter class="border-t bg-muted/20 px-5 py-4 md:px-6">
+            <Button type="submit" disabled={isProfileLoading} class="gap-2 md:w-auto">
               {#if isProfileLoading}
                 <span
-                  class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                 ></span>
               {:else}
-                <CheckCircle class="h-4 w-4" />
+                <CheckCircle class="size-4" />
               {/if}
               Lưu thông tin
             </Button>
@@ -363,74 +385,89 @@
         </form>
       </Card>
 
-      <!-- Email Card -->
-      <Card class="overflow-hidden border shadow-sm transition-shadow duration-200 hover:shadow-md">
+      <!-- ═══ Email Card ═══ -->
+      <Card class="overflow-hidden py-0!">
         <form onsubmit={handleEmailSubmit}>
-          <CardHeader class="border-b bg-muted/20 pb-4">
-            <div class="flex items-center gap-2">
-              <Mail class="h-5 w-5 text-primary" />
-              <CardTitle>Đổi Email</CardTitle>
+          <CardHeader class="border-b bg-muted/30 px-5 py-4 md:px-6">
+            <div class="flex items-center gap-2.5">
+              <Mail class="size-4 text-primary md:size-5" />
+              <CardTitle class="text-base md:text-lg">Đổi Email</CardTitle>
             </div>
-            <CardDescription>
-              Email hiện tại:
-              <span class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm font-medium">
+            <CardDescription class="mt-1 text-xs md:text-sm">
+              Email hiện tại:&nbsp;
+              <span
+                class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground"
+              >
                 {currentEmail}
               </span>
             </CardDescription>
           </CardHeader>
-          <CardContent class="space-y-5 pt-6">
-            <div class="space-y-2">
-              <Label for="new_email" class="text-sm font-medium">Email mới</Label>
-              <div class="relative">
-                <Mail
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="new_email"
-                  type="email"
-                  bind:value={emailForm.new_email}
-                  class="pl-10"
-                  placeholder="example@mail.com"
-                />
-              </div>
-              {#if emailErrors.new_email}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{emailErrors.new_email}</span>
+
+          <CardContent class="px-5 py-5 md:px-6 md:py-6">
+            <div class="space-y-5">
+              <div class="space-y-2">
+                <Label for="new_email" class="text-sm font-medium">Email mới</Label>
+                <div class="relative">
+                  <Mail
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="new_email"
+                    type="email"
+                    bind:value={emailForm.new_email}
+                    class="pl-10"
+                    placeholder="example@mail.com"
+                  />
                 </div>
-              {/if}
-            </div>
-            <div class="space-y-2">
-              <Label for="email_curpwd" class="text-sm font-medium">Mật khẩu hiện tại</Label>
-              <div class="relative">
-                <Lock
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="email_curpwd"
-                  type="password"
-                  bind:value={emailForm.current_password}
-                  class="pl-10"
-                  placeholder="••••••••"
-                />
+                {#if emailErrors.new_email}
+                  <p class="flex items-center gap-1.5 text-xs text-destructive">
+                    <AlertCircle class="size-3.5 shrink-0" />{emailErrors.new_email}
+                  </p>
+                {/if}
               </div>
-              {#if emailErrors.current_password}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{emailErrors.current_password}</span>
+              <div class="space-y-2">
+                <Label for="email_curpwd" class="text-sm font-medium">Mật khẩu hiện tại</Label>
+                <div class="relative">
+                  <Lock
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="email_curpwd"
+                    type={showEmailPwd ? 'text' : 'password'}
+                    bind:value={emailForm.current_password}
+                    class="pr-10 pl-10"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onclick={() => (showEmailPwd = !showEmailPwd)}
+                    aria-label={showEmailPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {#if showEmailPwd}
+                      <EyeOff class="size-4" />
+                    {:else}
+                      <Eye class="size-4" />
+                    {/if}
+                  </button>
                 </div>
-              {/if}
+                {#if emailErrors.current_password}
+                  <p class="flex items-center gap-1.5 text-xs text-destructive">
+                    <AlertCircle class="size-3.5 shrink-0" />{emailErrors.current_password}
+                  </p>
+                {/if}
+              </div>
             </div>
-            <div class="space-y-2"></div>
           </CardContent>
-          <CardFooter class="border-t bg-muted/10 px-6 py-4">
-            <Button type="submit" disabled={isEmailLoading} class="w-full gap-2 sm:w-auto">
+
+          <CardFooter class="border-t bg-muted/20 px-5 py-4 md:px-6">
+            <Button type="submit" disabled={isEmailLoading} class="gap-2 md:w-auto">
               {#if isEmailLoading}
                 <span
-                  class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                 ></span>
               {:else}
-                <Mail class="h-4 w-4" />
+                <Mail class="size-4" />
               {/if}
               Đổi Email
             </Button>
@@ -438,91 +475,134 @@
         </form>
       </Card>
 
-      <!-- Password Card -->
-      <Card class="overflow-hidden border shadow-sm transition-shadow duration-200 hover:shadow-md">
+      <!-- ═══ Password Card ═══ -->
+      <Card class="overflow-hidden py-0!">
         <form onsubmit={handlePasswordSubmit}>
-          <CardHeader class="border-b bg-muted/20 pb-4">
-            <div class="flex items-center gap-2">
-              <Key class="h-5 w-5 text-primary" />
-              <CardTitle>Đổi mật khẩu</CardTitle>
+          <CardHeader class="border-b bg-muted/30 px-5 py-4 md:px-6">
+            <div class="flex items-center gap-2.5">
+              <Key class="size-4 text-primary md:size-5" />
+              <CardTitle class="text-base md:text-lg">Đổi mật khẩu</CardTitle>
             </div>
-            <CardDescription>Cần xác nhận mật khẩu hiện tại để bảo vệ tài khoản</CardDescription>
+            <CardDescription class="mt-1 text-xs md:text-sm">
+              Cần xác nhận mật khẩu hiện tại để bảo vệ tài khoản
+            </CardDescription>
           </CardHeader>
-          <CardContent class="space-y-5 pt-6">
-            <div class="space-y-2">
-              <Label for="pw_cur" class="text-sm font-medium">Mật khẩu hiện tại</Label>
-              <div class="relative">
-                <Lock
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="pw_cur"
-                  type="password"
-                  bind:value={passwordForm.current_password}
-                  class="pl-10"
-                  placeholder="••••••••"
-                />
-              </div>
-              {#if passwordErrors.current_password}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{passwordErrors.current_password}</span>
+
+          <CardContent class="px-5 py-5 md:px-6 md:py-6">
+            <div class="space-y-5">
+              <div class="space-y-2">
+                <Label for="pw_cur" class="text-sm font-medium">Mật khẩu hiện tại</Label>
+                <div class="relative">
+                  <Lock
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="pw_cur"
+                    type={showCurPwd ? 'text' : 'password'}
+                    bind:value={passwordForm.current_password}
+                    class="pr-10 pl-10"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onclick={() => (showCurPwd = !showCurPwd)}
+                    aria-label={showCurPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {#if showCurPwd}
+                      <EyeOff class="size-4" />
+                    {:else}
+                      <Eye class="size-4" />
+                    {/if}
+                  </button>
                 </div>
-              {/if}
-            </div>
-            <div class="space-y-2">
-              <Label for="new_pw" class="text-sm font-medium">Mật khẩu mới</Label>
-              <div class="relative">
-                <Key
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="new_pw"
-                  type="password"
-                  bind:value={passwordForm.new_password}
-                  class="pl-10"
-                  placeholder="Tối thiểu 8 ký tự"
-                />
+                {#if passwordErrors.current_password}
+                  <p class="flex items-center gap-1.5 text-xs text-destructive">
+                    <AlertCircle class="size-3.5 shrink-0" />{passwordErrors.current_password}
+                  </p>
+                {/if}
               </div>
-              {#if passwordErrors.new_password}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{passwordErrors.new_password}</span>
+
+              <!-- New + Confirm side-by-side on desktop -->
+              <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div class="space-y-2">
+                  <Label for="new_pw" class="text-sm font-medium">Mật khẩu mới</Label>
+                  <div class="relative">
+                    <Key
+                      class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      id="new_pw"
+                      type={showNewPwd ? 'text' : 'password'}
+                      bind:value={passwordForm.new_password}
+                      class="pr-10 pl-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onclick={() => (showNewPwd = !showNewPwd)}
+                      aria-label={showNewPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {#if showNewPwd}
+                        <EyeOff class="size-4" />
+                      {:else}
+                        <Eye class="size-4" />
+                      {/if}
+                    </button>
+                  </div>
+                  {#if passwordErrors.new_password}
+                    <p class="flex items-center gap-1.5 text-xs text-destructive">
+                      <AlertCircle class="size-3.5 shrink-0" />{passwordErrors.new_password}
+                    </p>
+                  {:else}
+                    <p class="text-xs text-muted-foreground">Tối thiểu 8 ký tự</p>
+                  {/if}
                 </div>
-              {/if}
-              <p class="text-xs text-muted-foreground">Mật khẩu phải có ít nhất 8 ký tự</p>
-            </div>
-            <div class="space-y-2">
-              <Label for="cf_pw" class="text-sm font-medium">Nhập lại mật khẩu mới</Label>
-              <div class="relative">
-                <Key
-                  class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="cf_pw"
-                  type="password"
-                  bind:value={passwordForm.confirm_password}
-                  class="pl-10"
-                  placeholder="••••••••"
-                />
+                <div class="space-y-2">
+                  <Label for="cf_pw" class="text-sm font-medium">Nhập lại mật khẩu mới</Label>
+                  <div class="relative">
+                    <Key
+                      class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      id="cf_pw"
+                      type={showCfPwd ? 'text' : 'password'}
+                      bind:value={passwordForm.confirm_password}
+                      class="pr-10 pl-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onclick={() => (showCfPwd = !showCfPwd)}
+                      aria-label={showCfPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {#if showCfPwd}
+                        <EyeOff class="size-4" />
+                      {:else}
+                        <Eye class="size-4" />
+                      {/if}
+                    </button>
+                  </div>
+                  {#if passwordErrors.confirm_password}
+                    <p class="flex items-center gap-1.5 text-xs text-destructive">
+                      <AlertCircle class="size-3.5 shrink-0" />{passwordErrors.confirm_password}
+                    </p>
+                  {/if}
+                </div>
               </div>
-              {#if passwordErrors.confirm_password}
-                <div class="flex items-center gap-1 text-sm text-destructive">
-                  <AlertCircle class="h-3.5 w-3.5" />
-                  <span>{passwordErrors.confirm_password}</span>
-                </div>
-              {/if}
             </div>
-            <div class="space-y-2"></div>
           </CardContent>
-          <CardFooter class="border-t bg-muted/10 px-6 py-4">
-            <Button type="submit" disabled={isPasswordLoading} class="w-full gap-2 sm:w-auto">
+
+          <CardFooter class="border-t bg-muted/20 px-5 py-4 md:px-6">
+            <Button type="submit" disabled={isPasswordLoading} class="gap-2 md:w-auto">
               {#if isPasswordLoading}
                 <span
-                  class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                 ></span>
               {:else}
-                <Lock class="h-4 w-4" />
+                <Lock class="size-4" />
               {/if}
               Đổi mật khẩu
             </Button>

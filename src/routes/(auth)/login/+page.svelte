@@ -136,6 +136,7 @@
           id="password"
           type={showPassword ? 'text' : 'password'}
           bind:value={password}
+          placeholder="••••••••"
           class="pr-10"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}

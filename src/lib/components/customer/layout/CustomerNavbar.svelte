@@ -88,7 +88,9 @@
 <!-- ═══════════════════════════════════════════════════ -->
 <header class="relative z-40 w-full md:sticky md:top-0">
   <div class="glass-nav border-b border-outline-variant/10">
-    <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-6 px-4 sm:px-6">
+    <div
+      class="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-3 sm:h-16 sm:gap-6 sm:px-6"
+    >
       <!-- Brand -->
 
       <a
@@ -98,7 +100,9 @@
         <span class="size-6 fill-primary">
           <Logo2 />
         </span>
-        <span class="font-heading text-2xl font-extrabold tracking-tight text-primary">TixTac</span>
+        <span class="font-heading text-xl font-extrabold tracking-tight text-primary sm:text-2xl">
+          TixTac
+        </span>
       </a>
 
       <!-- Center nav links (desktop only) -->
@@ -274,7 +278,7 @@
   <!-- CATEGORY FILTER BAR — hidden on /search which has its own filter sidebar -->
   {#if categories.length > 0 && !currentPath.startsWith('/search')}
     <div class="border-b border-outline-variant/10 bg-surface-container-lowest">
-      <div class="mx-auto flex h-12 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto flex h-10 w-full max-w-7xl items-center px-3 sm:h-12 sm:px-6 lg:px-8">
         <CategoryFilterBar {categories} bind:activeCategory />
       </div>
     </div>
@@ -289,8 +293,8 @@
     ? 'translate-y-0'
     : 'translate-y-full'}"
 >
-  <div class="rounded-t-2xl border-t border-outline-variant/10 bg-accent">
-    <div class="mx-auto flex h-18 max-w-lg items-center justify-around px-2">
+  <div class="rounded-t-xl border-t border-outline-variant/10 bg-accent sm:rounded-t-2xl">
+    <div class="mx-auto flex h-[4.25rem] max-w-lg items-center justify-around px-1 sm:h-18 sm:px-2">
       <!-- Home -->
       <a
         href={resolve('/')}
@@ -309,8 +313,10 @@
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        <Search class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Tìm kiếm</span>
+        <Search class="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+        <span class="text-[9px] font-semibold tracking-wider uppercase sm:text-[10px]">
+          Tìm kiếm
+        </span>
       </a>
 
       <!-- My Tickets -->
@@ -320,19 +326,23 @@
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        <Ticket class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
+        <Ticket class="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+        <span class="text-[9px] font-semibold tracking-wider uppercase sm:text-[10px]">
+          Vé của tôi
+        </span>
       </a>
 
       <!-- Profile -->
       <a
-        href={resolve(user ? '/profile' : '/login')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/profile')
+        href={resolve(user ? '/me/profile' : '/login')}
+        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/profile')
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        <User class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Cá nhân</span>
+        <User class="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+        <span class="text-[9px] font-semibold tracking-wider uppercase sm:text-[10px]">
+          Cá nhân
+        </span>
       </a>
     </div>
   </div>

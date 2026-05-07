@@ -54,8 +54,8 @@
   }
 </script>
 
-<section class="relative w-full py-6 sm:py-10">
-  <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
+<section class="relative w-full py-4 sm:py-10">
+  <div class="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-8">
     <Carousel.Root
       opts={{ align: 'start', loop: true }}
       plugins={[autoplayPlugin]}
@@ -69,7 +69,7 @@
           <Carousel.Item class="basis-full ps-4">
             <a
               href={resolve(`/events/${event.id}`)}
-              class="group relative flex min-h-[500px] w-full flex-col overflow-hidden rounded-[2rem] bg-slate-950 ring-1 ring-border/10 lg:min-h-[560px]"
+              class="group relative flex aspect-3/4 w-full flex-col overflow-hidden rounded-[1.5rem] bg-slate-950 ring-1 ring-border/10 sm:aspect-[16/9] lg:aspect-auto lg:min-h-[560px]"
             >
               <!-- 1. Background Image Full-bleed -->
               <div class="absolute inset-0">
@@ -99,14 +99,14 @@
               ></div>
 
               <!-- 3. Content Block -->
-              <div class="absolute inset-0 z-10 flex flex-col p-5 sm:p-8 lg:p-12">
+              <div class="absolute inset-0 z-10 flex flex-col p-4 sm:p-8 lg:p-12">
                 <div
                   class="flex flex-1 flex-col justify-end pb-6 md:w-[70%] md:justify-center md:pb-0"
                 >
                   <!-- Category Badge -->
                   {#if event.categoryName}
                     <span
-                      class="mb-4 inline-block w-fit rounded-full border border-white/20 bg-white/10 px-3.5 py-1 text-[11px] font-bold tracking-widest text-white uppercase backdrop-blur-md"
+                      class="mb-3 inline-block w-fit rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-bold tracking-widest text-white uppercase backdrop-blur-md sm:mb-4 sm:px-3.5 sm:py-1 sm:text-[11px]"
                     >
                       {event.categoryName}
                     </span>
@@ -114,7 +114,7 @@
 
                   <!-- Title -->
                   <h2
-                    class="mb-5 line-clamp-3 font-heading text-3xl leading-tight font-black tracking-tight text-white drop-shadow-lg sm:text-4xl md:text-5xl lg:text-[3.5rem] lg:leading-[1.15]"
+                    class="mb-3 line-clamp-3 font-heading text-2xl leading-tight font-black tracking-tight text-white drop-shadow-lg sm:text-3xl md:text-5xl lg:text-[3.5rem] lg:leading-[1.15]"
                   >
                     {event.title}
                   </h2>
@@ -127,7 +127,7 @@
                       <span
                         class="flex items-center gap-2 rounded-full bg-black/20 px-3 py-1.5 backdrop-blur-sm"
                       >
-                        <Calendar class="size-4 text-primary" />
+                        <Calendar class="size-4 text-info/80" />
                         {new Date(event.earliestShowDate).toLocaleDateString('vi-VN', {
                           weekday: 'short',
                           day: '2-digit',
@@ -139,36 +139,36 @@
                     <span
                       class="flex items-center gap-2 rounded-full bg-black/20 px-3 py-1.5 backdrop-blur-sm"
                     >
-                      <MapPin class="size-4 text-primary" />
+                      <MapPin class="size-4 text-info/80" />
                       <span class="line-clamp-1">{event.venue}</span>
                     </span>
                   </div>
                 </div>
 
                 <div
-                  class="mt-auto flex w-full flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-5 md:border-none md:pt-0"
+                  class="mt-auto flex w-full flex-wrap items-end justify-between gap-3 border-t border-white/10 pt-4 md:border-none md:pt-0"
                 >
                   <div class="flex flex-col">
                     <span
-                      class="mb-0.5 text-[10px] font-bold tracking-widest text-slate-400 uppercase drop-shadow-sm"
+                      class="mb-0.5 text-[9px] font-bold tracking-widest text-slate-400 uppercase drop-shadow-sm sm:text-[10px]"
                     >
                       Giá vé từ
                     </span>
                     <span
-                      class="flex items-center gap-1.5 text-2xl font-black text-white drop-shadow-md md:text-3xl lg:text-4xl"
+                      class="flex items-center gap-1.5 text-xl font-black text-white drop-shadow-md sm:text-2xl md:text-3xl lg:text-4xl"
                     >
-                      <Ticket class="size-5 text-primary md:size-6 lg:size-7" />
+                      <Ticket class="size-4 text-info/80 sm:size-5 md:size-6 lg:size-7" />
                       {formatPrice(event.min_price)}
                     </span>
                   </div>
 
                   <span
-                    class="group/btn relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 sm:px-8 sm:py-3.5 sm:text-base"
+                    class="group/btn relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 sm:px-8 sm:py-3.5 sm:text-base"
                   >
-                    <span class="relative z-10 flex items-center gap-2">
+                    <span class="relative z-10 flex items-center gap-1.5">
                       Mua vé ngay
                       <ArrowRight
-                        class="size-4 transition-transform duration-300 group-hover/btn:translate-x-1"
+                        class="size-3.5 transition-transform duration-300 group-hover/btn:translate-x-1 sm:size-4"
                       />
                     </span>
                     <div
@@ -184,7 +184,7 @@
 
       <!-- Carousel Controls (Dots & Arrows) -->
       {#if count > 1}
-        <div class="mt-6 flex items-center justify-between px-2 sm:mt-8">
+        <div class="mt-4 flex items-center justify-between px-2 sm:mt-8">
           <!-- Modern Pill Indicators -->
           <div class="flex items-center gap-2">
             {#each [...Array(count).keys()] as index (index)}

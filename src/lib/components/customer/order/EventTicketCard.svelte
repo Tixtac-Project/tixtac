@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CalendarDays, MapPin, Ticket } from 'lucide-svelte';
   import { formatDate, formatTime } from '$lib/utils/datetime';
+  import { CalendarDays, MapPin, Ticket } from 'lucide-svelte';
 
   export interface PaidTicketEntry {
     order_item_id: number;
@@ -52,11 +52,11 @@
   });
 </script>
 
-<div class="mb-8 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+<div class="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-sm md:mb-8 md:rounded-2xl">
   <!-- Header Sự kiện -->
-  <div class="flex items-center gap-4 border-b border-border bg-surface-container-low p-4 sm:p-5">
+  <div class="flex items-center gap-3 border-b border-border bg-surface-container-low p-3 md:gap-4 md:p-5">
     <div
-      class="h-16 w-24 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm sm:h-20 sm:w-32"
+      class="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border shadow-sm md:h-20 md:w-32 md:rounded-xl"
     >
       <img
         src={eventData.banner_image_url || 'https://picsum.photos/400/200'}
@@ -65,94 +65,92 @@
       />
     </div>
     <div class="min-w-0 flex-1">
-      <h2 class="truncate text-lg font-bold text-foreground sm:text-xl">{eventData.title}</h2>
+      <h2 class="truncate text-base font-bold text-foreground md:text-xl">{eventData.title}</h2>
       <div
-        class="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground sm:text-sm"
+        class="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground md:text-sm"
       >
-        <MapPin class="h-4 w-4 shrink-0" />
+        <MapPin class="h-3.5 w-3.5 shrink-0 md:h-4 md:w-4" />
         <span class="truncate">{eventData.venue}</span>
       </div>
     </div>
   </div>
 
   <!-- Danh sách Suất diễn -->
-  <div class="p-4 sm:p-5">
+  <div class="p-3 md:p-5">
     {#each groupedShows as show, i (i)}
-      <div class="mb-10 last:mb-0">
-        <!-- Tiêu đề Suất diễn — stack on mobile -->
+      <div class="mb-8 last:mb-0 md:mb-10">
+        <!-- Tiêu đề Suất diễn -->
         <div
-          class="mb-5 flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between"
+          class="mb-4 flex flex-col gap-2 border-b border-border pb-3 md:flex-row md:items-end md:justify-between md:mb-5 md:pb-4"
         >
           <div>
-            <p class="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+            <p class="mb-0.5 text-[9px] font-bold tracking-wider text-muted-foreground uppercase md:text-[10px]">
               SUẤT DIỄN
             </p>
-            <h3 class="text-lg font-bold text-foreground sm:text-xl">
+            <h3 class="text-base font-bold text-foreground md:text-xl">
               {show.title || 'Suất diễn'}
             </h3>
           </div>
           <div
-            class="flex w-fit items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-bold text-primary"
+            class="flex w-fit items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary md:px-3 md:text-xs"
           >
-            <CalendarDays class="h-3.5 w-3.5 shrink-0" />
+            <CalendarDays class="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
             {formatTime(show.start_time)} | {formatDate(show.start_time)}
           </div>
         </div>
 
-        <!-- Lưới vé: 1 cột mobile, 2 cột xl -->
-        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <!-- Lưới vé -->
+        <div class="grid grid-cols-1 gap-3 md:gap-5 xl:grid-cols-2">
           {#each show.tickets as ticket, j (j)}
             <div
               class="overflow-hidden rounded-xl border border-border bg-surface-container-lowest shadow-sm transition hover:border-primary/50 hover:shadow-md"
             >
-              <div class="flex flex-col sm:hidden">
-                <!-- Stripe ngang -->
-                <div class="h-1.5 w-full bg-primary"></div>
+              <!-- Mobile ticket (horizontal stripe) -->
+              <div class="flex flex-col md:hidden">
+                <div class="h-1 w-full bg-primary"></div>
 
-                <!-- Thông tin vé -->
-                <div class="px-4 pt-4 pb-3">
-                  <div class="mb-3 flex items-center justify-between">
-                    <p class="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                <div class="px-3 pt-3 pb-2">
+                  <div class="mb-2 flex items-center justify-between md:mb-3">
+                    <p class="text-[9px] font-bold tracking-wider text-muted-foreground uppercase md:text-[10px]">
                       THÔNG TIN VÉ
                     </p>
                     <span
-                      class="rounded-full border border-primary px-2.5 py-0.5 text-[10px] font-bold text-primary"
+                      class="rounded-full border border-primary px-2 py-0.5 text-[9px] font-bold text-primary md:px-2.5 md:text-[10px]"
                     >
                       {ticket.seat_type === 'general' ? 'Vé đứng' : 'Vé ngồi'}
                     </span>
                   </div>
 
-                  <p class="text-sm font-bold text-foreground">
+                  <p class="text-xs font-bold text-foreground md:text-sm">
                     Khu vực {ticket.section_name}
                     {#if ticket.seat_type !== 'general'}
                       · Ghế {ticket.seat_label}
                     {/if}
                   </p>
                   <p
-                    class="mt-1 flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+                    class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground md:text-xs"
                   >
-                    <Ticket class="h-3.5 w-3.5 shrink-0" />
+                    <Ticket class="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
                     Mã:
                     <span class="text-foreground">{ticket.ticket_code}</span>
                   </p>
 
                   <div
-                    class="mt-3 flex items-center justify-between border-t border-dashed border-border pt-2.5"
+                    class="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 md:mt-3 md:pt-2.5"
                   >
-                    <p class="text-[10px] text-muted-foreground italic">Vui lòng đến đúng giờ</p>
+                    <p class="text-[9px] text-muted-foreground italic md:text-[10px]">Vui lòng đến đúng giờ</p>
                     <span
-                      class="rounded bg-primary/10 px-2 py-0.5 text-[9px] font-bold tracking-wider text-primary uppercase"
+                      class="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-primary uppercase md:px-2 md:text-[9px]"
                     >
                       E-TICKET
                     </span>
                   </div>
                 </div>
 
-                <!-- Separator QR -->
+                <!-- QR strip -->
                 <div
-                  class="relative flex items-center justify-center gap-6 border-t border-dashed border-border bg-surface-container-low py-4"
+                  class="relative flex items-center justify-center gap-4 border-t border-dashed border-border bg-surface-container-low py-3 md:gap-6 md:py-4"
                 >
-                  <!-- Vòng tròn khoét 2 bên -->
                   <div
                     class="absolute -top-3 -left-3 h-6 w-6 rounded-full border border-border bg-background"
                   ></div>
@@ -161,7 +159,7 @@
                   ></div>
 
                   <div
-                    class="flex h-16 w-16 items-center justify-center rounded-md border border-border bg-surface-container-lowest p-1 shadow-sm"
+                    class="flex h-14 w-14 items-center justify-center rounded-md border border-border bg-surface-container-lowest p-1 shadow-sm md:h-16 md:w-16"
                   >
                     <div
                       class="flex h-full w-full items-center justify-center border-2 border-dashed border-border text-xs text-muted-foreground"
@@ -169,17 +167,15 @@
                       QR
                     </div>
                   </div>
-                  <p class="text-xs font-bold text-primary">QUÉT ĐỂ VÀO CỔNG</p>
+                  <p class="text-[10px] font-bold text-primary md:text-xs">QUÉT ĐỂ VÀO CỔNG</p>
                 </div>
               </div>
 
-              <div class="relative hidden h-[160px] sm:flex">
-                <!-- Stripe dọc trái -->
+              <!-- Desktop ticket (vertical stripe + sawtooth) -->
+              <div class="relative hidden h-[160px] md:flex">
                 <div class="absolute top-0 bottom-0 left-0 w-1.5 bg-primary"></div>
-                <!-- Răng cưa -->
                 <div class="ticket-sawtooth absolute top-0 bottom-0 left-1.5 z-10 w-3"></div>
 
-                <!-- Thông tin vé -->
                 <div class="flex flex-1 flex-col justify-between py-4 pr-4 pl-8">
                   <div class="flex items-center justify-between">
                     <p class="text-xs font-bold tracking-wider text-muted-foreground uppercase">

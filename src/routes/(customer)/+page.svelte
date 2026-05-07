@@ -39,7 +39,7 @@
 {/if}
 
 <!-- Events Section -->
-<section class="mx-auto max-w-7xl px-6 py-16 lg:py-24" id="events">
+<section class="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:py-24" id="events">
   <SectionHeader title="Sự kiện nổi bật" viewAllHref="/events" />
 
   {#if events.length === 0}
