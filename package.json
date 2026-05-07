@@ -76,7 +76,6 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "amqplib": "^1.0.5",
-    "argon2": "^0.44.0",
     "bits-ui": "^2.18.1",
     "drizzle-orm": "^0.45.2",
     "isomorphic-dompurify": "^3.12.0",
