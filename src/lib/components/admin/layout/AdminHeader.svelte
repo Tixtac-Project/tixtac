@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { enhance } from '$app/forms';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import * as Avatar from '$lib/components/ui/avatar';
   import { Button } from '$lib/components/ui/button';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { AnimatedThemeToggler } from '$lib/components/magic/animated-theme-toggler';
-  import { toast } from '$lib/stores/toast';
-  import { api } from '$lib/utils/api';
+  import { handleLogout as sharedLogout } from '$lib/utils/auth';
   import { Loader, LogOut, Menu, User } from 'lucide-svelte';
 
   let {
@@ -18,15 +17,9 @@
 
   let loggingOut = $state(false);
 
-  async function handleLogout() {
+  function handleLogout() {
     loggingOut = true;
-    const { error } = await api.post('/auth/logout', {});
-    loggingOut = false;
-
-    if (!error) {
-      toast.success('Đăng xuất thành công');
-      goto(resolve('/login'));
-    }
+    return () => sharedLogout();
   }
 
   const pageTitle = $derived.by(() => {
@@ -87,18 +80,21 @@
             <span>Hồ sơ</span>
           </DropdownMenu.Item>
           <DropdownMenu.Separator />
-          <DropdownMenu.Item
-            class="gap-2 rounded-lg text-destructive focus:text-destructive"
-            onclick={handleLogout}
-            disabled={loggingOut}
-          >
-            {#if loggingOut}
-              <Loader class="h-4 w-4 animate-spin" />
-            {:else}
-              <LogOut class="h-4 w-4" />
-            {/if}
-            <span>Đăng xuất</span>
-          </DropdownMenu.Item>
+          <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
+            <DropdownMenu.Item
+              class="gap-2 rounded-lg text-destructive focus:text-destructive"
+              disabled={loggingOut}
+            >
+              <button type="submit" class="flex w-full items-center gap-2">
+                {#if loggingOut}
+                  <Loader class="h-4 w-4 animate-spin" />
+                {:else}
+                  <LogOut class="h-4 w-4" />
+                {/if}
+                <span>Đăng xuất</span>
+              </button>
+            </DropdownMenu.Item>
+          </form>
         </DropdownMenu.Group>
       </DropdownMenu.Content>
     </DropdownMenu.Root>

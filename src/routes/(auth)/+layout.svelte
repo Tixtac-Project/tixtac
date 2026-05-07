@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onNavigate } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import RevenueChartIllustration from '$lib/components/customer/auth/RevenueChartIllustration.svelte';
   import SeatMapIllustration from '$lib/components/customer/auth/SeatMapIllustration.svelte';
   import TicketIllustration from '$lib/components/customer/auth/TicketIllustration.svelte';
@@ -11,7 +11,7 @@
 
   let { children } = $props();
 
-  let isLogin = $derived($page.url.pathname.endsWith('/login'));
+  let isLogin = $derived(page.url.pathname.endsWith('/login'));
 
   onNavigate((navigation) => {
     if (!document.startViewTransition) return;

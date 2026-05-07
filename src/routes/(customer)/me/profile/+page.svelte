@@ -1,6 +1,5 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
@@ -40,7 +39,8 @@
     User,
     Users,
   } from 'lucide-svelte';
-  import { toast } from 'svelte-sonner';
+  import { handleLogout as sharedLogout } from '$lib/utils/auth';
+  import { toast } from '$lib/stores/toast';
 
   const profile = $derived(page.data.profile);
 
@@ -234,11 +234,7 @@
   let isLoggingOut = $state(false);
 
   function handleLogout() {
-    return async () => {
-      isLoggingOut = true;
-      await invalidateAll();
-      await goto(resolve('/'));
-    };
+    return () => sharedLogout();
   }
 </script>
 

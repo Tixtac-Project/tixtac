@@ -1,7 +1,7 @@
 <!-- src/lib/components/customer/layout/CustomerNavbar.svelte -->
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page as pageState } from '$app/state';
   import Logo2 from '$lib/assets/Logo2.svelte';
@@ -27,6 +27,7 @@
     User,
   } from 'lucide-svelte';
   import { onMount, tick } from 'svelte';
+  import { handleLogout as sharedLogout } from '$lib/utils/auth';
 
   interface Props {
     user?: UserInfo;
@@ -75,10 +76,7 @@
   }
 
   function handleLogout() {
-    return async () => {
-      await invalidateAll();
-      await goto(resolve('/'));
-    };
+    return () => sharedLogout();
   }
 
   let currentPath = $derived(pageState.url.pathname);
