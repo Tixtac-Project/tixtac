@@ -28,7 +28,7 @@
           class="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-7xl"
         >
           <span class="text-primary italic">Lỡ hẹn</span>
-           mất rồi?
+          mất rồi?
         </h1>
 
         <p class="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">

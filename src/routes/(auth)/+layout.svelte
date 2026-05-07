@@ -5,6 +5,8 @@
   import RevenueChartIllustration from '$lib/components/customer/auth/RevenueChartIllustration.svelte';
   import SeatMapIllustration from '$lib/components/customer/auth/SeatMapIllustration.svelte';
   import TicketIllustration from '$lib/components/customer/auth/TicketIllustration.svelte';
+  import { DotPattern } from '$lib/components/magic/dot-pattern';
+  import { cn } from '$lib/utils';
   import { Ticket } from 'lucide-svelte';
 
   let { children } = $props();
@@ -24,6 +26,17 @@
 </script>
 
 <div class="relative grid min-h-dvh w-full place-items-center bg-surface p-4 py-8 font-sans lg:p-8">
+  <!-- Dot Pattern -->
+  <DotPattern
+    width={24}
+    height={24}
+    cx={2}
+    cy={2}
+    cr={1}
+    glow
+    class={cn('text-primary', 'mask-[radial-gradient(800px_circle_at_center,transparent,white)]')}
+  />
+
   <!-- ═══════════════════════════════════════════════ -->
   <!-- Mobile: Floating blurred decorative cards      -->
   <!-- ═══════════════════════════════════════════════ -->
@@ -57,7 +70,7 @@
     ></div>
   </div>
 
-  <div class="auth-bento w-full max-w-[1280px]">
+  <div class="auth-bento w-full max-w-[1280px] md:max-w-2xl lg:max-w-[1280px]">
     <!-- ══════ A · Hero / Brand ══════ -->
     <div
       class="area-hero bento-card group relative hidden overflow-hidden rounded-[32px] bg-primary p-8 text-white shadow-lg md:flex lg:p-10"
@@ -96,7 +109,7 @@
 
     <!-- ══════ F · Chọn chỗ ngồi ══════ -->
     <div
-      class="area-seat bento-card group relative hidden flex-col justify-between overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex lg:p-6"
+      class="area-seat bento-card group relative hidden flex-col justify-between overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md lg:flex lg:p-6"
     >
       <div class="relative z-10">
         <p class="text-sm font-bold tracking-tight text-foreground">Chọn chỗ ngồi</p>
@@ -109,7 +122,7 @@
 
     <!-- ══════ B · Stats mini ══════ -->
     <div
-      class="area-stats bento-card group hidden flex-col items-center justify-center gap-1 rounded-[24px] border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md md:flex lg:p-6"
+      class="area-stats bento-card group relative hidden flex-col items-center justify-center gap-1 rounded-[24px] border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md lg:flex lg:p-6"
     >
       <div class="text-3xl font-extrabold tracking-tight text-primary lg:text-4xl">12.4K</div>
       <p class="mt-1 text-xs font-medium text-muted-foreground">Vé đã bán ra</p>
@@ -214,7 +227,6 @@
       grid-template-columns: 1fr 1fr;
       grid-template-areas:
         'hero    hero'
-        'seat    stats'
         'right   right'
         'ticket  chart';
     }
