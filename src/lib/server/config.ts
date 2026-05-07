@@ -13,6 +13,7 @@ const envSchema = z.object({
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
   UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),
+<<<<<<< HEAD
   ENABLE_QUEUE_WORKER: z
     .enum(['true', 'false'])
     .default('true')
@@ -21,6 +22,8 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+=======
+>>>>>>> 01a437b03c6dbe5de946dedbc8ab7d1c4545d385
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
 });
 
@@ -34,8 +37,11 @@ const result = envSchema.safeParse({
   CLOUDAMQP_URL: env.CLOUDAMQP_URL,
   UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
+<<<<<<< HEAD
   ENABLE_QUEUE_WORKER: env.ENABLE_QUEUE_WORKER,
   ENABLE_BACKGROUND_WORKERS: env.ENABLE_BACKGROUND_WORKERS,
+=======
+>>>>>>> 01a437b03c6dbe5de946dedbc8ab7d1c4545d385
   RESEND_API_KEY: env.RESEND_API_KEY,
 });
 
@@ -70,10 +76,13 @@ export const config = {
   upstashUrl: parsed.UPSTASH_REDIS_REST_URL,
   /** Upstash Redis REST token */
   upstashToken: parsed.UPSTASH_REDIS_REST_TOKEN,
+<<<<<<< HEAD
   /** Whether to start the gatekeeper queue worker loop (default: true) */
   enableQueueWorker: parsed.ENABLE_QUEUE_WORKER,
   /** Whether to start MQ consumers & background workers (default: true) */
   enableBackgroundWorkers: parsed.ENABLE_BACKGROUND_WORKERS,
+=======
+>>>>>>> 01a437b03c6dbe5de946dedbc8ab7d1c4545d385
   /** Resend API key */
   resendApiKey: parsed.RESEND_API_KEY,
 } as const;

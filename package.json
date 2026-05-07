@@ -70,7 +70,10 @@
   "dependencies": {
     "@internationalized/date": "^3.12.1",
     "@neondatabase/serverless": "^1.1.0",
+<<<<<<< HEAD
     "@types/d3-scale": "^4.0.9",
+=======
+>>>>>>> 01a437b03c6dbe5de946dedbc8ab7d1c4545d385
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "amqplib": "^1.0.5",
