@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { invalidateAll } from '$app/navigation';
+  import { enhance } from '$app/forms';
+  import { goto, invalidateAll } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import {
@@ -31,6 +33,7 @@
     EyeOff,
     Key,
     Lock,
+    LogOut,
     Mail,
     Phone,
     ShieldCheck,
@@ -226,6 +229,16 @@
     if (g === 'female') return 'Nữ';
     if (g === 'other') return 'Khác';
     return 'Chọn';
+  }
+
+  let isLoggingOut = $state(false);
+
+  function handleLogout() {
+    return async () => {
+      isLoggingOut = true;
+      await invalidateAll();
+      await goto(resolve('/'));
+    };
   }
 </script>
 
@@ -616,6 +629,38 @@
             </Button>
           </CardFooter>
         </form>
+      </Card>
+
+      <!-- ═══ Logout Card ═══ -->
+      <Card class="overflow-hidden border-danger/30 py-0!">
+        <CardHeader class="border-b bg-danger/5 px-5 py-4 md:px-6">
+          <div class="flex items-center gap-2.5">
+            <LogOut class="size-4 text-destructive md:size-5" />
+            <CardTitle class="text-base text-foreground md:text-lg">Phiên đăng nhập</CardTitle>
+          </div>
+          <CardDescription class="mt-1 text-xs md:text-sm">
+            Đăng xuất khỏi tài khoản của bạn
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="px-5 py-5 md:px-6 md:py-6">
+          <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
+            <Button
+              variant="destructive"
+              type="submit"
+              disabled={isLoggingOut}
+              class="w-full gap-2 md:w-auto"
+            >
+              {#if isLoggingOut}
+                <span
+                  class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                ></span>
+              {:else}
+                <LogOut class="size-4" />
+              {/if}
+              Đăng xuất
+            </Button>
+          </form>
+        </CardContent>
       </Card>
     </div>
   </div>
