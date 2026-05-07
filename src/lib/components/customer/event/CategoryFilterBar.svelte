@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { page as pageState } from '$app/state';
   import {
     Disc3,
     Dumbbell,
@@ -13,6 +12,7 @@
     Theater,
     Trophy,
   } from 'lucide-svelte';
+  import { SvelteURLSearchParams } from 'svelte/reactivity';
 
   interface Category {
     id?: number;
@@ -55,14 +55,11 @@
 
   function handleSelectCategory(slug: string) {
     activeCategory = slug;
-    const url = new URL(pageState.url);
+    const params = new SvelteURLSearchParams();
     if (slug) {
-      url.searchParams.set('category', slug);
-    } else {
-      url.searchParams.delete('category');
+      params.set('category', slug);
     }
-    url.searchParams.delete('page');
-    goto(resolve(`${url.pathname}${url.search}`), { keepFocus: true, noScroll: true });
+    goto(resolve(`/search?${params.toString()}`), { keepFocus: true });
   }
 </script>
 

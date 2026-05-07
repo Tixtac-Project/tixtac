@@ -197,7 +197,7 @@
         </div>
 
         <!-- Theme toggle -->
-        <AnimatedThemeToggler class="text-muted-foreground" duration={600} />
+        <AnimatedThemeToggler class="text-muted-foreground" />
 
         <!-- Profile / Auth -->
         {#if user}
@@ -253,7 +253,7 @@
             href={resolve('/login')}
             class="hidden h-9 w-9 rounded-full text-muted-foreground transition-all hover:bg-primary-light hover:text-primary md:inline-flex"
           >
-            <CircleUserRound class="size-5" />
+            <CircleUserRound class="size-6" />
           </Button>
         {/if}
       </div>
