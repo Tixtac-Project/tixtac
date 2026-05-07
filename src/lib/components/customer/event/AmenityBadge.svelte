@@ -46,7 +46,9 @@
   let IconComponent = $derived(mapped?.icon);
 </script>
 
-<div class="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-2.5 py-1 md:px-3 md:py-1.5">
+<div
+  class="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-2.5 py-1 md:px-3 md:py-1.5"
+>
   {#if IconComponent}
     <IconComponent class="h-3 w-3 md:h-3.5 md:w-3.5" />
   {/if}

@@ -157,12 +157,12 @@
         style="view-transition-name: auth-card;"
       >
         <!-- Mobile-only brand header -->
-        <div class="mb-6 flex items-center gap-2 md:hidden">
+        <a href={resolve('/')} class="mb-6 flex items-center gap-2 md:hidden">
           <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm">
             <Ticket class="h-5 w-5 text-white" />
           </div>
           <span class="text-lg font-bold tracking-tight text-foreground">TixTac</span>
-        </div>
+        </a>
         {@render children()}
       </div>
 

@@ -52,9 +52,13 @@
   });
 </script>
 
-<div class="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-sm md:mb-8 md:rounded-2xl">
+<div
+  class="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-sm md:mb-8 md:rounded-2xl"
+>
   <!-- Header Sự kiện -->
-  <div class="flex items-center gap-3 border-b border-border bg-surface-container-low p-3 md:gap-4 md:p-5">
+  <div
+    class="flex items-center gap-3 border-b border-border bg-surface-container-low p-3 md:gap-4 md:p-5"
+  >
     <div
       class="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border shadow-sm md:h-20 md:w-32 md:rounded-xl"
     >
@@ -81,10 +85,12 @@
       <div class="mb-8 last:mb-0 md:mb-10">
         <!-- Tiêu đề Suất diễn -->
         <div
-          class="mb-4 flex flex-col gap-2 border-b border-border pb-3 md:flex-row md:items-end md:justify-between md:mb-5 md:pb-4"
+          class="mb-4 flex flex-col gap-2 border-b border-border pb-3 md:mb-5 md:flex-row md:items-end md:justify-between md:pb-4"
         >
           <div>
-            <p class="mb-0.5 text-[9px] font-bold tracking-wider text-muted-foreground uppercase md:text-[10px]">
+            <p
+              class="mb-0.5 text-[9px] font-bold tracking-wider text-muted-foreground uppercase md:text-[10px]"
+            >
               SUẤT DIỄN
             </p>
             <h3 class="text-base font-bold text-foreground md:text-xl">
@@ -111,7 +117,9 @@
 
                 <div class="px-3 pt-3 pb-2">
                   <div class="mb-2 flex items-center justify-between md:mb-3">
-                    <p class="text-[9px] font-bold tracking-wider text-muted-foreground uppercase md:text-[10px]">
+                    <p
+                      class="text-[9px] font-bold tracking-wider text-muted-foreground uppercase md:text-[10px]"
+                    >
                       THÔNG TIN VÉ
                     </p>
                     <span
@@ -138,7 +146,9 @@
                   <div
                     class="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2 md:mt-3 md:pt-2.5"
                   >
-                    <p class="text-[9px] text-muted-foreground italic md:text-[10px]">Vui lòng đến đúng giờ</p>
+                    <p class="text-[9px] text-muted-foreground italic md:text-[10px]">
+                      Vui lòng đến đúng giờ
+                    </p>
                     <span
                       class="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-primary uppercase md:px-2 md:text-[9px]"
                     >

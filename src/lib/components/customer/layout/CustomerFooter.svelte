@@ -117,22 +117,6 @@
         <ul class="space-y-3 text-sm">
           <li>
             <a
-              href={resolve('/faq')}
-              class="text-secondary-foreground transition-colors hover:text-primary"
-            >
-              FAQ
-            </a>
-          </li>
-          <li>
-            <a
-              href={resolve('/refund-policy')}
-              class="text-secondary-foreground transition-colors hover:text-primary"
-            >
-              Chính sách hoàn vé
-            </a>
-          </li>
-          <li>
-            <a
               href={resolve('/terms')}
               class="text-secondary-foreground transition-colors hover:text-primary"
             >
@@ -145,6 +129,14 @@
               class="text-secondary-foreground transition-colors hover:text-primary"
             >
               Chính sách bảo mật
+            </a>
+          </li>
+          <li>
+            <a
+              href={resolve('/faq')}
+              class="text-secondary-foreground transition-colors hover:text-primary"
+            >
+              FAQ
             </a>
           </li>
         </ul>

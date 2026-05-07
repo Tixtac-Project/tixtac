@@ -30,8 +30,7 @@ export const actions = {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Email không hợp lệ';
     if (!subject.trim()) errors.subject = 'Vui lòng nhập tiêu đề';
     if (!message.trim()) errors.message = 'Vui lòng nhập nội dung';
-    else if (message.trim().length < 10)
-      errors.message = 'Nội dung quá ngắn (tối thiểu 10 ký tự)';
+    else if (message.trim().length < 10) errors.message = 'Nội dung quá ngắn (tối thiểu 10 ký tự)';
 
     if (Object.keys(errors).length > 0) {
       return fail(400, { success: false, errors, values: { name, email, subject, message } });

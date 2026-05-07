@@ -641,7 +641,7 @@ export type FormDraft = z.infer<typeof formDraftSchema>;
 // ── Event Query Schema (Public List API) ───────
 export const eventQuerySchema = z.object({
   q: z.string().optional(),
-  category: z.string().optional(), // Filter by category slug 
+  category: z.string().optional(), // Filter by category slug
   categoryId: z.coerce.number().int().positive().optional(), // Filter by category ID
   startDate: z
     .string()
