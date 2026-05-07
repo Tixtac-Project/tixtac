@@ -1,52 +1,40 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { Moon, Sun } from '@lucide/svelte';
   import { cn } from '$lib/utils';
+  import Moon from '@lucide/svelte/icons/moon';
+  import Sun from '@lucide/svelte/icons/sun';
+  import { toggleMode } from 'mode-watcher';
 
-  interface AnimatedThemeTogglerProps {
+  interface Props {
     class?: string;
     duration?: number;
   }
 
-  let { class: className, duration = 400, ...props }: AnimatedThemeTogglerProps = $props();
+  let { class: className = '', duration = 400 }: Props = $props();
 
-  let isDark = $state(false);
   let buttonRef: HTMLButtonElement | null = $state(null);
+  let isDark = $state(false);
 
-  onMount(() => {
-    const updateTheme = () => {
+  // Sync with mode-watcher — it owns the `dark` class and localStorage key
+  $effect(() => {
+    const check = () => {
       isDark = document.documentElement.classList.contains('dark');
     };
-
-    updateTheme();
-
-    const observer = new MutationObserver(updateTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   });
 
-  const toggleTheme = async () => {
+  async function toggle(e: MouseEvent) {
     if (!buttonRef) return;
 
-    // Check if View Transition API is supported
     if (!document.startViewTransition) {
-      // Fallback for browsers that don't support View Transition API
-      const newTheme = !isDark;
-      isDark = newTheme;
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+      toggleMode();
       return;
     }
 
     await document.startViewTransition(() => {
-      const newTheme = !isDark;
-      isDark = newTheme;
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+      toggleMode();
     }).ready;
 
     const { top, left, width, height } = buttonRef.getBoundingClientRect();
@@ -67,10 +55,14 @@
         pseudoElement: '::view-transition-new(root)',
       },
     );
-  };
+  }
+
+  function handleClick(e: MouseEvent) {
+    toggle(e);
+  }
 </script>
 
-<button bind:this={buttonRef} onclick={toggleTheme} class={cn(className)} {...props}>
+<button bind:this={buttonRef} onclick={handleClick} class={cn(className)}>
   {#if isDark}
     <Sun />
   {:else}

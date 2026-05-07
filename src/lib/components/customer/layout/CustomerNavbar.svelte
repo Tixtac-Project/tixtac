@@ -6,6 +6,7 @@
   import { page as pageState } from '$app/state';
   import Logo2 from '$lib/assets/Logo2.svelte';
   import CategoryFilterBar from '$lib/components/customer/event/CategoryFilterBar.svelte';
+  import { AnimatedThemeToggler } from '$lib/components/magic/animated-theme-toggler';
   import { Button } from '$lib/components/ui/button';
   import {
     DropdownMenu,
@@ -16,10 +17,7 @@
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
   import type { CategoryInfo, UserInfo } from '$lib/types/layout';
-  import MoonIcon from '@lucide/svelte/icons/moon';
-  import SunIcon from '@lucide/svelte/icons/sun';
   import { CircleUserRound, House, LogOut, Search, Ticket, User } from 'lucide-svelte';
-  import { toggleMode } from 'mode-watcher';
   import { onMount, tick } from 'svelte';
 
   interface Props {
@@ -199,20 +197,7 @@
         </div>
 
         <!-- Theme toggle -->
-        <Button
-          onclick={toggleMode}
-          variant="ghost"
-          size="icon"
-          class="h-9 w-9 shrink-0 rounded-full text-muted-foreground transition-colors duration-200 hover:text-foreground"
-        >
-          <SunIcon
-            class="size-max scale-100 rotate-0 transition-all! dark:scale-0 dark:-rotate-90"
-          />
-          <MoonIcon
-            class="absolute size-max scale-0 rotate-90 transition-all! dark:scale-100 dark:rotate-0"
-          />
-          <span class="sr-only">Toggle theme</span>
-        </Button>
+        <AnimatedThemeToggler class="text-muted-foreground" duration={600} />
 
         <!-- Profile / Auth -->
         {#if user}
