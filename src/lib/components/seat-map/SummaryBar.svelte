@@ -84,6 +84,34 @@
     expanded = !expanded;
   }
 
+  // ── Swipe down to dismiss ──
+  let swipeStartY = $state(0);
+  let swipeOffset = $state(0);
+  let isSwiping = $state(false);
+  const SWIPE_THRESHOLD = 60;
+
+  function handleTouchStart(e: TouchEvent) {
+    if (e.touches.length === 1) {
+      swipeStartY = e.touches[0].clientY;
+      isSwiping = true;
+    }
+  }
+
+  function handleTouchMove(e: TouchEvent) {
+    if (!isSwiping || e.touches.length !== 1) return;
+    const dy = e.touches[0].clientY - swipeStartY;
+    // Only track downward swipes
+    swipeOffset = Math.max(0, dy);
+  }
+
+  function handleTouchEnd() {
+    if (swipeOffset > SWIPE_THRESHOLD) {
+      expanded = false;
+    }
+    swipeOffset = 0;
+    isSwiping = false;
+  }
+
   function handleRemoveSeat(showId: number, seatId: number) {
     store.removeSeatFromShow(showId, seatId);
   }
@@ -112,9 +140,16 @@
   <div class="fixed right-0 bottom-0 left-0 z-50 flex flex-col">
     <!-- Expandable cart items panel -->
     {#if expanded}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="flex max-h-[60vh] flex-col overflow-hidden rounded-t-2xl bg-surface-container-lowest shadow-2xl"
+        style="transform: translateY({swipeOffset}px); transition: transform {isSwiping
+          ? '0s'
+          : '0.2s ease-out'};"
         transition:fly={{ y: 300, duration: 300, opacity: 1 }}
+        ontouchstart={handleTouchStart}
+        ontouchmove={handleTouchMove}
+        ontouchend={handleTouchEnd}
       >
         <!-- Drag handle indicator -->
         <div class="flex justify-center pt-3 pb-1">

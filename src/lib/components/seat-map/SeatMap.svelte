@@ -93,30 +93,51 @@
     isPanning = false;
   }
 
-  // ── Touch pan ──
+  // ── Touch pan + pinch zoom ──
   let lastTouchX = $state(0);
   let lastTouchY = $state(0);
   let isTouchPanning = $state(false);
+  let lastPinchDist = $state(0);
+
+  function getPinchDist(touches: TouchList): number {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
 
   function handleTouchStart(e: TouchEvent) {
+    e.preventDefault();
     if (e.touches.length === 1) {
       isTouchPanning = true;
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      isTouchPanning = false;
+      lastPinchDist = getPinchDist(e.touches);
     }
   }
 
   function handleTouchMove(e: TouchEvent) {
+    e.preventDefault();
     if (isTouchPanning && e.touches.length === 1) {
       panX += e.touches[0].clientX - lastTouchX;
       panY += e.touches[0].clientY - lastTouchY;
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      const dist = getPinchDist(e.touches);
+      if (lastPinchDist > 0) {
+        const scale = dist / lastPinchDist;
+        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * scale));
+      }
+      lastPinchDist = dist;
     }
   }
 
   function handleTouchEnd() {
     isTouchPanning = false;
+    lastPinchDist = 0;
   }
 
   // ── Stage element helpers ──
@@ -406,7 +427,7 @@
     <div
       bind:this={containerEl}
       class="relative min-h-0 flex-1 cursor-grab overflow-hidden select-none active:cursor-grabbing"
-      style="min-height:500px; max-height:80vh;"
+      style="min-height:380px; max-height:55vh; touch-action:none;"
       role="application"
       aria-label="Sơ đồ chỗ ngồi"
       onwheel={handleWheel}
