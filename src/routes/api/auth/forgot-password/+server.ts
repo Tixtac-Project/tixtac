@@ -19,7 +19,7 @@ export const POST = apiHandler(async ({ request, url, getClientAddress }) => {
     (await forgotPasswordIpLimiter.limit(getClientAddress()));
 
   if (!success) {
-    return json({ error: 'Too many requests' }, { status: 429 });
+    return json({ error: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.' }, { status: 429 });
   }
 
   await userService.forgotPassword(email, url.origin);
