@@ -5,6 +5,7 @@
   import * as Avatar from '$lib/components/ui/avatar';
   import { Button } from '$lib/components/ui/button';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+  import { AnimatedThemeToggler } from '$lib/components/magic/animated-theme-toggler';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { Loader, LogOut, Menu, User } from 'lucide-svelte';
@@ -60,6 +61,7 @@
   </div>
 
   <div class="flex items-center gap-2">
+    <AnimatedThemeToggler class="text-muted-foreground" />
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
