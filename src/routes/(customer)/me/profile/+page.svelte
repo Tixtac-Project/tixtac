@@ -427,27 +427,29 @@
               </div>
               <div class="space-y-2">
                 <Label for="email_curpwd" class="text-sm font-medium">Mật khẩu hiện tại</Label>
-                <div class="relative">
-                  <Lock
-                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
+                <div
+                  class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                >
+                  <div class="flex items-center pl-3 text-muted-foreground">
+                    <Lock class="size-4 shrink-0" />
+                  </div>
+                  <input
                     id="email_curpwd"
                     type={showEmailPwd ? 'text' : 'password'}
                     bind:value={emailForm.current_password}
-                    class="pr-10 pl-10"
                     placeholder="••••••••"
+                    class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
                   />
                   <button
                     type="button"
-                    class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onclick={() => (showEmailPwd = !showEmailPwd)}
+                    class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
                     aria-label={showEmailPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   >
                     {#if showEmailPwd}
-                      <EyeOff class="size-4" />
+                      <EyeOff class="size-4 shrink-0" />
                     {:else}
-                      <Eye class="size-4" />
+                      <Eye class="size-4 shrink-0" />
                     {/if}
                   </button>
                 </div>
@@ -492,27 +494,29 @@
             <div class="space-y-5">
               <div class="space-y-2">
                 <Label for="pw_cur" class="text-sm font-medium">Mật khẩu hiện tại</Label>
-                <div class="relative">
-                  <Lock
-                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
+                <div
+                  class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                >
+                  <div class="flex items-center pl-3 text-muted-foreground">
+                    <Lock class="size-4 shrink-0" />
+                  </div>
+                  <input
                     id="pw_cur"
                     type={showCurPwd ? 'text' : 'password'}
                     bind:value={passwordForm.current_password}
-                    class="pr-10 pl-10"
                     placeholder="••••••••"
+                    class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
                   />
                   <button
                     type="button"
-                    class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onclick={() => (showCurPwd = !showCurPwd)}
+                    class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
                     aria-label={showCurPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   >
                     {#if showCurPwd}
-                      <EyeOff class="size-4" />
+                      <EyeOff class="size-4 shrink-0" />
                     {:else}
-                      <Eye class="size-4" />
+                      <Eye class="size-4 shrink-0" />
                     {/if}
                   </button>
                 </div>
@@ -527,27 +531,29 @@
               <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div class="space-y-2">
                   <Label for="new_pw" class="text-sm font-medium">Mật khẩu mới</Label>
-                  <div class="relative">
-                    <Key
-                      class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
+                  <div
+                    class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                  >
+                    <div class="flex items-center pl-3 text-muted-foreground">
+                      <Key class="size-4 shrink-0" />
+                    </div>
+                    <input
                       id="new_pw"
                       type={showNewPwd ? 'text' : 'password'}
                       bind:value={passwordForm.new_password}
-                      class="pr-10 pl-10"
                       placeholder="••••••••"
+                      class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
                     />
                     <button
                       type="button"
-                      class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onclick={() => (showNewPwd = !showNewPwd)}
+                      class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
                       aria-label={showNewPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
                       {#if showNewPwd}
-                        <EyeOff class="size-4" />
+                        <EyeOff class="size-4 shrink-0" />
                       {:else}
-                        <Eye class="size-4" />
+                        <Eye class="size-4 shrink-0" />
                       {/if}
                     </button>
                   </div>
@@ -561,27 +567,29 @@
                 </div>
                 <div class="space-y-2">
                   <Label for="cf_pw" class="text-sm font-medium">Nhập lại mật khẩu mới</Label>
-                  <div class="relative">
-                    <Key
-                      class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
+                  <div
+                    class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                  >
+                    <div class="flex items-center pl-3 text-muted-foreground">
+                      <Key class="size-4 shrink-0" />
+                    </div>
+                    <input
                       id="cf_pw"
                       type={showCfPwd ? 'text' : 'password'}
                       bind:value={passwordForm.confirm_password}
-                      class="pr-10 pl-10"
                       placeholder="••••••••"
+                      class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
                     />
                     <button
                       type="button"
-                      class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onclick={() => (showCfPwd = !showCfPwd)}
+                      class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
                       aria-label={showCfPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
                       {#if showCfPwd}
-                        <EyeOff class="size-4" />
+                        <EyeOff class="size-4 shrink-0" />
                       {:else}
-                        <Eye class="size-4" />
+                        <Eye class="size-4 shrink-0" />
                       {/if}
                     </button>
                   </div>

@@ -131,13 +131,15 @@
 
     <div class="grid gap-2">
       <Label for="password">Mật khẩu</Label>
-      <div class="relative">
-        <Input
+      <div
+        class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+      >
+        <input
           id="password"
           type={showPassword ? 'text' : 'password'}
           bind:value={password}
           placeholder="••••••••"
-          class="pr-10"
+          class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
           onfocus={() => clearError('password')}
           onblur={() => validateField('password')}
           onkeydown={handleKeydown}
@@ -145,16 +147,15 @@
         />
         <button
           type="button"
-          class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          style="transition: color 0.2s var(--ease-bento);"
+          class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
           onclick={() => (showPassword = !showPassword)}
           tabindex={-1}
           aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
         >
           {#if showPassword}
-            <EyeOff class="size-5" />
+            <EyeOff class="size-4 shrink-0" />
           {:else}
-            <Eye class="size-5" />
+            <Eye class="size-4 shrink-0" />
           {/if}
         </button>
       </div>
