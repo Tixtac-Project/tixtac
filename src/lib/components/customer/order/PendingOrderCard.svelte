@@ -82,13 +82,13 @@
             <span class="truncate">Đơn hàng #{order.order_id}</span>
           </h3>
           <p class="text-[11px] text-muted-foreground md:text-sm">
-            Vui lòng hoàn tất thanh toán để giữ chỗ
+            Vui lòng hoàn tất thanh toán trước khi hết thời gian để giữ chỗ
           </p>
         </div>
         <div
-          class="flex shrink-0 items-center gap-1 text-sm font-bold text-foreground tabular-nums md:text-lg"
+          class="flex shrink-0 items-center gap-1.5 rounded-full border border-cta/40 bg-cta-muted/20 px-3 py-1 text-sm font-extrabold text-cta-muted-foreground tabular-nums md:px-4 md:py-1.5 md:text-lg"
         >
-          <Clock class="h-3.5 w-3.5 animate-pulse text-destructive md:h-5 md:w-5" />
+          <Clock class="h-3.5 w-3.5 animate-pulse md:h-4 md:w-4" />
           <span>{formattedTime}</span>
         </div>
       </div>
