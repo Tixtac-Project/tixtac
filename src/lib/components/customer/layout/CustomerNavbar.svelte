@@ -79,6 +79,15 @@
     if (path === '/') return currentPath === '/';
     return currentPath.startsWith(path);
   }
+
+  // Bottom nav tabs in order — used for the sliding pill
+  const bottomTabs = ['/', '/search', '/me/tickets', '/me/profile'] as const;
+  let activeTabIndex = $derived(
+    bottomTabs.findIndex((p) => {
+      if (p === '/') return currentPath === '/';
+      return currentPath.startsWith(p);
+    }),
+  );
 </script>
 
 <!-- ═══════════════════════════════════════════════════ -->
@@ -278,56 +287,96 @@
     ? 'translate-y-0'
     : 'translate-y-full'}"
 >
-  <div class="rounded-t-xl border-t border-outline-variant/10 bg-accent sm:rounded-t-2xl">
-    <div class="mx-auto flex h-[4.25rem] max-w-lg items-center justify-around px-1 sm:h-18 sm:px-2">
+  <div
+    class="rounded-t-xl border-t border-outline-variant/10 bg-surface-container-lowest shadow-[0_-4px_20px_oklch(0.35_0.12_260/0.06)] backdrop-blur-xl"
+  >
+    <div
+      class="relative mx-auto grid h-[4.25rem] max-w-lg grid-cols-4 items-center"
+      style="--active-idx: {activeTabIndex}"
+    >
+      <!-- Sliding pill background — 1/4 width, centered in its column -->
+      <div
+        class="absolute top-1.5 left-[calc(var(--active-idx)*25%+0.375rem)] h-[calc(100%-0.75rem)] w-[calc(25%-0.75rem)] rounded-2xl bg-primary-light transition-all duration-350 ease-(--ease-architectural)"
+      ></div>
+
       <!-- Home -->
       <a
         href={resolve('/')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/')
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
         <House class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Home</span>
+        <span class="text-[10px] font-bold tracking-wider uppercase">Home</span>
       </a>
 
       <!-- Search -->
       <a
         href={resolve('/search')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/search')
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/search',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        <Search class="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-        <span class="text-[9px] font-semibold tracking-wider uppercase sm:text-[10px]">
-          Tìm kiếm
-        </span>
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/search',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
+        <Search class="h-5 w-5" />
+        <span class="text-[10px] font-bold tracking-wider uppercase">Tìm kiếm</span>
       </a>
 
       <!-- My Tickets -->
       <a
         href={resolve('/me/tickets')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/tickets')
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/me/tickets',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        <Ticket class="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-        <span class="text-[9px] font-semibold tracking-wider uppercase sm:text-[10px]">
-          Vé của tôi
-        </span>
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/me/tickets',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
+        <Ticket class="h-5 w-5" />
+        <span class="text-[10px] font-bold tracking-wider uppercase">Vé của tôi</span>
       </a>
 
       <!-- Profile -->
       <a
         href={resolve(user ? '/me/profile' : '/login')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/profile')
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/me/profile',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        <User class="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-        <span class="text-[9px] font-semibold tracking-wider uppercase sm:text-[10px]">
-          Cá nhân
-        </span>
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/me/profile',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
+        <User class="h-5 w-5" />
+        <span class="text-[10px] font-bold tracking-wider uppercase">Cá nhân</span>
       </a>
     </div>
   </div>
