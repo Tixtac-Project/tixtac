@@ -74,6 +74,36 @@
     queueStore.commitHolding();
   });
 
+  // ── Countdown Timer cho phiên giữ chỗ ──
+  let timeLeft = $state<number | null>(null);
+
+  $effect(() => {
+    if (!queueStore.expiresAt || queueStore.status !== 'holding') {
+      timeLeft = null;
+      return;
+    }
+
+    const update = () => {
+      const remaining = Math.max(0, Math.floor((queueStore.expiresAt! - Date.now()) / 1000));
+      timeLeft = remaining;
+      if (remaining === 0) {
+        queueStore.status = 'missed';
+        queueStore.leave();
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  });
+
+  function formatCountdown(seconds: number | null): string {
+    if (seconds === null) return '--:--';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
   // Sync from server data whenever the route's event/show changes
   // (handles initial load AND SvelteKit reusing this page for a different route)
   $effect(() => {
@@ -429,6 +459,17 @@
           Suất: {showTitle}
         </p>
       </div>
+
+      <!-- Đếm ngược phiên chọn ghế -->
+      {#if timeLeft !== null}
+        <div class="flex items-center gap-2 rounded-xl border border-orange-600/40 bg-orange-400/10 px-3 py-1.5 text-orange-700 sm:px-4 sm:py-2">
+          <Clock class="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+          <div class="text-right">
+            <p class="text-[9px] font-bold tracking-widest uppercase opacity-80 sm:text-[10px]">Thời gian</p>
+            <p class="font-mono text-sm font-black tabular-nums leading-none sm:text-base">{formatCountdown(timeLeft)}</p>
+          </div>
+        </div>
+      {/if}
     </div>
   </header>
 

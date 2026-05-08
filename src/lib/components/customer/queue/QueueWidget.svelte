@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { queueStore } from '$lib/stores/queue.svelte';
+  import { fly } from 'svelte/transition';
   import QueueWaiting from './QueueWaiting.svelte';
   import QueueReady from './QueueReady.svelte';
   import QueueHolding from './QueueHolding.svelte';
@@ -146,25 +147,120 @@
     await queueStore.leave();
     isLeaving = false;
   }
+
+  // --- Drag and Drop State ---
+  let isDragging = $state(false);
+  let dragOffset = $state({ x: 0, y: 0 });
+  let startPointer = { x: 0, y: 0 };
+  let startOffset = { x: 0, y: 0 };
+  let widgetEl: HTMLElement | undefined = $state();
+
+  function handlePointerDown(e: PointerEvent) {
+    // Only allow left click dragging and ignore clicks on buttons
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+
+    isDragging = true;
+    startPointer = { x: e.clientX, y: e.clientY };
+    startOffset = { ...dragOffset };
+
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (!isDragging || !widgetEl) return;
+    e.preventDefault(); // Prevent text selection/scrolling while dragging
+
+    const dx = e.clientX - startPointer.x;
+    const dy = e.clientY - startPointer.y;
+    
+    let newX = startOffset.x + dx;
+    let newY = startOffset.y + dy;
+
+    // Boundary constraints
+    // Base position is fixed right-5 (20px) and bottom-5 (20px)
+    const baseLeft = window.innerWidth - 40 - 320; // 40 = 20px left + 20px right padding
+    const baseTop = window.innerHeight - 20 - widgetEl.offsetHeight;
+
+    const minX = -baseLeft; // touches left padding limit
+    const maxX = 0; // touches right padding limit
+    
+    // Ensure 80px top padding to avoid header
+    const minY = -(baseTop - 80); 
+    const maxY = 0; // touches bottom padding limit
+
+    const safeMinX = Math.min(minX, maxX);
+    const safeMaxX = Math.max(minX, maxX);
+    const safeMinY = Math.min(minY, maxY);
+    const safeMaxY = Math.max(minY, maxY);
+
+    newX = Math.max(safeMinX, Math.min(newX, safeMaxX));
+    newY = Math.max(safeMinY, Math.min(newY, safeMaxY));
+
+    dragOffset = { x: newX, y: newY };
+  }
+
+  function handlePointerUp(e: PointerEvent) {
+    if (!isDragging) return;
+    isDragging = false;
+    const el = e.currentTarget as HTMLElement;
+    el.releasePointerCapture(e.pointerId);
+
+    if (!widgetEl) return;
+
+    // iPhone AssistiveTouch Snapping Logic
+    // Snap to the nearest vertical edge (Left or Right)
+    const baseLeft = window.innerWidth - 40 - 320;
+    const minX = -baseLeft;
+    const maxX = 0;
+
+    const safeMinX = Math.min(minX, maxX);
+    const safeMaxX = Math.max(minX, maxX);
+
+    const midX = (safeMinX + safeMaxX) / 2;
+    const targetX = dragOffset.x > midX ? safeMaxX : safeMinX;
+
+    dragOffset = {
+      x: targetX,
+      y: dragOffset.y // keep current Y
+    };
+  }
 </script>
 
 {#if shouldShow}
   <div
-    class="fixed right-5 bottom-5 z-50 w-[320px] animate-in overflow-hidden rounded-2xl
-           shadow-2xl ring-1 ring-black/10
-           backdrop-blur-sm duration-300 fade-in slide-in-from-bottom-4"
+    transition:fly={{ y: 20, duration: 300 }}
+    class="fixed right-5 bottom-5 z-50 w-[320px]"
   >
-    {#if queueStore.status === 'waiting'}
-      <QueueWaiting onExpand={expandQueue} onExitClick={() => (showExitConfirm = true)} />
-    {:else if queueStore.status === 'ready'}
-      <QueueReady formattedTime={formatTime(timeLeft)} onGoToSeats={goToSeats} />
-    {:else if queueStore.status === 'holding'}
-      <QueueHolding
-        formattedTime={formatTime(timeLeft)}
-        onGoToSeats={goToSeats}
-        onExitClick={() => (showExitConfirm = true)}
-      />
-    {/if}
+    <div
+      bind:this={widgetEl}
+      role="none"
+      class="w-full overflow-hidden rounded-2xl ring-1 ring-black/10 backdrop-blur-sm
+             {isDragging ? 'cursor-grabbing shadow-2xl ring-black/20' : 'cursor-grab shadow-xl'}"
+      style="
+        transform: translate({dragOffset.x}px, {dragOffset.y}px) scale({isDragging ? 1.02 : 1});
+        touch-action: none;
+        transition: {isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'};
+      "
+      onpointerdown={handlePointerDown}
+      onpointermove={handlePointerMove}
+      onpointerup={handlePointerUp}
+      onpointercancel={handlePointerUp}
+    >
+      {#if queueStore.status === 'waiting'}
+        <QueueWaiting onExpand={expandQueue} onExitClick={() => (showExitConfirm = true)} />
+      {:else if queueStore.status === 'ready'}
+        <QueueReady formattedTime={formatTime(timeLeft)} onGoToSeats={goToSeats} />
+      {:else if queueStore.status === 'holding'}
+        <QueueHolding
+          formattedTime={formatTime(timeLeft)}
+          onGoToSeats={goToSeats}
+          onExitClick={() => (showExitConfirm = true)}
+        />
+      {/if}
+    </div>
   </div>
 {/if}
 
