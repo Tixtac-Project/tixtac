@@ -192,7 +192,7 @@ export const POST = apiHandler(async ({ request, params, locals }) => {
 
 ```
 src/lib/server/services/
-├── user.service.ts        # Register, login, profile, verify
+├── user.service.ts        # Register, login, profile, forgot/reset password
 ├── category.service.ts    # CRUD danh mục sự kiện
 ├── event.service.ts       # Tạo sự kiện (3-step flow), lấy danh sách, publish
 ├── show.service.ts        # CRUD suất diễn (shows/sessions)
@@ -248,7 +248,7 @@ src/lib/server/
 ```
 src/lib/shared/
 ├── schemas/
-│   ├── auth.schema.ts     # Zod schema cho login, register
+│   ├── auth.schema.ts     # Zod schema cho login, register, forgot/reset password
 │   ├── event.schema.ts    # Zod schema tạo/sửa event, show, section, seatmap
 │   ├── booking.schema.ts  # Zod schema cho purchase/checkout
 │   ├── category.schema.ts # Zod schema cho categories
@@ -926,13 +926,74 @@ Giải quyết bài toán user rời tab khi đang xếp hàng.
 - **Backend:** Lưu subscription vào Upstash Redis (TTL 2 giờ).
 - **Worker:** Khi xả hàng chờ, dùng `@pushforge/builder` (Zero-dependency Web Crypto API) bọc payload và gửi POST request thẳng tới FCM/APNs. Đặt header `ttl: 60` (chỉ sống 60s khớp với Grace Period).
 
-### 4.7 Password Reset & Email (Resend + Bun Crypto)
+### 4.7 Password Reset & Email (Resend + IP Geolocation)
 
-Bảo mật tối đa cho luồng khôi phục mật khẩu.
+Bảo mật tối đa cho luồng khôi phục mật khẩu, với nhiều lớp bảo vệ và trải nghiệm người dùng rõ ràng.
 
-- **Sinh Token:** Dùng `crypto.getRandomValues` (CSPRNG) sinh chuỗi 32 bytes ngẫu nhiên.
-- **Bảo mật (HMAC-SHA256):** Dùng `Bun.CryptoHasher` kết hợp Secret Key để băm token trước khi lưu vào DB. Chống lộ token kể cả khi DB bị hack.
-- **Gửi Email:** Render template HTML trực tiếp từ Svelte component bằng `better-svelte-email`, gửi qua API của `Resend`.
+**Luồng tổng quan:**
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as /api/auth/forgot-password
+    participant RL as Rate Limiter
+    participant US as user.service
+    participant DB as PostgreSQL
+    participant EM as email.ts
+    participant GEO as ipgeolocation.io
+    participant RE as Resend
+
+    C->>API: POST { email }
+    API->>RL: Check email limit (3/hr) + IP limit (5/hr)
+    RL-->>API: OK / 429
+    API->>US: forgotPassword(email, ip, userAgent)
+    US->>DB: findFirst user by email
+    alt User not found
+        US-->>API: return (silent — no info leak)
+    end
+    US->>US: generateResetToken() — 32 random bytes
+    US->>DB: INSERT/UPDATE password_reset_tokens
+    US->>US: parseUserAgent(userAgent) → device string
+    US->>EM: sendResetPasswordEmail(email, rawToken, ip, device)
+    EM->>EM: maskIp(ip) — 192.168.1.xxx
+    opt GEO_API_KEY configured
+        EM->>GEO: /ipgeo?ip={ip}&fields=country_name,city
+        GEO-->>EM: { city, country_name }
+    end
+    EM->>EM: render ResetPassword.svelte → HTML
+    alt Production
+        EM->>RE: Send email
+    else Development
+        EM->>EM: console.log reset link (skip Resend)
+    end
+```
+
+**Chi tiết từng bước:**
+
+- **Sinh Token:** Dùng `crypto.getRandomValues` (CSPRNG) sinh chuỗi 32 bytes ngẫu nhiên → mã hóa Base64URL.
+- **Bảo mật (HMAC-SHA256):** Dùng `Bun.CryptoHasher` với `RESET_TOKEN_SECRET` để băm token trước khi lưu vào DB. **Cả generation và verification đều dùng cùng một secret** (`config.resetTokenSecret`) để tránh sai khóa.
+- **Upsert Token:** Mỗi user chỉ có 1 token active (`password_reset_tokens.user_id` là UNIQUE). Gọi mới → ghi đè token cũ. Token tự hết hạn sau 1 giờ.
+- **IP Masking:** IP được mask octet cuối (IPv4: `192.168.1.xxx`, IPv6: `::1:xxxx`) trước khi hiển thị trong email, bảo vệ quyền riêng tư người dùng.
+- **IP Geolocation (Optional):** Nếu `GEO_API_KEY` được cấu hình, gọi `api.ipgeolocation.io` để lấy city/country và hiển thị kèm IP trong email. Lỗi → bỏ qua (non-blocking).
+- **Device Parsing:** `parseUserAgent()` phân tích User-Agent header để hiển thị OS và trình duyệt (VD: "Windows 10/11 • Chrome 130").
+- **Shared Validation:** `forgotPasswordSchema` và `resetPasswordSchema` được định nghĩa trong `$lib/shared/schemas/auth.schema.ts`, dùng chung giữa FE validation và API route.
+- **Rate Limiting:**
+  - `forgotPasswordLimiter`: 3 requests/email/hour
+  - `forgotPasswordIpLimiter`: 5 requests/IP/hour
+  - Dev mode: tự động bypass tất cả rate limiters (`DISABLE_RATE_LIMITER` mặc định `true`).
+- **Dev Mode:** Thay vì gửi email qua Resend, reset link được log ra console để dễ debug.
+- **Gửi Email:** Render template HTML từ Svelte component `ResetPassword.svelte` bằng `better-svelte-email` → gửi qua `Resend` với sender name `TixTac <no-reply@tixtac.io.vn>`.
+
+**Email Template (`ResetPassword.svelte`):**
+
+Template hiển thị đầy đủ thông tin bảo mật trong một card có tổ chức:
+
+- Header: Brand TixTac màu primary
+- Body: Tiêu đề, mô tả, CTA button (màu cta/orange)
+- Security Details Box: Địa chỉ IP (đã mask) kèm (Location) nếu có, Thiết bị
+- Fallback link cho email client không hỗ trợ HTML
+- Warning banner nếu có IP: hướng dẫn liên hệ hỗ trợ nếu không phải người dùng yêu cầu
+- Footer: © năm TixTac + support email
 
 ### 4.8 SSR QR Code (etiket)
 
@@ -1262,11 +1323,31 @@ const envSchema = z.object({
   MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
-  UPSTASH_REDIS_REST_URL: z.string().url(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
-  RESEND_API_KEY: z.string().min(1),
-  VAPID_PUBLIC_KEY: z.string().min(1),
-  VAPID_PRIVATE_KEY_JWK: z.string().min(1),
+  UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),
+  ENABLE_QUEUE_WORKER: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  ENABLE_BACKGROUND_WORKERS: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  DISABLE_RATE_LIMITER: z
+    .enum(['true', 'false'])
+    .default(dev ? 'true' : 'false')
+    .transform((v) => v === 'true'),
+  RESEND_API_KEY: dev
+    ? z.string().default('dev-mode-skip')
+    : z.string().min(1, 'RESEND_API_KEY is required'),
+  EMAIL_FROM: z.string().email().default('no-reply@tixtac.io.vn'),
+  SUPPORT_EMAIL: z.string().email().default('support@tixtac.io.vn'),
+  APP_URL: z.string().url().default('https://tixtac.io.vn'),
+  GEO_API_KEY: z.string().default(''),
+  RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
+  // Planned: Web Push Notification
+  // VAPID_PUBLIC_KEY: z.string().min(1),
+  // VAPID_PRIVATE_KEY_JWK: z.string().min(1),
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -1279,9 +1360,15 @@ const result = envSchema.safeParse({
   CLOUDAMQP_URL: env.CLOUDAMQP_URL,
   UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
+  ENABLE_QUEUE_WORKER: env.ENABLE_QUEUE_WORKER,
+  ENABLE_BACKGROUND_WORKERS: env.ENABLE_BACKGROUND_WORKERS,
+  DISABLE_RATE_LIMITER: env.DISABLE_RATE_LIMITER,
   RESEND_API_KEY: env.RESEND_API_KEY,
-  VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY_JWK: env.VAPID_PRIVATE_KEY_JWK,
+  EMAIL_FROM: env.EMAIL_FROM,
+  SUPPORT_EMAIL: env.SUPPORT_EMAIL,
+  APP_URL: env.APP_URL,
+  GEO_API_KEY: env.GEO_API_KEY,
+  RESET_TOKEN_SECRET: env.RESET_TOKEN_SECRET,
 });
 
 if (!result.success) {
@@ -1302,9 +1389,15 @@ export const config = {
   cloudAmqpUrl: parsed.CLOUDAMQP_URL,
   upstashUrl: parsed.UPSTASH_REDIS_REST_URL,
   upstashToken: parsed.UPSTASH_REDIS_REST_TOKEN,
+  enableQueueWorker: parsed.ENABLE_QUEUE_WORKER,
+  enableBackgroundWorkers: parsed.ENABLE_BACKGROUND_WORKERS,
+  disableRateLimiter: parsed.DISABLE_RATE_LIMITER,
   resendApiKey: parsed.RESEND_API_KEY,
-  vapidPublicKey: parsed.VAPID_PUBLIC_KEY,
-  vapidPrivateKeyJwk: parsed.VAPID_PRIVATE_KEY_JWK,
+  emailFrom: `TixTac <${parsed.EMAIL_FROM}>`,
+  supportEmail: parsed.SUPPORT_EMAIL,
+  appUrl: parsed.APP_URL,
+  geoApiKey: parsed.GEO_API_KEY,
+  resetTokenSecret: parsed.RESET_TOKEN_SECRET,
 } as const;
 ```
 

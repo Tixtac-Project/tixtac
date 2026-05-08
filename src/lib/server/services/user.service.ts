@@ -1,9 +1,12 @@
 import { signAuthToken } from '$lib/server/auth/jwt';
 import { hashPassword, verifyPassword } from '$lib/server/auth/password';
+import { generateResetToken, hashExistingToken } from '$lib/server/auth/token';
 import { config } from '$lib/server/config';
 import { db } from '$lib/server/db/index';
-import { users } from '$lib/server/db/schema';
+import { passwordResetTokens, users } from '$lib/server/db/schema';
+import { sendResetPasswordEmail } from '$lib/server/email';
 import { AppError, Errors, throwError } from '$lib/server/errors';
+import { parseUserAgent } from '$lib/server/utils/parse-user-agent';
 import {
   loginSchema,
   registerSchema,
@@ -13,7 +16,7 @@ import {
 } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
 import type { Cookies } from '@sveltejs/kit';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 
 // Prepared statements – compiled once, reused across requests
 const userByEmail = db
@@ -289,5 +292,62 @@ export const userService = {
     });
 
     return { message: 'Cập nhật bảo mật thành công' };
+  },
+
+  async forgotPassword(email: string, origin: string, ip: string, userAgent: string) {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, normalizedEmail),
+    });
+
+    if (!user || !user.isActive) return;
+
+    const { rawToken, hmacToken } = generateResetToken();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await db
+      .insert(passwordResetTokens)
+      .values({
+        tokenHash: hmacToken,
+        userId: user.id,
+        expiresAt: expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: passwordResetTokens.userId,
+        set: {
+          tokenHash: hmacToken,
+          expiresAt: expiresAt,
+        },
+      });
+    const device = parseUserAgent(userAgent);
+    await sendResetPasswordEmail(user.email, rawToken, ip, device);
+  },
+
+  async resetPassword(token: string, password: string) {
+    const hashed = hashExistingToken(token);
+
+    await db.transaction(async (tx) => {
+      const [record] = await tx
+        .delete(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.tokenHash, hashed),
+            gt(passwordResetTokens.expiresAt, new Date()),
+          ),
+        )
+        .returning();
+
+      if (!record) {
+        throwError(Errors.INVALID_TOKEN, 'Token không hợp lệ hoặc đã hết hạn');
+      }
+
+      const hashedPassword = await hashPassword(password);
+
+      await db
+        .update(users)
+        .set({ passwordHash: hashedPassword })
+        .where(eq(users.id, record.userId));
+    });
   },
 };
