@@ -6,6 +6,7 @@
   import { Label } from '$lib/components/ui/label';
   import { passwordSchema } from '$lib/shared/schemas/auth.schema';
   import { toast } from '$lib/stores/toast';
+  import { api } from '$lib/utils/api';
   import { Eye, EyeOff, Loader } from 'lucide-svelte';
 
   const { data } = $props<{ data: { token: string } }>();
@@ -22,7 +23,7 @@
     const password = formData.get('password') as string;
     const confirmPassword = formData.get('confirmPassword') as string;
 
-    // Validate client
+    // Validate client (password strength + confirm match)
     const validation = passwordSchema.safeParse({ password, confirmPassword });
 
     if (!validation.success) {
@@ -34,52 +35,22 @@
     serverError = null;
 
     loading = true;
-    try {
-      let token = data.token;
-      if (token && token.startsWith('http')) {
-        try {
-          const nestedUrl = new URL(token);
-          token = nestedUrl.searchParams.get('token') || '';
-        } catch {
-          // Nếu không parse được, giữ nguyên để xử lý lỗi sau
-        }
-      }
+    const { error } = await api.post('/auth/reset-password', {
+      token: data.token,
+      password,
+    });
+    loading = false;
 
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        let errorMessage = 'Lỗi không xác định';
-        if (body) {
-          // Nếu body.error tồn tại
-          if (body.error) {
-            errorMessage =
-              typeof body.error === 'string'
-                ? body.error
-                : body.error.message || 'Lỗi không xác định';
-          } else if (body.message) {
-            errorMessage = body.message;
-          }
-        }
-        serverError = errorMessage;
-        loading = false;
-        return;
-      }
-
-      toast.success('Đặt lại mật khẩu thành công');
-      loading = false;
-
-      setTimeout(() => {
-        goto(resolve('/(auth)/login'), { invalidateAll: true });
-      }, 300);
-    } catch {
-      loading = false;
-      serverError = 'Lỗi kết nối, vui lòng thử lại.';
+    if (error) {
+      serverError = error;
+      return;
     }
+
+    toast.success('Đặt lại mật khẩu thành công');
+
+    setTimeout(() => {
+      goto(resolve('/(auth)/login'), { invalidateAll: true });
+    }, 300);
   }
 </script>
 
