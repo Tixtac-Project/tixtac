@@ -164,14 +164,14 @@
             >
               <Text style="margin: 0; font-size: 13px; line-height: 1.6; color: {C.danger};">
                 <strong>Không phải bạn?</strong>
-                Vui lòng
+                Vui lòng bỏ qua email này hoặc nếu bạn lo ngại về bảo mật, hãy
                 <Link
                   href="mailto:{supportEmail}"
                   style="color: {C.danger}; font-weight: 600; text-decoration: underline;"
                 >
                   liên hệ hỗ trợ
                 </Link>
-                ngay lập tức để bảo vệ tài khoản của bạn.
+                để bảo vệ tài khoản của bạn.
               </Text>
             </Section>
           {/if}

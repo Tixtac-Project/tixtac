@@ -33,7 +33,8 @@ export async function sendResetPasswordEmail(
   ip: string,
   device: string,
 ) {
-  const resetLink = `${config.appUrl}/reset-password?token=${rawToken}`;
+  const baseUrl = config.isDev ? 'http://localhost:5173' : config.appUrl;
+  const resetLink = `${baseUrl}/reset-password?token=${rawToken}`;
 
   // Optional enrichment (non-blocking — silently skip on failure)
   const [location, displayIp] = await Promise.all([
@@ -50,6 +51,13 @@ export async function sendResetPasswordEmail(
       device,
     },
   });
+
+  // Dev: log to console instead of sending (Resend requires verified domains)
+  if (config.isDev) {
+    console.log('\n🔗 [DEV] Password reset link:', resetLink);
+    console.log('   To:', to, '\n');
+    return;
+  }
 
   await resend.emails.send({
     from: config.emailFrom,

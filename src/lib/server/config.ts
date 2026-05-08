@@ -24,7 +24,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
   EMAIL_FROM: z.email().default('no-reply@tixtac.io.vn'),
   SUPPORT_EMAIL: z.email().default('support@tixtac.io.vn'),
-  APP_URL: dev ? z.url().default('http://localhost:5173') : z.url().default('https://tixtac.io.vn'),
+  APP_URL: z.url().default('https://tixtac.io.vn'),
   GEO_API_KEY: z.string().default(''),
   RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
 });
@@ -86,8 +86,8 @@ export const config = {
   enableBackgroundWorkers: parsed.ENABLE_BACKGROUND_WORKERS,
   /** Resend API key for sending emails */
   resendApiKey: parsed.RESEND_API_KEY,
-  /** Email address for the "From" field in outgoing emails */
-  emailFrom: parsed.EMAIL_FROM,
+  /** Email address for the "From" field in outgoing emails (includes display name) */
+  emailFrom: `TixTac <${parsed.EMAIL_FROM}>`,
   /** Support email address for handling user inquiries */
   supportEmail: parsed.SUPPORT_EMAIL,
   /** Base URL of the app, used for constructing links in emails (e.g. password reset) */
