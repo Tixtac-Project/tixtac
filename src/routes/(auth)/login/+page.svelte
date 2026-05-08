@@ -183,5 +183,14 @@
       {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
       Đăng nhập
     </Button>
+
+    <div class="mt-4 flex justify-end text-sm">
+      <a
+        href={resolve('/forgot-password')}
+        class="ml-1 font-bold text-primary transition-colors hover:text-primary/80"
+      >
+        Quên mật khẩu?
+      </a>
+    </div>
   </form>
 </div>

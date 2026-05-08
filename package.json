@@ -16,9 +16,11 @@
     "db:seed": "bun src/lib/server/db/seed.ts && bun src/lib/server/db/seed-tickets.ts",
     "db:migrate": "drizzle-kit migrate",
     "test:race": "bun run scripts/reset-db.ts && bun run tests/race-condition.test.ts",
-    "db:reset": "bun run scripts/reset-db.ts"
+    "db:reset": "bun run scripts/reset-db.ts",
+    "email:dev": "bse dev"
   },
   "devDependencies": {
+    "@better-svelte-email/cli": "^2.0.0",
     "@dotenvx/dotenvx": "^1.65.0",
     "@eslint/compat": "^2.0.5",
     "@eslint/js": "^10.0.1",
@@ -68,9 +70,12 @@
     "vite": "^8.0.10"
   },
   "dependencies": {
+    "@better-svelte-email/components": "^2.0.0",
+    "@better-svelte-email/server": "^2.0.0",
     "@internationalized/date": "^3.12.1",
     "@neondatabase/serverless": "^1.1.0",
     "@types/d3-scale": "^4.0.9",
+    "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "amqplib": "^1.0.5",
     "bits-ui": "^2.18.1",
@@ -80,6 +85,7 @@
     "motion-sv": "^0.1.12",
     "overtype": "^2.3.10",
     "pg": "^8.20.0",
+    "resend": "^6.12.3",
     "svelte-adapter-bun": "^1.0.1",
     "tiny-lru": "^13.0.0",
     "ws": "^8.20.0",
