@@ -13,6 +13,7 @@
   import type { SeatLayoutConfig } from '$lib/types/seat-map';
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
+  import { api } from '$lib/utils/api';
   import {
     ArrowRight,
     Building,
@@ -115,45 +116,42 @@
   }
 
   async function joinQueue(showId: number) {
-    // const seatsPath = resolve(`/events/${event.id}/shows/${showId}/seats`);
-    try {
-      const res = await fetch(`/api/events/${event.id}/queue`, { method: 'POST' });
-      const result = await res.json();
+    const result = await api.post<{
+      status: 'waiting' | 'active';
+      position?: number;
+      expiresAt?: number;
+      token?: string;
+    }>(`/events/${event.id}/queue`, {}, { silent: true });
 
-      if (res.status === 403) {
-        // Server-side cross-queue guard (Redis Lua) đã chặn
-        // → Hiện CrossQueueModal để user chọn rời cũ hoặc ở lại
-        pendingShowId = showId;
-        showCrossQueueModal = true;
-        return;
+    if (result.status === 403) {
+      // Server-side cross-queue guard (Redis Lua) blocked → show modal
+      pendingShowId = showId;
+      showCrossQueueModal = true;
+      return;
+    }
+
+    if (result.error || !result.data) {
+      // api util already showed a toast for non-silent errors
+      return;
+    }
+
+    queueStore.eventId = event.id;
+    queueStore.eventTitle = event.title;
+    queueStore.showId = showId;
+
+    if (result.data.status === 'waiting') {
+      queueStore.status = 'waiting';
+      queueStore.position = result.data.position ?? 0;
+      goto(resolve(`/events/${event.id}/queue`));
+    } else if (result.data.status === 'active') {
+      queueStore.status = 'ready';
+      queueStore.expiresAt = result.data.expiresAt ?? null;
+      if (result.data.token) {
+        queueStore.token = result.data.token;
       }
-
-      if (!res.ok) {
-        alert(result.message || 'Có lỗi xảy ra khi tham gia hàng chờ.');
-        return;
-      }
-
-      queueStore.eventId = event.id;
-      queueStore.eventTitle = event.title;
-      queueStore.showId = showId;
-
-      if (result.data?.status === 'waiting') {
-        queueStore.status = 'waiting';
-        queueStore.position = result.data.position;
-        goto(resolve(`/events/${event.id}/queue`));
-      } else if (result.data?.status === 'active') {
-        queueStore.status = 'ready';
-        queueStore.expiresAt = result.data.expiresAt;
-        if (result.data.token) {
-          queueStore.token = result.data.token;
-        }
-        goto(resolve(`/events/${event.id}/queue`));
-      } else {
-        alert('Hệ thống trả về trạng thái không xác định. Vui lòng thử lại!');
-      }
-    } catch (error) {
-      console.error('Lỗi khi join queue:', error);
-      alert('Không thể kết nối đến hệ thống hàng chờ.');
+      goto(resolve(`/events/${event.id}/queue`));
+    } else {
+      // api util will show error toast
     }
   }
 

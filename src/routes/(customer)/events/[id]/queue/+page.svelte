@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { queueStore } from '$lib/stores/queue.svelte';
+  import { api } from '$lib/utils/api';
   import { onMount } from 'svelte';
   import { Clock, Loader2, Users } from 'lucide-svelte';
 
@@ -47,30 +48,30 @@
   );
 
   async function pollStatus() {
-    try {
-      const res = await fetch(`/api/events/${eventId}/queue/status`);
-      if (!res.ok) return;
-      const { data } = await res.json();
-      pollingError = false;
+    const result = await api.get<{
+      status: 'active' | 'waiting' | 'none';
+      position?: number;
+      expiresAt?: number;
+      token?: string;
+    }>(`/events/${eventId}/queue/status`, { silent: true });
 
-      if (data.status === 'active') {
-        // Server báo tới lượt → chuyển sang grace period
-        queueStore.status = 'ready';
-        queueStore.expiresAt = data.expiresAt;
-        // Server chỉ mint token mới khi ≤30s còn lại → không ghi đè token cũ nếu null
-        if (data.token) {
-          queueStore.token = data.token;
-        }
-      } else if (data.status === 'waiting') {
-        queueStore.status = 'waiting';
-        queueStore.position = data.position;
-      } else if (data.status === 'none') {
-        // Bị đuổi khỏi queue (timeout, worker eviction, ...)
-        queueStore.clear();
-        goto(resolve(`/events/${eventId}`));
-      }
-    } catch {
+    if (result.error || !result.data) {
       pollingError = true;
+      return;
+    }
+    pollingError = false;
+
+    const data = result.data;
+    if (data.status === 'active') {
+      queueStore.status = 'ready';
+      queueStore.expiresAt = data.expiresAt ?? null;
+      if (data.token) queueStore.token = data.token;
+    } else if (data.status === 'waiting') {
+      queueStore.status = 'waiting';
+      queueStore.position = data.position ?? queueStore.position;
+    } else if (data.status === 'none') {
+      queueStore.clear();
+      goto(resolve(`/events/${eventId}`));
     }
   }
 
@@ -78,16 +79,14 @@
     if (isConfirming) return;
     isConfirming = true;
     try {
-      const res = await fetch(`/api/events/${eventId}/queue/confirm`, { method: 'POST' });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err?.message ?? 'Không thể xác nhận. Vui lòng thử lại.');
-        return;
-      }
-      const { data } = await res.json();
-      // Lưu vào pendingConfirm thay vì set 'holding' ngay — tránh flash widget cam
-      // seats/+page.svelte sẽ gọi queueStore.commitHolding() khi mount
-      queueStore.setPendingConfirm(data.expiresAt, data.token);
+      const result = await api.post<{ expiresAt: number; token: string }>(
+        `/events/${eventId}/queue/confirm`,
+        {}
+      );
+
+      if (result.error || !result.data) return; // toast shown by api util
+
+      queueStore.setPendingConfirm(result.data.expiresAt, result.data.token);
 
       const showId = queueStore.showId;
       if (showId) {
@@ -95,8 +94,6 @@
       } else {
         goto(resolve(`/events/${eventId}`));
       }
-    } catch {
-      alert('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
       isConfirming = false;
     }
