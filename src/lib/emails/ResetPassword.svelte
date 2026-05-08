@@ -36,11 +36,11 @@
     <title>Đặt lại mật khẩu — TixTac</title>
   </Head>
 
-  <Preview preview="Yêu cầu đặt lại mật khẩu cho tài khoản TixTac của bạn." />
-
   <Body
     style="margin: 0; padding: 0; background-color: {C.bg}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; -webkit-font-smoothing: antialiased;"
   >
+    <Preview preview="Yêu cầu đặt lại mật khẩu cho tài khoản TixTac của bạn." />
+
     <!-- Outer wrapper với padding bảo vệ viền trên mobile -->
     <Section style="padding: 40px 20px;">
       <Container
