@@ -14,10 +14,9 @@ export const POST = apiHandler(async ({ request, url, getClientAddress }) => {
   }
   const { email } = parsed.data;
   const key = `${email}:${getClientAddress()}`;
-  const { success } =
-    (await forgotPasswordLimiter.limit(key)) &&
-    (await forgotPasswordIpLimiter.limit(getClientAddress()));
-
+  const emailLimit = await forgotPasswordLimiter.limit(key);
+  const ipLimit = await forgotPasswordIpLimiter.limit(getClientAddress());
+  const success = emailLimit.success && ipLimit.success;
   if (!success) {
     return json({ error: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.' }, { status: 429 });
   }
