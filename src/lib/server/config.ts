@@ -22,11 +22,9 @@ const envSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
-  EMAIL_FROM: z.string().email().min(1, 'EMAIL_FROM is required'),
-  SUPPORT_EMAIL: z.string().email().min(1, 'SUPPORT_EMAIL is required'),
-  APP_URL: dev
-    ? z.string().url().default('http://localhost:5173')
-    : z.string().url().min(1, 'APP_URL is required'),
+  EMAIL_FROM: z.email().default('no-reply@tixtac.io.vn'),
+  SUPPORT_EMAIL: z.email().default('support@tixtac.io.vn'),
+  APP_URL: dev ? z.url().default('http://localhost:5173') : z.url().default('https://tixtac.io.vn'),
   RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
 });
 
