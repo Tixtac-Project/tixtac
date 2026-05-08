@@ -8,12 +8,22 @@ import { Resend } from 'resend';
 const renderer = new Renderer();
 const resend = new Resend(config.resendApiKey);
 
-export async function sendResetPasswordEmail(to: string, rawToken: string) {
+export async function sendResetPasswordEmail(
+  to: string,
+  rawToken: string,
+  ip: string,
+  device: string,
+) {
   const resetLink = `${config.appUrl}/reset-password?token=${rawToken}`;
 
   // Render component → HTML
   const html = await renderer.render(ResetPassword, {
-    props: { resetLink },
+    props: {
+      resetLink,
+      supportEmail: config.supportEmail,
+      ip,
+      device,
+    },
   });
 
   // Phần text thuần (tuỳ chọn)

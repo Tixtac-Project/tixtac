@@ -6,6 +6,7 @@ import { db } from '$lib/server/db/index';
 import { passwordResetTokens, users } from '$lib/server/db/schema';
 import { sendResetPasswordEmail } from '$lib/server/email';
 import { AppError, Errors, throwError } from '$lib/server/errors';
+import { parseUserAgent } from '$lib/server/utils/parse-user-agent';
 import {
   loginSchema,
   registerSchema,
@@ -293,7 +294,7 @@ export const userService = {
     return { message: 'Cập nhật bảo mật thành công' };
   },
 
-  async forgotPassword(email: string, origin: string) {
+  async forgotPassword(email: string, origin: string, ip: string, userAgent: string) {
     const normalizedEmail = email.toLowerCase().trim();
 
     const user = await db.query.users.findFirst({
@@ -319,9 +320,8 @@ export const userService = {
           expiresAt: expiresAt,
         },
       });
-
-    const resetLink = `${origin}/reset-password?token=${encodeURIComponent(rawToken)}`;
-    await sendResetPasswordEmail(user.email, resetLink);
+    const device = parseUserAgent(userAgent);
+    await sendResetPasswordEmail(user.email, rawToken, ip, device);
   },
 
   async resetPassword(token: string, password: string) {

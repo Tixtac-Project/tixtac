@@ -23,6 +23,7 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
   EMAIL_FROM: z.string().email().min(1, 'EMAIL_FROM is required'),
+  SUPPORT_EMAIL: z.string().email().min(1, 'SUPPORT_EMAIL is required'),
   APP_URL: dev
     ? z.string().url().default('http://localhost:5173')
     : z.string().url().min(1, 'APP_URL is required'),
@@ -43,6 +44,7 @@ const result = envSchema.safeParse({
   ENABLE_BACKGROUND_WORKERS: env.ENABLE_BACKGROUND_WORKERS,
   RESEND_API_KEY: env.RESEND_API_KEY,
   EMAIL_FROM: env.EMAIL_FROM,
+  SUPPORT_EMAIL: env.SUPPORT_EMAIL,
   APP_URL: env.APP_URL,
   RESET_TOKEN_SECRET: env.RESET_TOKEN_SECRET,
 });
@@ -86,6 +88,8 @@ export const config = {
   resendApiKey: parsed.RESEND_API_KEY,
   /** Email address for the "From" field in outgoing emails */
   emailFrom: parsed.EMAIL_FROM,
+  /** Support email address for handling user inquiries */
+  supportEmail: parsed.SUPPORT_EMAIL,
   /** Base URL of the app, used for constructing links in emails (e.g. password reset) */
   appUrl: parsed.APP_URL,
   /** Secret for signing password reset tokens */

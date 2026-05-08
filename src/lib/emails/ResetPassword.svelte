@@ -12,7 +12,7 @@
     Text,
   } from '@better-svelte-email/components';
 
-  let { resetLink = '' } = $props();
+  let { resetLink = '', supportEmail = 'support@example.com', ip = '', device = '' } = $props();
 </script>
 
 <Html lang="vi">
@@ -20,55 +20,64 @@
     <title>Đặt lại mật khẩu</title>
   </Head>
 
-  <!-- Nền xám trung tính, không chói -->
-  <Body style="margin:0; padding:0; background-color:#f3f4f6;">
+  <Body style="margin:0; padding:0; background-color:#f1f5f9;">
     <Section style="padding:40px 20px;">
-      <!-- Card chính: trắng, bo cong mềm, đổ bóng nhẹ -->
       <Container
-        style="max-width:480px; background-color:#ffffff; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.05); padding:40px;"
+        style="max-width:480px; background-color:#ffffff; border-radius:20px; box-shadow:0 4px 16px rgba(0,0,0,0.04); padding:40px 36px;"
       >
-        <!-- Tiêu đề với thẻ heading thực sự (h1) cho screen reader -->
-        <Heading as="h1" class="mb-2 text-2xl font-bold tracking-tight text-gray-900">
+        <!-- Tiêu đề -->
+        <Heading as="h1" class="mb-3 text-2xl font-bold tracking-tight text-gray-900">
           Đặt lại mật khẩu
         </Heading>
 
-        <!-- Mô tả ngắn, tone thân thiện -->
-        <Text class="mb-8 text-sm text-gray-600">
-          Chào bạn, chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.
+        <!-- Đường kẻ phân cách nhẹ -->
+        <Hr class="my-6" style="border-color:#e5e7eb;" />
+
+        <!-- Mô tả ngắn -->
+        <Text class="mb-6 text-sm leading-relaxed text-gray-600">
+          Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.
         </Text>
 
-        <!-- Nút hành động chính: full-width, tương phản cao, aria-label cho accessibility -->
+        <!-- Thông tin bảo mật (IP & thiết bị) – chuyển lên trên, ngay sau mô tả -->
+        <Text class="mb-6 text-sm leading-relaxed text-gray-500">
+          Yêu cầu được gửi từ địa chỉ IP: <strong class="text-gray-700">{ip || '—'}</strong>
+          <br />
+          Thiết bị:
+          <span class="text-gray-700">{device || 'Không xác định'}</span>
+        </Text>
+
+        <!-- Nút hành động chính -->
         <Button
           href={resetLink}
-          class="block w-full rounded-xl bg-indigo-600 py-3.5 text-center text-sm font-semibold text-white no-underline"
+          class="block w-full rounded-xl bg-indigo-600 py-4 text-center text-sm font-semibold text-white no-underline"
           aria-label="Nhấn để đặt lại mật khẩu"
         >
           Đặt lại mật khẩu
         </Button>
 
-        <!-- Thông tin phụ: thời hạn & hướng dẫn an toàn -->
-        <Text class="mt-6 text-xs text-gray-500">
+        <!-- Đường kẻ phân cách nhẹ -->
+        <Hr class="my-6" style="border-color:#e5e7eb;" />
+
+        <!-- Thời hạn -->
+        <Text class="mt-5 text-sm text-gray-500">
           Liên kết sẽ hết hạn sau <strong class="text-gray-700">1 giờ</strong>
-          . Nếu bạn không yêu cầu đặt lại, vui lòng bỏ qua email này.
+          .
         </Text>
 
-        <Hr class="my-6" />
-
-        <!-- Footer: lưu ý spam + liên hệ hỗ trợ -->
-        <Text class="text-xs text-gray-400">
-          Vui lòng kiểm tra thư mục <strong>Spam</strong>
-           nếu bạn không thấy email.
-        </Text>
-        <Text class="mt-2 text-xs text-gray-400">
-          Cần hỗ trợ?
-          <a
-            href="mailto:support@yourdomain.com"
-            class="text-indigo-600 underline"
-            aria-label="Gửi email đến bộ phận hỗ trợ"
-          >
-            Liên hệ hỗ trợ
-          </a>
-        </Text>
+        <!-- Lời nhắn hỗ trợ (vẫn ở dưới cùng) -->
+        {#if ip}
+          <Text class="text-sm text-gray-400">
+            Nếu không phải bạn, hãy
+            <a
+              href="mailto:{supportEmail}"
+              class="text-indigo-600 underline"
+              aria-label="Gửi email đến bộ phận hỗ trợ"
+            >
+              liên hệ hỗ trợ
+            </a>
+            ngay.
+          </Text>
+        {/if}
       </Container>
     </Section>
   </Body>
