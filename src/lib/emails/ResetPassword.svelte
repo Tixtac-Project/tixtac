@@ -13,7 +13,7 @@
     Text,
   } from '@better-svelte-email/components';
 
-  let { resetLink = '', supportEmail = '', ip = '', device = '' } = $props();
+  let { resetLink = '', supportEmail = '', ip = '', device = '', location = '' } = $props();
 
   const C = {
     bg: '#f4f5f7',
@@ -124,7 +124,8 @@
                     <Text
                       style="margin: 4px 0 0; font-size: 14px; font-weight: 500; color: {C.text};"
                     >
-                      {ip || '—'}
+                      {ip || '—'}{#if location}
+                        ({location}){/if}
                     </Text>
                   </td>
                 </tr>

@@ -25,6 +25,7 @@ const envSchema = z.object({
   EMAIL_FROM: z.email().default('no-reply@tixtac.io.vn'),
   SUPPORT_EMAIL: z.email().default('support@tixtac.io.vn'),
   APP_URL: dev ? z.url().default('http://localhost:5173') : z.url().default('https://tixtac.io.vn'),
+  GEO_API_KEY: z.string().default(''),
   RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
 });
 
@@ -44,6 +45,7 @@ const result = envSchema.safeParse({
   EMAIL_FROM: env.EMAIL_FROM,
   SUPPORT_EMAIL: env.SUPPORT_EMAIL,
   APP_URL: env.APP_URL,
+  GEO_API_KEY: env.GEO_API_KEY,
   RESET_TOKEN_SECRET: env.RESET_TOKEN_SECRET,
 });
 
@@ -90,6 +92,8 @@ export const config = {
   supportEmail: parsed.SUPPORT_EMAIL,
   /** Base URL of the app, used for constructing links in emails (e.g. password reset) */
   appUrl: parsed.APP_URL,
+  /** ipgeolocation.io API key (optional — when set, password reset emails include city/country) */
+  geoApiKey: parsed.GEO_API_KEY,
   /** Secret for signing password reset tokens */
   resetTokenSecret: parsed.RESET_TOKEN_SECRET,
 } as const;
