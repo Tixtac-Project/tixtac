@@ -122,18 +122,21 @@ class QueueStore {
   }
 
   /**
-   * Leaves the queue: calls the DELETE API, clears local state, then navigates
-   * back to the event page (or home if eventId is unavailable).
+   * Leaves the queue: calls the DELETE API, clears local state, then optionally
+   * navigates back to the event page (or home if eventId is unavailable).
    */
-  async leave() {
+  async leave(options?: { navigate?: boolean }) {
+    const shouldNavigate = options?.navigate ?? true;
     const eventId = this.eventId;
     this.clear();
     if (!browser) return;
     await fetch(`/api/events/${eventId}/queue`, { method: 'DELETE' }).catch(() => {});
-    if (eventId) {
-      goto(resolve(`/events/${eventId}`));
-    } else {
-      goto(resolve('/'));
+    if (shouldNavigate) {
+      if (eventId) {
+        goto(resolve(`/events/${eventId}`));
+      } else {
+        goto(resolve('/'));
+      }
     }
   }
 

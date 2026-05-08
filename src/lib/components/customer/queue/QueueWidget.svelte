@@ -5,6 +5,7 @@
   import { resolve } from '$app/paths';
   import { queueStore } from '$lib/stores/queue.svelte';
   import { fly } from 'svelte/transition';
+  import { tick } from 'svelte';
   import QueueWaiting from './QueueWaiting.svelte';
   import QueueReady from './QueueReady.svelte';
   import QueueHolding from './QueueHolding.svelte';
@@ -29,8 +30,7 @@
         timeLeft = Math.max(0, Math.floor((queueStore.expiresAt - Date.now()) / 1000));
         // Timer expired — auto-leave to release the slot for the next user.
         if (timeLeft === 0 && (queueStore.status === 'ready' || queueStore.status === 'holding')) {
-          queueStore.status = 'missed';
-          queueStore.leave();
+          queueStore.leave({ navigate: false });
         }
       }
     };
@@ -152,26 +152,52 @@
   }
 
   async function handleLeave() {
+    if (isLeaving) return;
     isLeaving = true;
-    showExitConfirm = false;
-    await queueStore.leave();
-    isLeaving = false;
+    try {
+      await queueStore.leave();
+      showExitConfirm = false;
+    } finally {
+      isLeaving = false;
+    }
   }
 
   // --- Drag and Drop State ---
   let isDragging = $state(false);
+  let hasMoved = $state(false);
   let dragOffset = $state({ x: 0, y: 0 });
   let startPointer = { x: 0, y: 0 };
   let startOffset = { x: 0, y: 0 };
   let widgetEl: HTMLElement | undefined = $state();
 
+  // --- Docking State ---
+  let isDocked = $state(false);
+  let anchorSide = $state<'left' | 'right'>('right');
+  let disableTransition = $state(false);
+
+  // Auto-undock when status changes
+  let prevStatus = $state(queueStore.status);
+  $effect(() => {
+    if (queueStore.status !== prevStatus) {
+      if (queueStore.status !== 'idle' && queueStore.status !== 'missed') {
+        isDocked = false; // Auto pop-out on status change
+      }
+      prevStatus = queueStore.status;
+    }
+  });
+
+  function handleUndock() {
+    isDocked = false;
+  }
+
   function handlePointerDown(e: PointerEvent) {
     // Only allow left click dragging and ignore clicks on buttons
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('button')) return;
+    if (target.closest('.action-btn')) return;
 
     isDragging = true;
+    hasMoved = false;
     startPointer = { x: e.clientX, y: e.clientY };
     startOffset = { ...dragOffset };
 
@@ -181,10 +207,17 @@
 
   function handlePointerMove(e: PointerEvent) {
     if (!isDragging || !widgetEl) return;
-    e.preventDefault(); // Prevent text selection/scrolling while dragging
-
+    
     const dx = e.clientX - startPointer.x;
     const dy = e.clientY - startPointer.y;
+
+    if (!hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      hasMoved = true;
+    }
+
+    if (!hasMoved) return;
+
+    e.preventDefault(); // Prevent text selection/scrolling while dragging
 
     let newX = startOffset.x + dx;
     let newY = startOffset.y + dy;
@@ -199,8 +232,14 @@
     const baseLeft = window.innerWidth - paddingX * 2 - widgetWidth;
     const baseTop = window.innerHeight - paddingBottom - widgetEl.offsetHeight;
 
-    const minX = -baseLeft; // touches left padding limit
-    const maxX = 0; // touches right padding limit
+    let minX, maxX;
+    if (anchorSide === 'right') {
+      minX = -baseLeft; // touches left padding limit
+      maxX = 0; // touches right padding limit
+    } else {
+      minX = 0; // touches left padding limit
+      maxX = baseLeft; // touches right padding limit
+    }
 
     // Ensure top padding to avoid header
     const minY = -(baseTop - paddingTop);
@@ -225,6 +264,11 @@
 
     if (!widgetEl) return;
 
+    if (!hasMoved) {
+      // It was just a tap, do not execute docking logic
+      return;
+    }
+
     // iPhone AssistiveTouch Snapping Logic
     // Snap to the nearest vertical edge (Left or Right)
     const isMobile = window.innerWidth < 640;
@@ -232,8 +276,14 @@
     const widgetWidth = widgetEl.offsetWidth;
 
     const baseLeft = window.innerWidth - paddingX * 2 - widgetWidth;
-    const minX = -baseLeft;
-    const maxX = 0;
+    let minX, maxX;
+    if (anchorSide === 'right') {
+      minX = -baseLeft;
+      maxX = 0;
+    } else {
+      minX = 0;
+      maxX = baseLeft;
+    }
 
     const safeMinX = Math.min(minX, maxX);
     const safeMaxX = Math.max(minX, maxX);
@@ -245,13 +295,45 @@
       x: targetX,
       y: dragOffset.y // keep current Y
     };
+
+    if (isMobile) {
+      if (anchorSide === 'right' && targetX === safeMinX) {
+        // Snapped to left edge
+        setTimeout(async () => {
+          disableTransition = true;
+          anchorSide = 'left';
+          dragOffset.x = 0;
+          await tick(); // Wait for Svelte to apply state to DOM
+          void widgetEl?.offsetHeight; // Force browser reflow to apply styles synchronously
+          disableTransition = false;
+          isDocked = true;
+        }, 500); // Wait for transform animation
+      } else if (anchorSide === 'left' && targetX === safeMaxX) {
+        // Snapped to right edge
+        setTimeout(async () => {
+          disableTransition = true;
+          anchorSide = 'right';
+          dragOffset.x = 0;
+          await tick();
+          void widgetEl?.offsetHeight;
+          disableTransition = false;
+          isDocked = true;
+        }, 500);
+      } else {
+        // Snapped back to current edge
+        setTimeout(() => {
+          isDocked = true;
+        }, 500);
+      }
+    }
   }
 </script>
 
 {#if shouldShow}
   <div
     transition:fly={{ y: 20, duration: 300 }}
-    class="fixed right-4 bottom-24 z-50 w-max sm:right-5 sm:bottom-5 sm:w-[320px]"
+    class="fixed bottom-24 z-50 w-max sm:bottom-5 sm:w-[320px] sm:!right-5 sm:!left-auto"
+    style="{anchorSide === 'left' ? 'left: 16px; right: auto;' : 'right: 16px; left: auto;'}"
   >
     <div
       bind:this={widgetEl}
@@ -261,7 +343,7 @@
       style="
         transform: translate({dragOffset.x}px, {dragOffset.y}px) scale({isDragging ? 1.02 : 1});
         touch-action: none;
-        transition: {isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'};
+        transition: {isDragging || disableTransition ? 'none' : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'};
       "
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
@@ -269,11 +351,13 @@
       onpointercancel={handlePointerUp}
     >
       {#if queueStore.status === 'waiting'}
-        <QueueWaiting onExpand={expandQueue} onExitClick={() => (showExitConfirm = true)} />
+        <QueueWaiting {isDocked} onUndock={handleUndock} onExpand={expandQueue} onExitClick={() => (showExitConfirm = true)} />
       {:else if queueStore.status === 'ready'}
-        <QueueReady formattedTime={formatTime(timeLeft)} onGoToSeats={goToSeats} />
+        <QueueReady {isDocked} onUndock={handleUndock} formattedTime={formatTime(timeLeft)} onGoToSeats={goToSeats} />
       {:else if queueStore.status === 'holding'}
         <QueueHolding
+          {isDocked}
+          onUndock={handleUndock}
           formattedTime={formatTime(timeLeft)}
           onGoToSeats={goToSeats}
           onExitClick={() => (showExitConfirm = true)}

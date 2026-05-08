@@ -115,7 +115,7 @@
   }
 
   async function joinQueue(showId: number) {
-    const seatsPath = resolve(`/events/${event.id}/shows/${showId}/seats`);
+    // const seatsPath = resolve(`/events/${event.id}/shows/${showId}/seats`);
     try {
       const res = await fetch(`/api/events/${event.id}/queue`, { method: 'POST' });
       const result = await res.json();
@@ -171,6 +171,7 @@
         return;
       }
       if (queueStore.status === 'ready' || queueStore.status === 'waiting') {
+        queueStore.showId = showId;
         goto(resolve(`/events/${event.id}/queue`));
         return;
       }

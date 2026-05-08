@@ -135,12 +135,20 @@ export const queueService = {
         local now = tonumber(ARGV[2])
         local eventId = ARGV[3]
         local holdingDuration = tonumber(ARGV[4]) -- e.g. 300 seconds
+        local confirmedKey = KEYS[3]
 
         -- Only extend if the slot is still valid (within grace period).
         if currentScore > now then
+          -- If already confirmed, return the existing expiry without extending
+          local alreadyConfirmed = redis.call('GET', confirmedKey)
+          if alreadyConfirmed then
+            return currentScore
+          end
+
           local newExpiresAt = now + (holdingDuration * 1000)
           redis.call('ZADD', KEYS[1], newExpiresAt, ARGV[1])
           redis.call('SET', KEYS[2], eventId, 'EX', holdingDuration + 5)
+          redis.call('SET', confirmedKey, '1', 'EX', holdingDuration + 5)
           return newExpiresAt
         end
 
@@ -149,7 +157,7 @@ export const queueService = {
 
       const activeExpiresAt = await redis.eval<[string, number, string, number], number>(
         luaScript,
-        [activeKey, `user_current_queue:${userId}`],
+        [activeKey, `user_current_queue:${userId}`, `confirmed:${eventId}:${userId}`],
         [String(userId), now, String(eventId), config.accessTokenDuration],
       );
 
@@ -179,6 +187,7 @@ export const queueService = {
           redis.call('DEL', KEYS[1])
           redis.call('ZREM', KEYS[2], ARGV[2])
           redis.call('ZREM', KEYS[3], ARGV[2])
+          redis.call('DEL', KEYS[4])
           return 1
         end
         return 0
@@ -186,7 +195,12 @@ export const queueService = {
 
       await redis.eval<[string, string], number>(
         leaveQueueScript,
-        [userCurrentKey, `active_users:${eventId}`, `waiting_queue:${eventId}`],
+        [
+          userCurrentKey, 
+          `active_users:${eventId}`, 
+          `waiting_queue:${eventId}`,
+          `confirmed:${eventId}:${userId}`
+        ],
         [String(eventId), String(userId)],
       );
 

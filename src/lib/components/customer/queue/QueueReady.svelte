@@ -1,34 +1,48 @@
 <script lang="ts">
   import { AlertCircle, ArrowRight } from 'lucide-svelte';
+  import { slide } from 'svelte/transition';
   import { queueStore } from '$lib/stores/queue.svelte';
 
   type Props = {
+    isDocked?: boolean;
+    onUndock?: () => void;
     formattedTime: string;
     onGoToSeats: () => void;
   };
-  let { formattedTime, onGoToSeats }: Props = $props();
+  let { isDocked = false, onUndock, formattedTime, onGoToSeats }: Props = $props();
 </script>
 
 <div class="bg-emerald-600 p-2 sm:p-4 text-white shadow-inner sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center gap-3 sm:hidden pl-2 pr-1">
-    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 shadow-sm">
-      <AlertCircle class="h-5 w-5" />
-    </div>
-    
-    <span class="font-mono text-xl font-black drop-shadow-sm">{formattedTime}</span>
-    
-    <div class="mx-1 h-6 w-px bg-white/20"></div>
-    
-    <button
-      onclick={onGoToSeats}
-      class="flex h-10 w-auto px-4 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-emerald-700 animate-pulse shadow-md transition active:scale-95"
+  <div class="flex items-center sm:hidden text-white">
+    <!-- Clickable area to undock when docked -->
+    <button 
+      class="flex items-center gap-3"
+      onclick={isDocked ? onUndock : undefined}
+      aria-label={isDocked ? "Mở rộng widget" : undefined}
     >
-      CHỌN GHẾ
-      <ArrowRight class="h-4 w-4" />
+      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md">
+        <AlertCircle class="h-5 w-5 text-green-600" />
+      </div>
+      
+      <span class="font-mono text-xl font-black drop-shadow-sm">{formattedTime}</span>
     </button>
+    
+    {#if !isDocked}
+      <div class="flex items-center gap-3 overflow-hidden pl-3" transition:slide={{ axis: 'x', duration: 250 }}>
+        <div class="h-6 w-px bg-white/20 shrink-0"></div>
+        
+        <button
+          onclick={onGoToSeats}
+          class="action-btn flex h-10 w-auto px-4 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-emerald-700 animate-pulse shadow-md transition active:scale-95"
+        >
+          CHỌN GHẾ
+          <ArrowRight class="h-4 w-4" />
+        </button>
+      </div>
+    {/if}
   </div>
 
   <!-- ═══════════════════════════════════════════ -->
@@ -58,7 +72,7 @@
 
     <button
       onclick={onGoToSeats}
-      class="w-full animate-pulse rounded-xl bg-white py-3 text-sm font-bold text-emerald-700 shadow-lg shadow-black/20 transition-all hover:animate-none hover:bg-white/90 active:scale-95"
+      class="action-btn w-full animate-pulse rounded-xl bg-white py-3 text-sm font-bold text-emerald-700 shadow-lg shadow-black/20 transition-all hover:animate-none hover:bg-white/90 active:scale-95"
     >
       VÀO CHỌN GHẾ NGAY →
     </button>

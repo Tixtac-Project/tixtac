@@ -195,7 +195,7 @@
           {/if}
 
             <!-- Info note -->
-            <div class="flex items-start gap-2 rounded-xl bg-primary/5 p-4">
+            <div class="w-full flex items-start gap-3 rounded-2xl bg-primary/5 p-6">
               <Users class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <p class="text-xs leading-relaxed text-muted-foreground">
                 Hệ thống tự động thông báo khi tới lượt. Bạn có thể thu nhỏ phòng chờ và lướt web.
