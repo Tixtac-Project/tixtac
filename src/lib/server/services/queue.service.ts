@@ -91,7 +91,7 @@ export const queueService = {
 
       // ── Dispatch based on return code ──
       if (code === -1) {
-        throwError(Errors.EVENT_NOT_AVAILABLE, 'Bạn đang tham gia hàng chờ của một sự kiện khác');
+        throwError(Errors.QUEUE_ALREADY_JOINED);
       }
 
       // code 2: User already has an active (unexpired) slot — return its remaining time.
@@ -153,7 +153,7 @@ export const queueService = {
       );
 
       if (!activeExpiresAt) {
-        throwError(Errors.FORBIDDEN, 'Your queue slot does not exist or has already expired.');
+        throwError(Errors.QUEUE_SESSION_EXPIRED);
       }
 
       const expiresInSeconds = Math.max(1, Math.ceil((activeExpiresAt - now) / 1000));
@@ -213,6 +213,12 @@ export const queueService = {
       const position = await redis.zrank(waitingKey, userId);
       if (position !== null) {
         return { status: 'waiting', position: position + 1 };
+      }
+
+      // Cross-queue check: If not in this event, check if they are in ANY event
+      const currentEventId = await redis.get(`user_current_queue:${userId}`);
+      if (currentEventId && Number(currentEventId) !== eventId) {
+        return { status: 'other', eventId: Number(currentEventId) };
       }
 
       return { status: 'none' };
