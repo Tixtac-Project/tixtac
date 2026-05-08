@@ -181,16 +181,6 @@
                 Đăng ký ngay
               </a>
             </p>
-
-            <p class="text-sm font-medium text-muted-foreground">
-              Quên mật khẩu?
-              <a
-                href={resolve('/forgot-password')}
-                class="ml-1 font-bold text-primary transition-colors hover:text-primary/80"
-              >
-                Khôi phục mật khẩu
-              </a>
-            </p>
           {:else}
             <p class="text-sm font-medium text-muted-foreground">
               Đã có tài khoản?
