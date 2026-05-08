@@ -3,7 +3,9 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { queueStore } from '$lib/stores/queue.svelte';
-  import { AlertCircle, ArrowLeft, Loader2, LogOut, Timer, X } from 'lucide-svelte';
+  import QueueWaiting from './QueueWaiting.svelte';
+  import QueueReady from './QueueReady.svelte';
+  import QueueHolding from './QueueHolding.svelte';
 
   /** Remaining seconds, derived from `queueStore.expiresAt`. */
   let timeLeft = $state(0);
@@ -152,133 +154,16 @@
            shadow-2xl ring-1 ring-black/10
            backdrop-blur-sm duration-300 fade-in slide-in-from-bottom-4"
   >
-    <!-- ────────────────── WAITING (Thu nhỏ) ────────────────── -->
     {#if queueStore.status === 'waiting'}
-      <div class="bg-surface-container-highest p-4">
-        <!-- Header -->
-        <div class="mb-3 flex items-center gap-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <Loader2 class="h-5 w-5 animate-spin text-primary" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-[10px] font-bold tracking-widest text-primary uppercase">
-              Đang xếp hàng
-            </p>
-            {#if queueStore.eventTitle}
-              <p class="truncate text-xs font-semibold text-foreground">{queueStore.eventTitle}</p>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Position badge -->
-        <div
-          class="mb-3 flex items-center justify-center gap-2 rounded-xl bg-surface-container p-3"
-        >
-          <span class="text-sm text-muted-foreground">Vị trí của bạn:</span>
-          <span class="text-2xl font-black text-primary">#{queueStore.position}</span>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex gap-2">
-          <button
-            onclick={expandQueue}
-            class="flex-1 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground transition-all hover:opacity-90 active:scale-95"
-          >
-            Phóng to phòng chờ
-          </button>
-          <button
-            onclick={() => (showExitConfirm = true)}
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-            title="Hủy xếp hàng"
-          >
-            <X class="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <!-- ────────────────── READY (Grace Period 60s) ────────────────── -->
+      <QueueWaiting onExpand={expandQueue} onExitClick={() => (showExitConfirm = true)} />
     {:else if queueStore.status === 'ready'}
-      <div class="bg-emerald-600 p-4 text-white">
-        <!-- Pulse ring decoration -->
-        <div class="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-white/10 blur-xl"></div>
-
-        <div class="relative">
-          <div class="mb-3 flex items-center gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20">
-              <AlertCircle class="h-5 w-5" />
-            </div>
-            <div>
-              <p class="text-[10px] font-bold tracking-widest uppercase opacity-80">Đã tới lượt!</p>
-              {#if queueStore.eventTitle}
-                <p class="max-w-[180px] truncate text-xs font-semibold">{queueStore.eventTitle}</p>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Countdown -->
-          <div class="mb-3 text-center">
-            <p class="text-xs opacity-80">Xác nhận trong vòng</p>
-            <p class="font-mono text-4xl font-black tabular-nums">
-              {formatTime(timeLeft)}
-            </p>
-          </div>
-
-          <button
-            onclick={goToSeats}
-            class="w-full animate-pulse rounded-xl bg-white py-3 text-sm font-bold text-emerald-700
-                   shadow-lg shadow-black/20 transition-all hover:animate-none hover:bg-white/90 active:scale-95"
-          >
-            VÀO CHỌN GHẾ NGAY →
-          </button>
-        </div>
-      </div>
-
-      <!-- ────────────────── HOLDING (Bảo vệ phiên 5 phút) ────────────────── -->
+      <QueueReady formattedTime={formatTime(timeLeft)} onGoToSeats={goToSeats} />
     {:else if queueStore.status === 'holding'}
-      <div class="bg-orange-500 p-4 text-white">
-        <!-- Decoration -->
-        <div class="absolute -top-6 -left-6 h-24 w-24 rounded-full bg-white/10 blur-xl"></div>
-
-        <div class="relative">
-          <div class="mb-3 flex items-center gap-3">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20">
-              <Timer class="h-5 w-5" />
-            </div>
-            <div>
-              <p class="text-[10px] font-bold tracking-widest uppercase opacity-80">
-                Phiên chọn ghế
-              </p>
-              {#if queueStore.eventTitle}
-                <p class="max-w-[180px] truncate text-xs font-semibold">{queueStore.eventTitle}</p>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Countdown -->
-          <div class="mb-3 flex items-center justify-between rounded-xl bg-black/20 px-4 py-2.5">
-            <span class="text-xs opacity-80">Hết hạn sau:</span>
-            <span class="font-mono text-2xl font-black tabular-nums">{formatTime(timeLeft)}</span>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex gap-2">
-            <button
-              onclick={goToSeats}
-              class="flex-1 rounded-xl bg-white py-2.5 text-xs font-bold text-orange-600 transition-all hover:bg-white/90 active:scale-95"
-            >
-              <ArrowLeft class="mr-1 inline-block h-3.5 w-3.5 -rotate-180" />
-              Quay lại chọn ghế
-            </button>
-            <button
-              onclick={() => (showExitConfirm = true)}
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/20 text-white transition hover:bg-black/30"
-              title="Thoát phiên chọn ghế"
-            >
-              <LogOut class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <QueueHolding
+        formattedTime={formatTime(timeLeft)}
+        onGoToSeats={goToSeats}
+        onExitClick={() => (showExitConfirm = true)}
+      />
     {/if}
   </div>
 {/if}
