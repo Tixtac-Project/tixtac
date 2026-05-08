@@ -9,32 +9,32 @@
   let { onExpand, onExitClick }: Props = $props();
 </script>
 
-<div class="bg-surface-container-highest p-1.5 sm:p-4">
+<div class="bg-primary sm:bg-surface-container-highest p-2 sm:p-4 shadow-inner sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center gap-2 sm:hidden pl-1 pr-0.5">
-    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-      <Loader2 class="h-4 w-4 animate-spin text-primary" />
+  <div class="flex items-center gap-3 sm:hidden pl-2 pr-1 text-white">
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 shadow-sm">
+      <Loader2 class="h-5 w-5 animate-spin text-white" />
     </div>
-    <span class="font-mono text-lg font-black text-primary">#{queueStore.position}</span>
+    <span class="font-mono text-xl font-black text-white drop-shadow-sm">#{queueStore.position}</span>
     
-    <div class="mx-1 h-5 w-px bg-outline-variant/30"></div>
+    <div class="mx-1 h-6 w-px bg-white/20"></div>
     
     <button
       onclick={onExpand}
-      class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-high text-muted-foreground transition active:scale-95"
+      class="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition hover:bg-white/30 active:scale-95"
       title="Phóng to"
     >
-      <Maximize2 class="h-4 w-4" />
+      <Maximize2 class="h-5 w-5" />
     </button>
     
     <button
       onclick={onExitClick}
-      class="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10 text-destructive transition active:scale-95"
+      class="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition hover:bg-red-500 hover:text-white active:scale-95"
       title="Hủy xếp hàng"
     >
-      <X class="h-4 w-4" />
+      <X class="h-5 w-5" />
     </button>
   </div>
 

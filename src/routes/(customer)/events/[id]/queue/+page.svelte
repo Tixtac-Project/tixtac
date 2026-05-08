@@ -2,6 +2,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { queueStore } from '$lib/stores/queue.svelte';
   import { onMount } from 'svelte';
   import { Clock, Loader2, Users } from 'lucide-svelte';
@@ -66,7 +67,7 @@
       } else if (data.status === 'none') {
         // Bị đuổi khỏi queue (timeout, worker eviction, ...)
         queueStore.clear();
-        goto(`/events/${eventId}`);
+        goto(resolve(`/events/${eventId}`));
       }
     } catch {
       pollingError = true;
@@ -90,9 +91,9 @@
 
       const showId = queueStore.showId;
       if (showId) {
-        goto(`/events/${eventId}/shows/${showId}/seats`);
+        goto(resolve(`/events/${eventId}/shows/${showId}/seats`));
       } else {
-        goto(`/events/${eventId}`);
+        goto(resolve(`/events/${eventId}`));
       }
     } catch {
       alert('Có lỗi xảy ra. Vui lòng thử lại.');
@@ -103,10 +104,15 @@
 
   onMount(() => {
     // Nếu store đã ready (F5 trong grace period), không cần poll lại ngay
-    if (queueStore.status !== 'ready') {
+    if (queueStore.status !== 'ready') pollStatus();
+    
+    const interval = setInterval(() => {
+      // Stop polling once the server has promoted us; the countdown owns the
+      // expiresAt from here on, and the /confirm flow drives the next state.
+      if (queueStore.status === 'ready' || queueStore.status === 'holding') return;
       pollStatus();
-    }
-    const interval = setInterval(pollStatus, 5000);
+    }, 5000);
+    
     return () => clearInterval(interval);
   });
 </script>
@@ -128,7 +134,7 @@
         <div class="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-transparent hidden sm:block"></div>
 
         <div class="flex flex-1 flex-col p-6 sm:p-8">
-          
+
           <div class="flex-1 flex flex-col items-center justify-center pt-8 sm:pt-0">
             <!-- Illustration -->
             <div class="mb-8 flex justify-center">
@@ -197,14 +203,14 @@
             </div>
           </div>
 
-          <!-- Bottom Actions (Sticky on Mobile) -->
-          <div class="mt-8 flex flex-col gap-4 sticky bottom-0 bg-surface sm:bg-transparent pb-4 pt-2 sm:p-0">
+          <!-- Bottom Actions -->
+          <div class="mt-auto flex flex-col gap-4 pb-12 pt-8 sm:pb-0">
             <button
               onclick={() => {
                 queueStore.isMinimized = true;
-                goto(`/events/${eventId}`);
+                goto(resolve(`/events/${eventId}`));
               }}
-              class="w-full rounded-full sm:rounded-xl bg-surface-container-highest sm:bg-surface-container-high px-6 py-4 font-bold text-foreground shadow-lg sm:shadow-none transition-all hover:bg-surface-container-highest active:scale-95"
+              class="w-full rounded-xl bg-surface-container-highest sm:bg-surface-container-high px-6 py-4 font-bold text-foreground shadow-lg sm:shadow-none transition-all hover:bg-surface-container-highest active:scale-95"
             >
               Thu nhỏ & Xem thông tin sự kiện
             </button>
@@ -230,7 +236,7 @@
         <div class="absolute -bottom-12 -left-12 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
 
         <div class="relative flex flex-col flex-1 justify-between sm:justify-center">
-          
+
           <div class="flex-1 flex flex-col justify-center">
             <!-- Checkmark icon -->
             <div class="mb-8 flex justify-center">
@@ -275,11 +281,11 @@
             ></div>
           </div>
 
-          <div class="mt-4 pb-4 sm:pb-0">
+          <div class="mt-auto pt-8 pb-12 sm:pb-0">
             <button
               onclick={handleConfirm}
               disabled={isConfirming}
-              class="w-full animate-pulse rounded-full sm:rounded-xl bg-white px-6 py-4 text-lg font-black text-emerald-700
+              class="w-full animate-pulse rounded-xl bg-white px-6 py-4 text-lg font-black text-emerald-700
                      shadow-[0_8px_30px_rgb(0,0,0,0.2)] sm:shadow-xl sm:shadow-black/20 transition-all hover:animate-none hover:bg-white/90 active:scale-95
                      disabled:cursor-not-allowed disabled:opacity-70"
             >

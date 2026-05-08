@@ -9,25 +9,25 @@
   let { formattedTime, onGoToSeats }: Props = $props();
 </script>
 
-<div class="bg-emerald-600 p-1.5 sm:p-4 text-white">
+<div class="bg-emerald-600 p-2 sm:p-4 text-white shadow-inner sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center gap-2 sm:hidden pl-1 pr-0.5">
-    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">
-      <AlertCircle class="h-4 w-4" />
+  <div class="flex items-center gap-3 sm:hidden pl-2 pr-1">
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 shadow-sm">
+      <AlertCircle class="h-5 w-5" />
     </div>
     
-    <span class="font-mono text-lg font-black">{formattedTime}</span>
+    <span class="font-mono text-xl font-black drop-shadow-sm">{formattedTime}</span>
     
-    <div class="mx-1 h-5 w-px bg-white/20"></div>
+    <div class="mx-1 h-6 w-px bg-white/20"></div>
     
     <button
       onclick={onGoToSeats}
-      class="flex h-8 w-auto px-3 items-center justify-center gap-1.5 rounded-full bg-white text-xs font-bold text-emerald-700 animate-pulse transition active:scale-95"
+      class="flex h-10 w-auto px-4 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-emerald-700 animate-pulse shadow-md transition active:scale-95"
     >
       CHỌN GHẾ
-      <ArrowRight class="h-3 w-3" />
+      <ArrowRight class="h-4 w-4" />
     </button>
   </div>
 

@@ -80,17 +80,15 @@
     try {
       const res = await fetch(resolve('/api/auth/logout'), { method: 'POST' });
 
-      if (res.ok) {
-        // Clear the client-side queue widget state.
-        queueStore.clear();
-
-        // Hard redirect — ensures all SvelteKit stores and server data are fully reset.
-        window.location.href = resolve('/');
-      } else {
-        console.error('Logout failed');
+      if (!res.ok) {
+        console.warn('Logout thất bại, nhưng đã xóa local state!');
       }
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error(err);
+      console.warn('Lỗi mạng trong quá trình Logout, xóa local state!');
+    } finally {
+      queueStore.clear();
+      window.location.href = resolve('/');
     }
   }
 

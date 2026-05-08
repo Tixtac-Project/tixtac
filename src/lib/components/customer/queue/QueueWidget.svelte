@@ -2,6 +2,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { queueStore } from '$lib/stores/queue.svelte';
   import { fly } from 'svelte/transition';
   import QueueWaiting from './QueueWaiting.svelte';
@@ -98,7 +99,7 @@
   function expandQueue() {
     const eventId = queueStore.eventId;
     queueStore.isMinimized = false;
-    if (eventId) goto(`/events/${eventId}/queue`);
+    if (eventId) goto(resolve(`/events/${eventId}/queue`));
   }
 
   /**
@@ -117,27 +118,36 @@
         const res = await fetch(`/api/events/${eventId}/queue/confirm`, {
           method: 'POST',
         });
+
         if (res.ok) {
           const { data } = await res.json();
-          // Stage the confirm data; the /seats page commits it on mount to avoid the orange flash.
+          // Stage the confirm data
           queueStore.setPendingConfirm(data.expiresAt, data.token);
+
           if (showId) {
-            goto(`/events/${eventId}/shows/${showId}/seats`);
+            goto(resolve(`/events/${eventId}/shows/${showId}/seats`));
           } else {
-            goto(`/events/${eventId}`);
+            goto(resolve(`/events/${eventId}`));
           }
+          return;
+        } else {
+          console.error('[Widget] Confirm failed: Server rejected');
+          alert('Không thể xác nhận slot. Có thể phiên của bạn đã hết hạn. Vui lòng tải lại trang!');
           return;
         }
       } catch (err) {
-        console.error('[Widget Confirm Error]', err);
+        console.error('[Widget] Confirm Error:', err);
+        alert('Lỗi kết nối mạng. Vui lòng thử lại!');
+        return;
       }
     }
 
-    // Fallback: navigate directly if already holding.
-    if (showId && eventId) {
-      goto(`/events/${eventId}/shows/${showId}/seats`);
-    } else if (eventId) {
-      goto(`/events/${eventId}`);
+    if (queueStore.status === 'holding') {
+      if (showId && eventId) {
+        goto(resolve(`/events/${eventId}/shows/${showId}/seats`));
+      } else if (eventId) {
+        goto(resolve(`/events/${eventId}`));
+      }
     }
   }
 
@@ -175,7 +185,7 @@
 
     const dx = e.clientX - startPointer.x;
     const dy = e.clientY - startPointer.y;
-    
+
     let newX = startOffset.x + dx;
     let newY = startOffset.y + dy;
 
@@ -191,9 +201,9 @@
 
     const minX = -baseLeft; // touches left padding limit
     const maxX = 0; // touches right padding limit
-    
+
     // Ensure top padding to avoid header
-    const minY = -(baseTop - paddingTop); 
+    const minY = -(baseTop - paddingTop);
     const maxY = 0; // touches bottom padding limit
 
     const safeMinX = Math.min(minX, maxX);
@@ -220,7 +230,7 @@
     const isMobile = window.innerWidth < 640;
     const paddingX = isMobile ? 16 : 20;
     const widgetWidth = widgetEl.offsetWidth;
-    
+
     const baseLeft = window.innerWidth - paddingX * 2 - widgetWidth;
     const minX = -baseLeft;
     const maxX = 0;

@@ -20,17 +20,18 @@ export const POST = apiHandler(async ({ params, locals }) => {
 
   // On successful payment, immediately release the queue slot so the next
   // waiting user can be promoted. The eventId is resolved from the first order item.
-  try {
-    const orderDetails = await orderService.getOrderDetails(orderId, customer.id);
-    const eventId = orderDetails.items[0]?.event.id;
-    if (eventId) {
-      void queueService
-        .leaveQueue(customer.id, eventId)
-        .catch((err) => console.error('[order_checkout] leaveQueue failed (non-critical):', err));
+  // This is run in a fire-and-forget block to avoid blocking the fast checkout response.
+  (async () => {
+    try {
+      const orderDetails = await orderService.getOrderDetails(orderId, customer.id);
+      const eventId = orderDetails.items[0]?.event.id;
+      if (eventId) {
+        await queueService.leaveQueue(customer.id, eventId);
+      }
+    } catch (err) {
+      console.error('[order_checkout] Failed to cleanup queue slot (non-critical):', err);
     }
-  } catch (err) {
-    console.error('[order_checkout] Failed to fetch orderDetails for queue release:', err);
-  }
+  })();
 
   return json({ data }, { status: 200 });
 });

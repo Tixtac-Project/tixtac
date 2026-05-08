@@ -10,33 +10,33 @@
   let { formattedTime, onGoToSeats, onExitClick }: Props = $props();
 </script>
 
-<div class="bg-orange-500 p-1.5 sm:p-4 text-white">
+<div class="bg-orange-500 p-2 sm:p-4 text-white shadow-inner sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center gap-2 sm:hidden pl-1 pr-0.5">
-    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">
-      <Timer class="h-4 w-4" />
+  <div class="flex items-center gap-3 sm:hidden pl-2 pr-1">
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 shadow-sm">
+      <Timer class="h-5 w-5" />
     </div>
     
-    <span class="font-mono text-lg font-black">{formattedTime}</span>
+    <span class="font-mono text-xl font-black drop-shadow-sm">{formattedTime}</span>
     
-    <div class="mx-1 h-5 w-px bg-white/20"></div>
+    <div class="mx-1 h-6 w-px bg-white/20"></div>
     
     <button
       onclick={onGoToSeats}
-      class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white transition active:scale-95"
+      class="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition active:scale-95"
       title="Quay lại chọn ghế"
     >
-      <ArrowLeft class="h-4 w-4 -rotate-180" />
+      <ArrowLeft class="h-5 w-5" />
     </button>
-
+    
     <button
       onclick={onExitClick}
-      class="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-white transition active:scale-95"
-      title="Thoát phiên"
+      class="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition hover:bg-red-500 hover:text-white active:scale-95"
+      title="Hủy xếp hàng"
     >
-      <LogOut class="h-4 w-4" />
+      <LogOut class="h-5 w-5" />
     </button>
   </div>
 

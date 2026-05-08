@@ -137,15 +137,19 @@
       queueStore.eventTitle = event.title;
       queueStore.showId = showId;
 
-      if (result.data.status === 'waiting') {
+      if (result.data?.status === 'waiting') {
         queueStore.status = 'waiting';
         queueStore.position = result.data.position;
-        goto(`/events/${event.id}/queue`);
-      } else if (result.data.status === 'active') {
-        queueStore.status = 'holding';
+        goto(resolve(`/events/${event.id}/queue`));
+      } else if (result.data?.status === 'active') {
+        queueStore.status = 'ready';
         queueStore.expiresAt = result.data.expiresAt;
-        queueStore.token = result.data.token;
-        goto(seatsPath);
+        if (result.data.token) {
+          queueStore.token = result.data.token;
+        }
+        goto(resolve(`/events/${event.id}/queue`));
+      } else {
+        alert('Hệ thống trả về trạng thái không xác định. Vui lòng thử lại!');
       }
     } catch (error) {
       console.error('Lỗi khi join queue:', error);
@@ -158,6 +162,18 @@
     if (!user) {
       goto(resolve(`/login?redirect=${encodeURIComponent(seatsPath)}`));
       return;
+    }
+
+    // Nếu user đang trong luồng của chính event này, dùng luôn trạng thái hiện tại
+    if (queueStore.eventId === event.id) {
+      if (queueStore.status === 'holding') {
+        goto(seatsPath);
+        return;
+      }
+      if (queueStore.status === 'ready' || queueStore.status === 'waiting') {
+        goto(resolve(`/events/${event.id}/queue`));
+        return;
+      }
     }
 
     // Kiểm tra xung đột hàng chờ

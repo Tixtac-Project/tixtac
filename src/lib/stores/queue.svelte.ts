@@ -1,7 +1,7 @@
 // src/lib/stores/queue.svelte.ts
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-
+import { resolve } from '$app/paths';
 /** Represents the possible lifecycle states of a virtual queue session. */
 export type QueueStatus = 'idle' | 'waiting' | 'ready' | 'holding' | 'missed';
 
@@ -19,7 +19,7 @@ class QueueStore {
    * Staged confirm payload — prevents the orange widget from flashing during
    * navigation to the seats page. The seats page commits this on mount.
    */
-  pendingConfirm = $state<{ expiresAt: number; token: string } | null>(null);
+  pendingConfirm = $state<{ expiresAt: number; token?: string } | null>(null);
 
   private initialized = false;
 
@@ -28,6 +28,7 @@ class QueueStore {
     this.initialized = true;
 
     const saved = localStorage.getItem('tixtac_queue');
+    const savedToken = sessionStorage.getItem('tixtac_queue_token');
     if (saved) {
       try {
         const data = JSON.parse(saved);
@@ -38,7 +39,7 @@ class QueueStore {
         this.position = data.position ?? 0;
         this.expiresAt = data.expiresAt ?? null;
         this.isMinimized = data.isMinimized ?? false;
-        this.token = data.token ?? null;
+        this.token = savedToken ?? null;
 
         // If the session expired while the page was closed, reset to idle on restore.
         if (
@@ -67,9 +68,14 @@ class QueueStore {
             position: this.position,
             expiresAt: this.expiresAt,
             isMinimized: this.isMinimized,
-            token: this.token,
+            // Exclude token from localStorage to mitigate XSS exposure
           }),
         );
+        if (this.token) {
+          sessionStorage.setItem('tixtac_queue_token', this.token);
+        } else {
+          sessionStorage.removeItem('tixtac_queue_token');
+        }
       });
     });
   }
@@ -86,6 +92,7 @@ class QueueStore {
     this.pendingConfirm = null;
     if (browser) {
       localStorage.removeItem('tixtac_queue');
+      sessionStorage.removeItem('tixtac_queue_token');
     }
   }
 
@@ -97,7 +104,7 @@ class QueueStore {
    * @param expiresAt - Unix timestamp (ms) when the holding session expires.
    * @param token     - Signed seat-access token for the holding session.
    */
-  setPendingConfirm(expiresAt: number, token: string) {
+  setPendingConfirm(expiresAt: number, token?: string) {
     this.pendingConfirm = { expiresAt, token };
   }
 
@@ -109,7 +116,7 @@ class QueueStore {
     if (this.pendingConfirm) {
       this.status = 'holding';
       this.expiresAt = this.pendingConfirm.expiresAt;
-      this.token = this.pendingConfirm.token;
+      this.token = this.pendingConfirm.token ?? null;
       this.pendingConfirm = null;
     }
   }
@@ -124,9 +131,9 @@ class QueueStore {
     if (!browser) return;
     await fetch(`/api/events/${eventId}/queue`, { method: 'DELETE' }).catch(() => {});
     if (eventId) {
-      goto(`/events/${eventId}`);
+      goto(resolve(`/events/${eventId}`));
     } else {
-      goto('/');
+      goto(resolve('/'));
     }
   }
 

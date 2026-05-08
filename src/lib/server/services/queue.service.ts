@@ -21,8 +21,9 @@ export const queueService = {
       const waitingKey = `waiting_queue:${eventId}`;
       const now = Date.now();
       const maxUsers = config.maxConcurrentUsers ?? 200;
-      // Users promoted immediately (no waiting) receive the full holding duration (5 min).
-      const initialDuration = config.accessTokenDuration;
+      // Users promoted immediately (no waiting) receive a short grace period (60s).
+      // They must explicitly call /confirm to receive the full holding duration.
+      const initialDuration = 60;
       const expiresAt = now + initialDuration * 1000;
       const activeTtl = initialDuration + 5;
       const waitingTtl = 3600;
@@ -107,9 +108,9 @@ export const queueService = {
         return { status: 'waiting', position: value };
       }
 
-      // code 1: User was promoted immediately to active — mint a full-duration seat token.
+      // code 1: User was promoted immediately to active — mint a grace-period token.
       if (code === 1) {
-        const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
+        const token = await encryptSeatToken({ userId, eventId }, initialDuration);
         return { status: 'active', expiresAt: value, token };
       }
 
