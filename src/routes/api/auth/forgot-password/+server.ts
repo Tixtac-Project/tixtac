@@ -4,7 +4,9 @@ import { userService } from '$lib/server/services/user.service';
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 
-const forgotBodySchema = z.object({ email: z.string().email() });
+const forgotBodySchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
 
 export const POST = apiHandler(async ({ request, url, getClientAddress }) => {
   const body = await request.json();

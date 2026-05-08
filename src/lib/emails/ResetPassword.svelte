@@ -12,7 +12,7 @@
     Text,
   } from '@better-svelte-email/components';
 
-  let { resetLink = '', supportEmail = 'support@example.com', ip = '', device = '' } = $props();
+  let { resetLink = '', supportEmail = '', ip = '', device = '' } = $props();
 </script>
 
 <Html lang="vi">
