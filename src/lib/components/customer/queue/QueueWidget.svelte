@@ -179,16 +179,21 @@
     let newX = startOffset.x + dx;
     let newY = startOffset.y + dy;
 
-    // Boundary constraints
-    // Base position is fixed right-5 (20px) and bottom-5 (20px)
-    const baseLeft = window.innerWidth - 40 - 320; // 40 = 20px left + 20px right padding
-    const baseTop = window.innerHeight - 20 - widgetEl.offsetHeight;
+    // Boundary constraints based on responsive padding
+    const isMobile = window.innerWidth < 640;
+    const paddingX = isMobile ? 16 : 20; // right-4 vs right-5
+    const paddingBottom = isMobile ? 96 : 20; // bottom-24 (96px) vs bottom-5 (20px) to avoid mobile bottom navigation
+    const paddingTop = isMobile ? 60 : 80;
+    const widgetWidth = widgetEl.offsetWidth;
+
+    const baseLeft = window.innerWidth - paddingX * 2 - widgetWidth;
+    const baseTop = window.innerHeight - paddingBottom - widgetEl.offsetHeight;
 
     const minX = -baseLeft; // touches left padding limit
     const maxX = 0; // touches right padding limit
     
-    // Ensure 80px top padding to avoid header
-    const minY = -(baseTop - 80); 
+    // Ensure top padding to avoid header
+    const minY = -(baseTop - paddingTop); 
     const maxY = 0; // touches bottom padding limit
 
     const safeMinX = Math.min(minX, maxX);
@@ -212,7 +217,11 @@
 
     // iPhone AssistiveTouch Snapping Logic
     // Snap to the nearest vertical edge (Left or Right)
-    const baseLeft = window.innerWidth - 40 - 320;
+    const isMobile = window.innerWidth < 640;
+    const paddingX = isMobile ? 16 : 20;
+    const widgetWidth = widgetEl.offsetWidth;
+    
+    const baseLeft = window.innerWidth - paddingX * 2 - widgetWidth;
     const minX = -baseLeft;
     const maxX = 0;
 
@@ -232,12 +241,12 @@
 {#if shouldShow}
   <div
     transition:fly={{ y: 20, duration: 300 }}
-    class="fixed right-5 bottom-5 z-50 w-[320px]"
+    class="fixed right-4 bottom-24 z-50 w-max sm:right-5 sm:bottom-5 sm:w-[320px]"
   >
     <div
       bind:this={widgetEl}
       role="none"
-      class="w-full overflow-hidden rounded-2xl ring-1 ring-black/10 backdrop-blur-sm
+      class="w-full overflow-hidden rounded-full sm:rounded-2xl ring-1 ring-black/10 backdrop-blur-sm
              {isDragging ? 'cursor-grabbing shadow-2xl ring-black/20' : 'cursor-grab shadow-xl'}"
       style="
         transform: translate({dragOffset.x}px, {dragOffset.y}px) scale({isDragging ? 1.02 : 1});
