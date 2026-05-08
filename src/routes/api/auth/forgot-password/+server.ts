@@ -1,16 +1,12 @@
 import { apiHandler } from '$lib/server/handler';
 import { forgotPasswordIpLimiter, forgotPasswordLimiter } from '$lib/server/rate-limiter';
 import { userService } from '$lib/server/services/user.service';
+import { forgotPasswordSchema } from '$lib/shared/schemas/auth.schema';
 import { json } from '@sveltejs/kit';
-import { z } from 'zod';
-
-const forgotBodySchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-});
 
 export const POST = apiHandler(async ({ request, url, getClientAddress }) => {
   const body = await request.json();
-  const parsed = forgotBodySchema.safeParse(body);
+  const parsed = forgotPasswordSchema.safeParse(body);
   if (!parsed.success) {
     return json({ error: 'Email không hợp lệ' }, { status: 400 });
   }
