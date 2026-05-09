@@ -105,9 +105,6 @@
             <div class="h-5 w-1.5 rounded-full bg-primary md:h-6"></div>
             <h2 class="text-base font-bold text-foreground md:text-xl">Vé của tôi</h2>
           </div>
-          <button class="text-xs font-bold text-primary hover:underline md:text-sm">
-            Xem lịch sử ›
-          </button>
         </div>
 
         {#each paidEvents as event (event.event_id)}

@@ -94,7 +94,9 @@
   function handleTouchStart(e: TouchEvent) {
     if (e.touches.length === 1) {
       // Only allow swipe if scroll container is at the top
-      const scrollContainer = (e.currentTarget as HTMLElement).querySelector('[class*="overflow-y-auto"]');
+      const scrollContainer = (e.currentTarget as HTMLElement).querySelector(
+        '[class*="overflow-y-auto"]',
+      );
       const isAtTop = !scrollContainer || scrollContainer.scrollTop === 0;
       // Or if touch starts in header/drag handle area (within first 80px of the panel)
       const touchY = e.touches[0].clientY;

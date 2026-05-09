@@ -10,9 +10,9 @@ export const load: PageServerLoad = async ({ locals }) => {
     redirect(303, '/login?redirect=/me/tickets');
   }
 
-  // 2. Nếu là Admin vào đây thì cũng đưa về trang chủ
+  // 2. Staff/admin redirected to profile (only customers have tickets)
   if (user.role !== 'customer') {
-    redirect(303, '/');
+    redirect(303, '/me/profile');
   }
 
   // 3. Fetch dữ liệu lịch sử mua vé bằng Service

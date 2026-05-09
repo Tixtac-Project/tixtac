@@ -37,12 +37,6 @@
 
   let { user, searchQuery = '', categories = [] }: Props = $props();
 
-  let activeCategory = $state('');
-
-  $effect(() => {
-    activeCategory = pageState.url.searchParams.get('category') ?? '';
-  });
-
   let isSearchOpen = $state(false);
   let isUserMenuOpen = $state(false);
   let searchInput = $state<HTMLInputElement | null>(null);
@@ -315,7 +309,7 @@
   {#if categories.length > 0 && !currentPath.startsWith('/search')}
     <div class="border-b border-outline-variant/10 bg-surface-container-lowest">
       <div class="mx-auto flex h-10 w-full max-w-7xl items-center px-3 sm:h-12 sm:px-6 lg:px-8">
-        <CategoryFilterBar {categories} bind:activeCategory />
+        <CategoryFilterBar {categories} />
       </div>
     </div>
   {/if}
@@ -338,7 +332,9 @@
     >
       <!-- Sliding pill background — 1/4 width, centered in its column -->
       <div
-        class="absolute top-1.5 left-[calc(var(--active-idx)*25%+0.375rem)] h-[calc(100%-0.75rem)] w-[calc(25%-0.75rem)] rounded-2xl bg-primary-light transition-all duration-350 ease-(--ease-architectural) {activeTabIndex.hasActive ? '' : 'hidden'}"
+        class="absolute top-1.5 left-[calc(var(--active-idx)*25%+0.375rem)] h-[calc(100%-0.75rem)] w-[calc(25%-0.75rem)] rounded-2xl bg-primary-light transition-all duration-350 ease-(--ease-architectural) {activeTabIndex.hasActive
+          ? ''
+          : 'hidden'}"
       ></div>
 
       <!-- Home -->

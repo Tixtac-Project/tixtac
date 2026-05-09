@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import { useInView } from 'motion-sv';
   import { cn } from '$lib/utils';
+  import { useInView } from 'motion-sv';
+  import { onDestroy } from 'svelte';
 
   interface NumberTickerProps {
     value: number;
@@ -28,7 +28,7 @@
   }: NumberTickerProps = $props();
 
   let spanRef: HTMLSpanElement | null = $state(null);
-  let animatedValue = $state(direction === 'down' ? value : startValue);
+  let animatedValue = $state(0);
   let activeRafId: number | null = null;
 
   // Spring configuration

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import ProfileSidebar from '$lib/components/customer/layout/ProfileSidebar.svelte';
   import { Button } from '$lib/components/ui/button';
   import {
     Card,
@@ -23,7 +25,9 @@
     SelectTrigger,
   } from '$lib/components/ui/select';
   import { updateProfileSchema, updateSecuritySchema } from '$lib/shared/schemas/auth.schema';
+  import { toast } from '$lib/stores/toast';
   import { cn } from '$lib/utils';
+  import { handleLogout as sharedLogout } from '$lib/utils/auth';
   import {
     AlertCircle,
     Calendar as CalendarIcon,
@@ -39,8 +43,6 @@
     User,
     Users,
   } from 'lucide-svelte';
-  import { handleLogout as sharedLogout } from '$lib/utils/auth';
-  import { toast } from '$lib/stores/toast';
 
   const profile = $derived(page.data.profile);
 
@@ -242,8 +244,21 @@
   <title>Quản lý tài khoản</title>
 </svelte:head>
 
-<div class="min-h-screen bg-surface py-8 md:py-14">
-  <div class="mx-auto max-w-2xl px-4 md:px-6">
+<div class="mx-auto flex max-w-7xl gap-8 px-4 py-6 md:gap-10 md:px-8 md:py-10 lg:gap-12 lg:px-10">
+  <!-- Sidebar -->
+  <aside class="hidden w-52 shrink-0 md:block lg:w-56">
+    <div class="sticky top-24">
+      <ProfileSidebar
+        onItemClick={(id) => {
+          const el = document.getElementById(id);
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <div class="min-w-0 flex-1">
     <!-- Header -->
     <div class="mb-8 flex items-center gap-3.5 md:mb-10">
       <div class="rounded-xl bg-primary/10 p-2.5 text-primary">
@@ -259,7 +274,7 @@
 
     <div class="space-y-5 md:space-y-6">
       <!-- ═══ Profile Card ═══ -->
-      <Card class="overflow-hidden py-0!">
+      <Card id="profile" class="scroll-mt-20 overflow-hidden py-0!">
         <form onsubmit={handleProfileSubmit}>
           <CardHeader class="border-b bg-muted/30 px-5 py-4 md:px-6">
             <div class="flex items-center gap-2.5">
@@ -395,7 +410,7 @@
       </Card>
 
       <!-- ═══ Email Card ═══ -->
-      <Card class="overflow-hidden py-0!">
+      <Card id="email" class="scroll-mt-20 overflow-hidden py-0!">
         <form onsubmit={handleEmailSubmit}>
           <CardHeader class="border-b bg-muted/30 px-5 py-4 md:px-6">
             <div class="flex items-center gap-2.5">
@@ -487,7 +502,7 @@
       </Card>
 
       <!-- ═══ Password Card ═══ -->
-      <Card class="overflow-hidden py-0!">
+      <Card id="password" class="scroll-mt-20 overflow-hidden py-0!">
         <form onsubmit={handlePasswordSubmit}>
           <CardHeader class="border-b bg-muted/30 px-5 py-4 md:px-6">
             <div class="flex items-center gap-2.5">
@@ -627,37 +642,27 @@
         </form>
       </Card>
 
-      <!-- ═══ Logout Card ═══ -->
-      <Card class="overflow-hidden border-danger/30 py-0!">
-        <CardHeader class="border-b bg-danger/5 px-5 py-4 md:px-6">
-          <div class="flex items-center gap-2.5">
-            <LogOut class="size-4 text-destructive md:size-5" />
-            <CardTitle class="text-base text-foreground md:text-lg">Phiên đăng nhập</CardTitle>
-          </div>
-          <CardDescription class="mt-1 text-xs md:text-sm">
-            Đăng xuất khỏi tài khoản của bạn
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="px-5 py-5 md:px-6 md:py-6">
-          <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
-            <Button
-              variant="destructive"
-              type="submit"
-              disabled={isLoggingOut}
-              class="w-full gap-2 md:w-auto"
-            >
-              {#if isLoggingOut}
-                <span
-                  class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                ></span>
-              {:else}
-                <LogOut class="size-4" />
-              {/if}
-              Đăng xuất
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <!-- ═══ Logout Box ═══ -->
+      <div
+        class="flex items-center justify-between rounded-xl border border-danger/30 bg-surface-container-lowest px-5 py-4 md:px-6"
+      >
+        <div class="flex items-center gap-2.5">
+          <LogOut class="size-4 text-destructive md:size-5" />
+          <span class="text-sm font-medium text-foreground">Phiên đăng nhập</span>
+        </div>
+        <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
+          <Button variant="destructive" type="submit" disabled={isLoggingOut} class="gap-2">
+            {#if isLoggingOut}
+              <span
+                class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              ></span>
+            {:else}
+              <LogOut class="size-4" />
+            {/if}
+            Đăng xuất
+          </Button>
+        </form>
+      </div>
     </div>
   </div>
 </div>

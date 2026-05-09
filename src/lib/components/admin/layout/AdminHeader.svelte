@@ -1,11 +1,12 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { AnimatedThemeToggler } from '$lib/components/magic/animated-theme-toggler';
   import * as Avatar from '$lib/components/ui/avatar';
   import { Button } from '$lib/components/ui/button';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-  import { AnimatedThemeToggler } from '$lib/components/magic/animated-theme-toggler';
   import { handleLogout as sharedLogout } from '$lib/utils/auth';
   import { Loader, LogOut, Menu, User } from 'lucide-svelte';
 
@@ -75,7 +76,7 @@
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" class="w-48 rounded-lg p-1.5">
         <DropdownMenu.Group>
-          <DropdownMenu.Item class="gap-2 rounded-lg" disabled>
+          <DropdownMenu.Item class="gap-2 rounded-lg" onclick={() => goto(resolve('/me/profile'))}>
             <User class="h-4 w-4 text-muted-foreground" />
             <span>Hồ sơ</span>
           </DropdownMenu.Item>
