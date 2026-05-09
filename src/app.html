@@ -43,19 +43,6 @@
     <!-- Favicon (dynamic: primary color when tab active, muted when inactive) -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="favicon" />
 
-    <script>
-      (function () {
-        const el = document.getElementById('favicon');
-        if (!el) return;
-        var inactive = el.href;
-        var active = inactive.replace('favicon.svg', 'favicon-active.svg');
-        document.addEventListener('visibilitychange', function () {
-          el.href = document.hidden ? inactive : active;
-        });
-        if (!document.hidden) el.href = active;
-      })();
-    </script>
-
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
