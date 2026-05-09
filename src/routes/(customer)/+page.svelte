@@ -26,7 +26,7 @@
 </script>
 
 <svelte:head>
-  <title>TixTac - Nền tảng đặt vé sự kiện số 1</title>
+  <title>TixTac - Nền tảng đặt vé sự kiện hàng đầu</title>
   <meta
     name="description"
     content="Khám phá và đặt vé concert, festival, thể thao hàng đầu Việt Nam. Nhanh chóng, bảo mật, tiện lợi trên TixTac."
