@@ -100,7 +100,7 @@
     </BentoCard>
   {:else}
     <!-- ══════ Bento Stats Row ══════ -->
-    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <BentoStat label="Tổng" value={totalEvents} subtitle="sự kiện" hue={265} />
       <BentoStat label="Xuất bản" value={publishedCount} subtitle="trang này" hue={155} />
       <BentoStat label="Nháp" value={draftCount} subtitle="trang này" hue={85} />

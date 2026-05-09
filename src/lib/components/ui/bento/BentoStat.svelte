@@ -46,7 +46,9 @@
       </span>
     </div>
 
-    <p class="text-3xl font-extrabold tracking-tighter text-foreground">{value}</p>
+    <p class="text-xl font-extrabold tracking-tighter text-foreground md:text-2xl lg:text-3xl">
+      {value}
+    </p>
 
     {#if subtitle}
       <p class="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
