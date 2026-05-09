@@ -186,7 +186,7 @@
                 <div class="absolute top-0 bottom-0 left-0 w-1.5 bg-primary"></div>
                 <div class="ticket-sawtooth absolute top-0 bottom-0 left-1.5 z-10 w-3"></div>
 
-                <div class="flex flex-1 flex-col justify-between py-4 pr-4 pl-8">
+                <div class="flex min-w-0 flex-1 flex-col justify-between py-4 pr-4 pl-8">
                   <div class="flex items-center justify-between">
                     <p class="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                       THÔNG TIN VÉ
