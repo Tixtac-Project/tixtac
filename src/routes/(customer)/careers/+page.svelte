@@ -152,7 +152,7 @@
         transition={{ duration: 0.6, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
         class="mt-10 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground"
       >
-        {#each [{ value: '20+', label: 'Thành viên' }, { value: '4', label: 'Vị trí mở' }, { value: '100%', label: 'Đam mê' }] as s}
+        {#each [{ value: '20+', label: 'Thành viên' }, { value: '4', label: 'Vị trí mở' }, { value: '100%', label: 'Đam mê' }] as s (s.value)}
           <div class="flex items-center gap-2">
             <span class="text-lg font-black text-foreground">{s.value}</span>
             <span>{s.label}</span>

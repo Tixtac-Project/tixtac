@@ -11,10 +11,6 @@ export default defineConfig({
   server: {
     host: true,
     strictPort: true,
-    hmr: {
-      host: 'localhost',
-      protocol: 'wss',
-    },
     warmup: {
       clientFiles: ['./src/routes/**/*.svelte', './src/lib/components/**/*.svelte'],
     },

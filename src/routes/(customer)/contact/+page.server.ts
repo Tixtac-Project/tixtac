@@ -1,7 +1,10 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-const WEB3FORMS_KEY = '2fe33d39-dd60-4a96-8beb-3b807daf571e';
+const WEB3FORMS_KEY = process.env.WEB3FORMS_KEY;
+if (!WEB3FORMS_KEY) {
+  console.error('WEB3FORMS_KEY environment variable is not set');
+}
 
 export const actions = {
   default: async ({ request }) => {
@@ -38,6 +41,9 @@ export const actions = {
 
     // Submit to Web3Forms
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const res = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -48,7 +54,10 @@ export const actions = {
           subject: subject.trim(),
           message: message.trim(),
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const json = await res.json();
 
@@ -60,7 +69,10 @@ export const actions = {
       }
 
       return { success: true };
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return fail(504, { success: false, error: 'Yêu cầu hết thời gian chờ, vui lòng thử lại.' });
+      }
       return fail(500, { success: false, error: 'Lỗi máy chủ, vui lòng thử lại.' });
     }
   },

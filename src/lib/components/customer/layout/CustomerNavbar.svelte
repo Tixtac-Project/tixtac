@@ -94,12 +94,15 @@
       ? (['/', '/search', '/admin', '/me/profile'] as const)
       : (['/', '/search', '/me/tickets', '/me/profile'] as const),
   );
-  let activeTabIndex = $derived(
-    bottomTabs.findIndex((p) => {
+  let activeTabIndex = $derived.by(() => {
+    const rawIndex = bottomTabs.findIndex((p) => {
       if (p === '/') return currentPath === '/';
       return currentPath.startsWith(p);
-    }),
-  );
+    });
+    const clampedIndex = rawIndex < 0 ? 0 : rawIndex;
+    const hasActive = rawIndex >= 0;
+    return { clampedIndex, hasActive };
+  });
 </script>
 
 <!-- ═══════════════════════════════════════════════════ -->
@@ -331,11 +334,11 @@
   >
     <div
       class="relative mx-auto grid h-[4.25rem] max-w-lg grid-cols-4 items-center"
-      style="--active-idx: {activeTabIndex}"
+      style="--active-idx: {activeTabIndex.clampedIndex}"
     >
       <!-- Sliding pill background — 1/4 width, centered in its column -->
       <div
-        class="absolute top-1.5 left-[calc(var(--active-idx)*25%+0.375rem)] h-[calc(100%-0.75rem)] w-[calc(25%-0.75rem)] rounded-2xl bg-primary-light transition-all duration-350 ease-(--ease-architectural)"
+        class="absolute top-1.5 left-[calc(var(--active-idx)*25%+0.375rem)] h-[calc(100%-0.75rem)] w-[calc(25%-0.75rem)] rounded-2xl bg-primary-light transition-all duration-350 ease-(--ease-architectural) {activeTabIndex.hasActive ? '' : 'hidden'}"
       ></div>
 
       <!-- Home -->

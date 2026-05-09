@@ -88,28 +88,41 @@
   let swipeStartY = $state(0);
   let swipeOffset = $state(0);
   let isSwiping = $state(false);
+  let swipeAllowed = $state(false);
   const SWIPE_THRESHOLD = 60;
 
   function handleTouchStart(e: TouchEvent) {
     if (e.touches.length === 1) {
-      swipeStartY = e.touches[0].clientY;
-      isSwiping = true;
+      // Only allow swipe if scroll container is at the top
+      const scrollContainer = (e.currentTarget as HTMLElement).querySelector('[class*="overflow-y-auto"]');
+      const isAtTop = !scrollContainer || scrollContainer.scrollTop === 0;
+      // Or if touch starts in header/drag handle area (within first 80px of the panel)
+      const touchY = e.touches[0].clientY;
+      const panelTop = (e.currentTarget as HTMLElement).getBoundingClientRect().top;
+      const isInHeader = touchY - panelTop < 80;
+
+      swipeAllowed = isAtTop || isInHeader;
+      if (swipeAllowed) {
+        swipeStartY = e.touches[0].clientY;
+        isSwiping = true;
+      }
     }
   }
 
   function handleTouchMove(e: TouchEvent) {
-    if (!isSwiping || e.touches.length !== 1) return;
+    if (!isSwiping || !swipeAllowed || e.touches.length !== 1) return;
     const dy = e.touches[0].clientY - swipeStartY;
     // Only track downward swipes
     swipeOffset = Math.max(0, dy);
   }
 
   function handleTouchEnd() {
-    if (swipeOffset > SWIPE_THRESHOLD) {
+    if (swipeAllowed && swipeOffset > SWIPE_THRESHOLD) {
       expanded = false;
     }
     swipeOffset = 0;
     isSwiping = false;
+    swipeAllowed = false;
   }
 
   function handleRemoveSeat(showId: number, seatId: number) {

@@ -1,7 +1,6 @@
 // src/lib/utils/api.ts
 import { browser } from '$app/environment';
 import { toast } from '$lib/stores/toast';
-import { redirect } from '@sveltejs/kit';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const DEFAULT_TIMEOUT = 15_000;
@@ -83,7 +82,7 @@ async function fetchWrapper<T>(
       ) {
         isRedirectingToLogin = true;
         toast.error('Phiên đăng nhập đã hết hạn.');
-        await redirect(302, `/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+        window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         setTimeout(() => {
           isRedirectingToLogin = false;
         }, 2_000);
