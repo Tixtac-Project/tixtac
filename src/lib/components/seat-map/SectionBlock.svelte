@@ -4,6 +4,7 @@
   import { formatPrice } from '$lib/utils/price';
   import { getRowLabel } from '$lib/utils/seat-label';
   import { Minus, Plus } from 'lucide-svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import SeatItem from './SeatItem.svelte';
 
   interface Props {
@@ -18,7 +19,7 @@
 
   // Build seat lookup map: "rowLabel-colNumber" -> seat
   let seatLookup = $derived.by(() => {
-    const map = new Map<string, SeatMapSeat>();
+    const map = new SvelteMap<string, SeatMapSeat>();
     for (const seat of section.seats) {
       map.set(`${seat.row_label}-${seat.col_number}`, seat);
     }

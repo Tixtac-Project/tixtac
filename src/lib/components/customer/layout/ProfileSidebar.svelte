@@ -148,13 +148,14 @@
             Trang quản trị
           </a>
         </li>
+      {:else}
+        <li>
+          <a href={resolve('/me/tickets')} class={navCls('tickets')}>
+            <Ticket class="size-3.5 shrink-0" />
+            Vé của tôi
+          </a>
+        </li>
       {/if}
-      <li>
-        <a href={resolve('/me/tickets')} class={navCls('tickets')}>
-          <Ticket class="size-3.5 shrink-0" />
-          Vé của tôi
-        </a>
-      </li>
     </ul>
   </nav>
 
