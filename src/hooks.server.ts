@@ -5,7 +5,10 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
 import { config } from '$lib/server/config';
+import { db } from '$lib/server/db';
+import { eventShows, seatSections } from '$lib/server/db/schema';
 import { redis } from '$lib/server/redis';
+import { eq, sql } from 'drizzle-orm';
 
 // Fire-and-forget background init — must not block server startup on slow MQ connect.
 // Controlled via ENABLE_BACKGROUND_WORKERS env var (default: true).
@@ -20,17 +23,10 @@ if (config.enableBackgroundWorkers) {
   })();
 }
 
-const RELEASE_LOCK_SCRIPT = `
-  if redis.call('GET', KEYS[1]) == ARGV[1] then
-    return redis.call('DEL', KEYS[1])
-  else
-    return 0
-  end
-`;
-
-// Only delete user_current_queue if it still points to this event.
-// Prevents old event cleanup from deleting a newer event mapping.
-const DELETE_USER_QUEUE_IF_EVENT_SCRIPT = `
+// Generic atomic conditional-delete script.
+// Deletes KEYS[1] only if its current value equals ARGV[1].
+// Used for both worker lock release and user_current_queue cleanup.
+const SAFE_DEL_IF_VALUE_SCRIPT = `
   if redis.call('GET', KEYS[1]) == ARGV[1] then
     return redis.call('DEL', KEYS[1])
   else
@@ -71,10 +67,10 @@ async function runQueueWorker(): Promise<WorkerResult> {
   const lockToken = crypto.randomUUID();
   let lockHeld = false;
   try {
-    // Token-based distributed lock with 60s TTL.
-    // Note: if a processing cycle exceeds 60s, another worker may acquire the lock.
-    // Add lock renewal if cycles can exceed the TTL.
-    const lockResult = await redis.set('worker_lock:queue', lockToken, { nx: true, ex: 60 });
+    // Token-based distributed lock with 120s TTL.
+    // WARNING: if a processing cycle across many events + slow DB queries exceeds
+    // 120s, two workers may run concurrently. Add lock renewal if that's possible.
+    const lockResult = await redis.set('worker_lock:queue', lockToken, { nx: true, ex: 120 });
     if (!lockResult) return 'no-lock';
     lockHeld = true;
 
@@ -90,9 +86,13 @@ async function runQueueWorker(): Promise<WorkerResult> {
     // users must explicitly confirm before receiving the full holding duration.
     const gracePeriodSeconds = 60;
     const slotDurationMs = gracePeriodSeconds * 1000;
-    const maxUsers = config.maxConcurrentUsers ?? 200;
     const waitingTtlMs = 3600 * 1000;
     const activeTtl = gracePeriodSeconds + 5;
+
+    // Per-event cap constants
+    const defaultCap = config.queueDefaultEventCap;
+    const maxCap = config.queueMaxEventCap;
+    const capRatio = config.queueDynamicCapRatio;
 
     let didWork = false;
     let hasWaitingUsers = false;
@@ -101,8 +101,10 @@ async function runQueueWorker(): Promise<WorkerResult> {
       const activeKey = `active_users:${eventId}`;
       const waitingKey = `waiting_queue:${eventId}`;
 
-      // Step A1: Evict expired active users — conditionally removes `user_current_queue`
-      //          only if it still points to this event (safe delete).
+      // Step A1: Evict expired active users (score ≤ now) — uses explicit score range
+      //          instead of byScore option for broad Redis version compatibility.
+      //          Conditionally removes `user_current_queue` only if it still points
+      //          to this event (safe delete via atomic Lua script).
       const expiredUserIds = await redis.zrange(activeKey, 0, now, { byScore: true });
 
       if (expiredUserIds.length > 0) {
@@ -110,7 +112,7 @@ async function runQueueWorker(): Promise<WorkerResult> {
         const pipeline = redis.pipeline();
         for (const uId of expiredUserIds) {
           pipeline.eval(
-            DELETE_USER_QUEUE_IF_EVENT_SCRIPT,
+            SAFE_DEL_IF_VALUE_SCRIPT,
             [`user_current_queue:${uId}`],
             [String(eventId)],
           );
@@ -134,7 +136,7 @@ async function runQueueWorker(): Promise<WorkerResult> {
         const pipeline = redis.pipeline();
         for (const uId of staleWaitingUserIds) {
           pipeline.eval(
-            DELETE_USER_QUEUE_IF_EVENT_SCRIPT,
+            SAFE_DEL_IF_VALUE_SCRIPT,
             [`user_current_queue:${uId}`],
             [String(eventId)],
           );
@@ -146,10 +148,56 @@ async function runQueueWorker(): Promise<WorkerResult> {
         );
       }
 
-      // Step B: Promote waiting users into available slots — atomically checks
-      //         `user_current_queue` to ensure the user hasn’t left in the meantime.
+      // Step B: Compute per-event dynamic cap from remaining seats, store in Redis.
+      //         cap = min(MAX_CAP, ceil(remainingSeats * ratio)) || DEFAULT_CAP
+      const capKey = `queue:cap:${eventId}`;
+      let eventCap = defaultCap;
+      try {
+        // NOTE: availableSeats is a denormalized counter on seat_sections.
+        // It is kept in sync by the purchase flow (purchase.service.ts).
+        // If a bug causes drift, cap will be computed from a stale value.
+        // Cross-check with SELECT COUNT(*) FROM seats WHERE status='available'
+        // if you suspect the counter is off.
+        const [seatsRow] = await db
+          .select({
+            remaining: sql<number>`COALESCE(SUM(${seatSections.availableSeats}), 0)`,
+          })
+          .from(seatSections)
+          .innerJoin(eventShows, eq(eventShows.id, seatSections.showId))
+          .where(eq(eventShows.eventId, Number(eventId)));
+
+        const remaining = Number(seatsRow?.remaining ?? 0);
+        eventCap = remaining > 0
+          ? Math.max(1, Math.min(maxCap, Math.ceil(remaining * capRatio)))
+          : defaultCap;
+
+        // Adaptive TTL: shorten cache aggressively when seats are scarce to
+        // prevent a stale cap from allowing more users than safe.
+        // Trade-off: more frequent DB reads near sold-out, but avoids oversell.
+        // e.g. remaining=5, cap=1, stale cap=10 for 120s → 10 users compete for 5 seats.
+        const LOW_SEATS_THRESHOLD = 20; // below this, refresh cap every 30s
+        const cacheTtl = remaining < LOW_SEATS_THRESHOLD ? 30 : 120;
+        await redis.set(capKey, String(eventCap), { ex: cacheTtl });
+        console.log(
+          `[QueueWorker] 📊 Event ${eventId}: remaining=${remaining}, cap=${eventCap}, cacheTtl=${cacheTtl}s`,
+        );
+      } catch (capErr) {
+        // Non-fatal: fallback to cached cap or default
+        const cached = await redis.get(capKey);
+        eventCap = cached ? Number(cached) : defaultCap;
+        console.warn(`[QueueWorker] ⚠️ Cap computation failed for Event ${eventId}, using ${eventCap}`);
+      }
+
+      // Step C: Promote waiting users into available slots — atomically checks
+      //         `user_current_queue` to ensure the user hasn't left in the meantime.
+      //
+      // ⚠️  Trade-off: cap is based on the last Worker cycle's snapshot of remainingSeats.
+      // Between two cycles, multiple checkouts may complete → actual remaining drops but
+      // cap stays stale. This is intentional: the queue only throttles DB access, it does
+      // NOT enforce seat inventory. Seat locking and oversell prevention happen downstream
+      // in purchase.service.ts via SELECT ... FOR UPDATE.
       const currentActiveCount = await redis.zcount(activeKey, now, '+inf');
-      const availableSlots = Math.max(0, maxUsers - currentActiveCount);
+      const availableSlots = Math.max(0, eventCap - currentActiveCount);
 
       if (availableSlots > 0) {
         const nextUserIds = await redis.zrange(waitingKey, 0, availableSlots - 1);
@@ -169,11 +217,15 @@ async function runQueueWorker(): Promise<WorkerResult> {
           if (promotedCount > 0) {
             didWork = true;
             console.log(`[QueueWorker] 🚪 Xả ${promotedCount} users vào Active (Event ${eventId})`);
+            // TODO: Notify promoted users via SSE/pub-sub so they don't have to
+            // wait for the next polling cycle (~3-5s). Requires a Redis pub-sub
+            // channel (e.g. PUBLISH queue:promoted:{userId} '1') and an SSE
+            // endpoint that subscribes per-user.
           }
         }
       }
 
-      // Step C: Recompute counts after eviction and promotion to decide on GC.
+      // Step D: Recompute counts after eviction and promotion to decide on GC.
       const [activeCountAfterRaw, waitingCountAfterRaw] = await redis
         .pipeline()
         .zcount(activeKey, now, '+inf')
@@ -201,7 +253,7 @@ async function runQueueWorker(): Promise<WorkerResult> {
   } finally {
     // Safe release: only delete if the lock still holds our token.
     if (lockHeld) {
-      await redis.eval(RELEASE_LOCK_SCRIPT, ['worker_lock:queue'], [lockToken]).catch(() => {});
+      await redis.eval(SAFE_DEL_IF_VALUE_SCRIPT, ['worker_lock:queue'], [lockToken]).catch(() => {});
     }
   }
 }

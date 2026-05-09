@@ -19,8 +19,9 @@ export const queueService = {
       const userCurrentKey = `user_current_queue:${userId}`;
       const activeKey = `active_users:${eventId}`;
       const waitingKey = `waiting_queue:${eventId}`;
+      const capKey = `queue:cap:${eventId}`;
       const now = Date.now();
-      const maxUsers = config.maxConcurrentUsers ?? 200;
+      const defaultCap = config.queueDefaultEventCap;
       // Users promoted immediately (no waiting) receive a short grace period (60s).
       // They must explicitly call /confirm to receive the full holding duration.
       const initialDuration = 60;
@@ -29,15 +30,18 @@ export const queueService = {
       const waitingTtl = 3600;
 
       // ── Atomic Lua script: cross-queue guard, already‑active check,
-      //     already‑waiting check, promote-or-queue — all in one round‑trip ──
+      //     already‑waiting check, promote-or-queue — all in one round‑trip.
+      //     Reads per-event cap from Redis (queue:cap:{eventId}); falls back
+      //     to DEFAULT_CAP when the Worker hasn't computed it yet.
       const joinQueueScript = `
         local activeKey = KEYS[1]
         local waitingKey = KEYS[2]
         local userCurrentKey = KEYS[3]
         local activeEventIdsKey = KEYS[4]
+        local capKey = KEYS[5]
 
         local now = tonumber(ARGV[1])
-        local maxUsers = tonumber(ARGV[2])
+        local defaultCap = tonumber(ARGV[2])
         local expiresAt = tonumber(ARGV[3])
         local userId = ARGV[4]
         local eventId = ARGV[5]
@@ -63,9 +67,13 @@ export const queueService = {
           return {3, waitingRank + 1}
         end
 
-        -- 3. Available slot → promote immediately
+        -- 3. Read per-event cap; fall back to defaultCap if not set yet
+        local capRaw = redis.call('GET', capKey)
+        local cap = capRaw and tonumber(capRaw) or defaultCap
+
+        -- 4. Available slot → promote immediately
         local activeCount = redis.call('ZCOUNT', activeKey, now, '+inf')
-        if activeCount < maxUsers then
+        if activeCount < cap then
           redis.call('ZREM', waitingKey, userId)
           redis.call('ZADD', activeKey, expiresAt, userId)
           redis.call('SET', userCurrentKey, eventId, 'EX', activeTtl)
@@ -73,7 +81,7 @@ export const queueService = {
           return {1, expiresAt}
         end
 
-        -- 4. Full → enqueue as waiting
+        -- 5. Full → enqueue as waiting
         redis.call('ZADD', waitingKey, 'NX', now, userId)
         redis.call('SET', userCurrentKey, eventId, 'EX', waitingTtl)
         redis.call('SADD', activeEventIdsKey, eventId)
@@ -86,8 +94,8 @@ export const queueService = {
         [number, number]
       >(
         joinQueueScript,
-        [activeKey, waitingKey, userCurrentKey, 'active_event_ids'],
-        [now, maxUsers, expiresAt, String(userId), String(eventId), activeTtl, waitingTtl],
+        [activeKey, waitingKey, userCurrentKey, 'active_event_ids', capKey],
+        [now, defaultCap, expiresAt, String(userId), String(eventId), activeTtl, waitingTtl],
       );
 
       // ── Dispatch based on return code ──
@@ -217,12 +225,10 @@ export const queueService = {
       const activeScore = await redis.zscore(activeKey, userId);
       if (activeScore && activeScore > now) {
         const expiresInSeconds = Math.max(1, Math.ceil((activeScore - now) / 1000));
-        // Only mint a fresh token when ≤ 30s remain — client keeps previous token otherwise
-        const token =
-          expiresInSeconds <= 30
-            ? await encryptSeatToken({ userId, eventId }, expiresInSeconds)
-            : null; // Re-use the existing token if more than 30s remain.
-        return { status: 'active', expiresAt: activeScore, token };
+        // Always mint a fresh token so clients are never stuck with an expired one.
+        // The client should cache this token and only call /status again when needed.
+        const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
+        return { status: 'active', expiresAt: activeScore, token, remainingSeconds: expiresInSeconds };
       }
 
       const position = await redis.zrank(waitingKey, userId);
