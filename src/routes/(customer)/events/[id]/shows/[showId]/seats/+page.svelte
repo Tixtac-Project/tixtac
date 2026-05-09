@@ -450,9 +450,9 @@
 </svelte:head>
 
 <div class="min-h-screen bg-surface pb-24">
-  <!-- Header -->
+  <!-- Header — sits below desktop navbar (md:h-16) -->
   <header
-    class="sticky top-0 z-20 border-b border-border/30 bg-surface-container-lowest/90 backdrop-blur-md"
+    class="sticky top-0 z-20 border-b border-border/30 bg-surface-container-lowest/90 backdrop-blur-md md:top-16"
   >
     <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
       <button
@@ -477,7 +477,7 @@
         {@const progress =
           totalHoldSeconds > 0 ? Math.max(0, Math.min(1, timeLeft / totalHoldSeconds)) : 0}
         <div
-          class="flex shrink-0 items-center gap-3 rounded-2xl border-2 px-4 py-2.5 shadow-md transition-colors duration-500 {isCritical
+          class="flex shrink-0 items-center gap-2 rounded-2xl border-2 px-3 py-1.5 shadow-md transition-colors duration-500 md:gap-3 md:px-4 md:py-2.5 {isCritical
             ? 'animate-countdown-pulse border-danger/70 bg-danger-muted text-danger-muted-foreground'
             : 'border-warning/60 bg-warning-muted text-warning-muted-foreground'}"
           role="timer"
@@ -486,7 +486,7 @@
           <!-- Ring progress indicator -->
           <div class="relative shrink-0">
             <svg
-              class="h-10 w-10 -rotate-90"
+              class="size-8 -rotate-90 md:size-10"
               viewBox="0 0 40 40"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -517,16 +517,18 @@
               />
             </svg>
             <Clock
-              class="absolute inset-0 m-auto size-4.5 {isCritical ? 'text-danger' : 'text-warning'}"
+              class="absolute inset-0 m-auto size-3.5 md:size-4.5 {isCritical
+                ? 'text-danger'
+                : 'text-warning'}"
             />
           </div>
 
           <!-- Time display -->
           <div>
-            <p class="text-[10px] font-semibold tracking-wider uppercase opacity-85">
+            <p class="text-[9px] font-semibold tracking-wider uppercase opacity-85 md:text-[10px]">
               {isCritical ? 'Sắp hết hạn' : 'Thời gian giữ vé'}
             </p>
-            <p class="text-xl leading-none font-extrabold tracking-tight tabular-nums">
+            <p class="text-base leading-none font-extrabold tracking-tight tabular-nums md:text-xl">
               {formatCountdown(timeLeft)}
             </p>
           </div>
@@ -538,7 +540,7 @@
   <!-- Show Switcher (only if multiple shows) -->
   {#if allShows.length > 1}
     <div
-      class="relative z-20 border-b border-border/20 bg-surface-container-lowest/70 backdrop-blur-sm"
+      class="relative z-10 border-b border-border/20 bg-surface-container-lowest/70 backdrop-blur-sm"
     >
       <div class="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
         <div class="relative z-20">

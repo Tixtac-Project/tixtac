@@ -91,6 +91,9 @@
 
   function handleMouseUp() {
     isPanning = false;
+    setTimeout(() => {
+      didDrag = false;
+    }, 0);
   }
 
   // ── Touch pan + pinch zoom ──
@@ -120,21 +123,22 @@
   }
 
   function handleTouchMove(e: TouchEvent) {
-    if (e.touches.length >= 2 || (isTouchPanning && lastPinchDist > 0)) {
+    if (e.touches.length === 1 && isTouchPanning) {
       e.preventDefault();
-    }
-    if (isTouchPanning && e.touches.length === 1) {
       panX += e.touches[0].clientX - lastTouchX;
       panY += e.touches[0].clientY - lastTouchY;
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
+    } else if (e.touches.length >= 2) {
+      e.preventDefault();
       const dist = getPinchDist(e.touches);
       if (lastPinchDist > 0) {
         const scale = dist / lastPinchDist;
         zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * scale));
       }
       lastPinchDist = dist;
+      // Stop panning state if user adds a second finger mid-pan
+      isTouchPanning = false;
     }
   }
 
@@ -180,7 +184,8 @@
   // Estimates text width as charCount * fontSize * 0.6
   function fitFontSize(text: string, maxW: number, maxH: number, maxFs: number): number {
     const charW = 0.6; // approximate ratio
-    const byWidth = maxW / (text.length * charW || 1);
+    const charCount = Math.max(1, text.length);
+    const byWidth = maxW / (charCount * charW);
     const byHeight = maxH;
     return Math.max(6, Math.min(maxFs, byWidth, byHeight));
   }

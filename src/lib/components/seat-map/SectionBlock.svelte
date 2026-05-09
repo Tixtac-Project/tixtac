@@ -182,29 +182,31 @@
       {/each}
     </div>
 
-    <!-- Quantity selector overlay -->
-    <div class="absolute inset-x-0 -bottom-12 flex items-center justify-center gap-2">
+    <!-- Quantity selector overlay — positioned above the section label -->
+    <div class="absolute inset-x-0 -top-10 flex items-center justify-center gap-1.5">
       <div
-        class="flex items-center gap-2 rounded-lg px-3 py-1.5 shadow-md"
+        class="flex items-center gap-1.5 rounded-xl px-2.5 py-1 shadow-md"
         style="background-color:{section.layout_config.color}20;border:1px solid {section
           .layout_config.color}50;"
       >
         <button
           type="button"
-          class="flex h-6 w-6 cursor-pointer items-center justify-center rounded bg-surface-container-high text-foreground transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex size-6 cursor-pointer items-center justify-center rounded-lg bg-white/60 text-foreground transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-30"
           disabled={quantity <= 0}
           onclick={decrement}
         >
-          <Minus class="h-3 w-3" />
+          <Minus class="size-3" />
         </button>
-        <span class="min-w-6 text-center text-sm font-bold text-foreground">{quantity}</span>
+        <span class="min-w-5 text-center text-sm font-extrabold text-foreground tabular-nums">
+          {quantity}
+        </span>
         <button
           type="button"
-          class="flex h-6 w-6 cursor-pointer items-center justify-center rounded bg-surface-container-high text-foreground transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex size-6 cursor-pointer items-center justify-center rounded-lg bg-cta text-cta-foreground shadow-sm transition-all hover:bg-cta-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none"
           disabled={quantity >= availableCount}
           onclick={increment}
         >
-          <Plus class="h-3 w-3" />
+          <Plus class="size-3" />
         </button>
       </div>
     </div>
@@ -223,40 +225,55 @@
 {:else}
   <!-- General admission panel (standing tickets) -->
   <div
-    class="relative flex flex-col justify-center rounded-xl p-4"
+    class="relative flex flex-col rounded-xl p-3.5"
     style="width:{section.layout_config.width}px;height:{section.layout_config
       .height}px;background-color:{section.layout_config.color}15;border:2px solid {section
       .layout_config.color}40;"
   >
-    <div class="mb-2 flex items-center gap-2">
-      <div class="h-3 w-3 rounded-sm" style="background-color:{section.layout_config.color};"></div>
-      <span class="text-sm font-bold text-foreground">{section.name}</span>
+    <!-- Header row: section name + availability -->
+    <div class="mb-2.5 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <div
+          class="size-3 shrink-0 rounded-sm"
+          style="background-color:{section.layout_config.color};"
+        ></div>
+        <span class="truncate text-sm font-bold text-foreground">{section.name}</span>
+      </div>
+      <span
+        class="shrink-0 rounded-full bg-background/60 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground"
+      >
+        {availableCount}/{section.capacity}
+      </span>
     </div>
 
-    <p class="mb-1 text-xs text-muted-foreground">
+    <!-- Price line -->
+    <p class="mb-3 text-xs text-muted-foreground">
       Vé đứng • {formatPrice(Number(section.price))} / vé
     </p>
-    <p class="mb-3 text-xs text-muted-foreground">
-      Còn trống: {availableCount} / {section.capacity}
-    </p>
 
-    <div class="flex items-center gap-3">
+    <!-- Quantity selector — prominent CTA-style -->
+    <div class="mt-auto flex items-center justify-center gap-2.5">
       <button
         type="button"
-        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-surface-container-high text-foreground transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
+        class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary/90 text-primary-foreground shadow-sm transition-all hover:bg-primary hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none"
         disabled={quantity <= 0}
         onclick={decrement}
       >
-        <Minus class="h-4 w-4" />
+        <Minus class="size-4" />
       </button>
-      <span class="min-w-8 text-center text-lg font-bold text-foreground">{quantity}</span>
+      <div class="flex min-w-[3rem] flex-col items-center">
+        <span class="text-2xl leading-none font-extrabold text-foreground tabular-nums">
+          {quantity}
+        </span>
+        <span class="text-[9px] text-muted-foreground">vé đã chọn</span>
+      </div>
       <button
         type="button"
-        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-surface-container-high text-foreground transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
+        class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-cta text-cta-foreground shadow-sm shadow-cta/25 transition-all hover:bg-cta-hover hover:shadow-md hover:shadow-cta/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none"
         disabled={quantity >= availableCount}
         onclick={increment}
       >
-        <Plus class="h-4 w-4" />
+        <Plus class="size-4" />
       </button>
     </div>
   </div>

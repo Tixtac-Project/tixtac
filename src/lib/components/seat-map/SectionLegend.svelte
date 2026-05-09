@@ -61,7 +61,11 @@
 <div class="flex flex-col gap-3">
   <h3 class="text-xs font-bold tracking-wide text-foreground uppercase">Khu vực</h3>
 
-  {#each sections as section (section.id)}
+  {#each [...sections].sort((a, b) => {
+    if (a.type === 'general' && b.type !== 'general') return -1;
+    if (a.type !== 'general' && b.type === 'general') return 1;
+    return 0;
+  }) as section (section.id)}
     {@const avail = availableCount(section)}
     {@const total =
       section.type === 'general'
@@ -69,6 +73,7 @@
         : section.seats.filter((s) => s.status !== 'disabled').length}
     {@const isGA = needsQuantityControl(section)}
     {@const qty = getQuantity(section.id)}
+    {@const atLimit = store.isAtLimit}
 
     <div class="rounded-lg bg-surface-container-low p-3">
       <!-- Section header -->
@@ -78,43 +83,77 @@
           style="background-color:{section.layout_config.color};"
         ></div>
         <span class="text-xs leading-tight font-bold text-foreground">{section.name}</span>
+        {#if isGA}
+          <span
+            class="ml-auto rounded-sm bg-cta-muted px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-cta-muted-foreground uppercase"
+          >
+            GA
+          </span>
+        {/if}
       </div>
 
       <!-- Info row -->
       <div class="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-        <span>
-          {section.type === 'general' ? 'Vé đứng' : 'Chọn ghế'}
-        </span>
+        <span>{section.type === 'general' ? 'Vé đứng' : 'Chọn ghế'}</span>
         <span>•</span>
         <span>{formatPrice(Number(section.price))}</span>
       </div>
 
-      <!-- Availability -->
-      <div class="text-[10px] text-muted-foreground">
-        Còn trống: <span class="font-semibold text-foreground">{avail}</span>
-        / {total}
-      </div>
-
-      <!-- Quantity control for GA / non-pickable -->
+      <!-- Availability + quantity on same row for GA -->
       {#if isGA}
-        <div class="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-surface-container-high text-foreground transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={qty <= 0}
-            onclick={() => decrement(section)}
-          >
-            <Minus class="h-3 w-3" />
-          </button>
-          <span class="min-w-6 text-center text-sm font-bold text-foreground">{qty}</span>
-          <button
-            type="button"
-            class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-surface-container-high text-foreground transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={qty >= avail}
-            onclick={() => increment(section)}
-          >
-            <Plus class="h-3 w-3" />
-          </button>
+        <div class="mt-2.5 flex items-center justify-between gap-2">
+          <!-- Availability -->
+          <div class="text-[10px] text-muted-foreground">
+            Còn: <span class="font-semibold text-foreground">{avail}</span>
+            <span class="opacity-50">/ {total}</span>
+          </div>
+
+          <!-- Quantity control — uses CTA orange -->
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg
+                     border border-border bg-surface-container-high
+                     text-foreground transition-all
+                     hover:border-cta/40 hover:bg-cta-muted hover:text-cta-muted-foreground
+                     active:scale-90
+                     disabled:cursor-not-allowed disabled:opacity-30
+                     disabled:hover:border-border disabled:hover:bg-surface-container-high disabled:hover:text-foreground"
+              disabled={qty <= 0}
+              onclick={() => decrement(section)}
+              aria-label="Giảm số lượng"
+            >
+              <Minus class="h-3.5 w-3.5" />
+            </button>
+
+            <span
+              class="min-w-[2rem] text-center text-sm font-black text-foreground tabular-nums
+                     {qty > 0 ? 'text-cta' : ''}"
+            >
+              {qty}
+            </span>
+
+            <button
+              type="button"
+              class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg
+                     transition-all active:scale-90
+                     disabled:cursor-not-allowed disabled:opacity-30
+                     {qty > 0
+                ? 'bg-cta text-cta-foreground shadow-sm shadow-cta/30 hover:bg-cta-hover disabled:bg-surface-container-high disabled:text-foreground disabled:shadow-none'
+                : 'border border-border bg-surface-container-high text-foreground hover:border-cta/40 hover:bg-cta-muted hover:text-cta-muted-foreground disabled:hover:border-border disabled:hover:bg-surface-container-high disabled:hover:text-foreground'}"
+              disabled={qty >= avail || (atLimit && qty === getQuantity(section.id))}
+              onclick={() => increment(section)}
+              aria-label="Tăng số lượng"
+            >
+              <Plus class="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      {:else}
+        <!-- Non-GA: availability on its own row -->
+        <div class="text-[10px] text-muted-foreground">
+          Còn trống: <span class="font-semibold text-foreground">{avail}</span>
+          <span class="opacity-50">/ {total}</span>
         </div>
       {/if}
     </div>

@@ -1,28 +1,32 @@
 <!-- src/routes/(customer)/events/[id]/queue/+page.svelte -->
 <script lang="ts">
-  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { page } from '$app/state';
   import { queueStore } from '$lib/stores/queue.svelte';
   import { api } from '$lib/utils/api';
+  import { Clock, Loader2, Ticket, Users } from 'lucide-svelte';
   import { onMount } from 'svelte';
-  import { Clock, Loader2, Users } from 'lucide-svelte';
 
   let eventId = $derived(Number(page.params.id));
-
   let isConfirming = $state(false);
   let pollingError = $state(false);
 
-  // Countdown cho grace period (chỉ dùng khi status === 'ready')
+  // Countdown — used for both 'ready' (60s grace) and 'holding' (300s full)
   let timeLeft = $state(0);
+  let totalSeconds = $derived(
+    queueStore.status === 'ready' ? 60 : queueStore.status === 'holding' ? 300 : 0,
+  );
+
   $effect(() => {
-    if (queueStore.status !== 'ready' || !queueStore.expiresAt) {
+    const active = queueStore.status === 'ready' || queueStore.status === 'holding';
+    if (!active || !queueStore.expiresAt) {
       timeLeft = 0;
       return;
     }
     const update = () => {
       timeLeft = Math.max(0, Math.floor((queueStore.expiresAt! - Date.now()) / 1000));
-      if (timeLeft === 0) {
+      if (timeLeft === 0 && queueStore.status === 'ready') {
         queueStore.status = 'missed';
         queueStore.leave();
       }
@@ -38,7 +42,6 @@
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  // Thời gian chờ ước tính: mỗi người ~30 giây
   let estimatedWait = $derived(
     queueStore.position > 0
       ? queueStore.position <= 2
@@ -61,7 +64,7 @@
     }
     pollingError = false;
 
-    const data = result.data;
+    const { data } = result;
     if (data.status === 'active') {
       queueStore.status = 'ready';
       queueStore.expiresAt = data.expiresAt ?? null;
@@ -69,7 +72,7 @@
     } else if (data.status === 'waiting') {
       queueStore.status = 'waiting';
       queueStore.position = data.position ?? queueStore.position;
-    } else if (data.status === 'none') {
+    } else {
       queueStore.clear();
       goto(resolve(`/events/${eventId}`));
     }
@@ -83,33 +86,21 @@
         `/events/${eventId}/queue/confirm`,
         {},
       );
-
-      if (result.error || !result.data) return; // toast shown by api util
-
+      if (result.error || !result.data) return;
       queueStore.setPendingConfirm(result.data.expiresAt, result.data.token);
-
       const showId = queueStore.showId;
-      if (showId) {
-        goto(resolve(`/events/${eventId}/shows/${showId}/seats`));
-      } else {
-        goto(resolve(`/events/${eventId}`));
-      }
+      goto(resolve(showId ? `/events/${eventId}/shows/${showId}/seats` : `/events/${eventId}`));
     } finally {
       isConfirming = false;
     }
   }
 
   onMount(() => {
-    // Nếu store đã ready (F5 trong grace period), không cần poll lại ngay
-    if (queueStore.status !== 'ready') pollStatus();
-
+    if (queueStore.status !== 'ready' && queueStore.status !== 'holding') pollStatus();
     const interval = setInterval(() => {
-      // Stop polling once the server has promoted us; the countdown owns the
-      // expiresAt from here on, and the /confirm flow drives the next state.
       if (queueStore.status === 'ready' || queueStore.status === 'holding') return;
       pollStatus();
     }, 5000);
-
     return () => clearInterval(interval);
   });
 </script>
@@ -118,189 +109,335 @@
   <title>Phòng chờ ảo — {queueStore.eventTitle || 'TixTac'}</title>
 </svelte:head>
 
-<div class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center bg-surface sm:p-4">
-  <div
-    class="flex w-full flex-1 flex-col justify-between sm:max-w-md sm:flex-none sm:justify-start"
-  >
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TRẠNG THÁI: WAITING                         -->
-    <!-- ═══════════════════════════════════════════ -->
+<!-- Noise texture filter (invisible, referenced via CSS) -->
+<svg class="pointer-events-none absolute size-0" aria-hidden="true">
+  <defs>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+      <feBlend in="SourceGraphic" mode="overlay" result="blend" />
+      <feComposite in="blend" in2="SourceGraphic" operator="in" />
+    </filter>
+  </defs>
+</svg>
+
+<div
+  class="flex min-h-dvh flex-col bg-zinc-950 md:items-center md:justify-center md:bg-surface md:p-4"
+>
+  <div class="flex w-full flex-1 flex-col md:max-w-md md:flex-none">
+    <!-- ══════════════════════════════════════ -->
+    <!-- WAITING                                -->
+    <!-- ══════════════════════════════════════ -->
     {#if queueStore.status === 'waiting'}
       <div
-        class="flex flex-1 flex-col sm:block sm:overflow-hidden sm:rounded-2xl sm:bg-surface-container sm:shadow-2xl sm:ring-1 sm:ring-outline-variant/20"
+        class="flex flex-1 flex-col md:overflow-hidden md:rounded-2xl md:bg-zinc-900 md:shadow-2xl md:ring-1 md:ring-white/10"
       >
-        <!-- Top gradient accent -->
-        <div
-          class="hidden h-1.5 bg-gradient-to-r from-primary via-primary/70 to-transparent sm:block"
-        ></div>
+        <!-- Hero band -->
+        <div class="relative overflow-hidden bg-zinc-900 px-5 pt-14 pb-8 md:pt-10">
+          <!-- Radial glow behind icon -->
+          <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div class="size-64 rounded-full bg-primary/20 blur-3xl"></div>
+          </div>
 
-        <div class="flex flex-1 flex-col p-6 sm:p-8">
-          <div class="flex flex-1 flex-col items-center justify-center pt-8 sm:pt-0">
-            <!-- Illustration -->
-            <div class="mb-8 flex justify-center">
-              <div class="relative flex h-24 w-24 items-center justify-center">
-                <!-- Pulse rings -->
-                <div class="absolute h-24 w-24 animate-ping rounded-full bg-primary/10"></div>
-                <div
-                  class="absolute h-16 w-16 animate-ping rounded-full bg-primary/15 [animation-delay:300ms]"
-                ></div>
-                <div
-                  class="relative flex h-12 w-12 items-center justify-center rounded-full bg-primary/20"
-                >
-                  <Loader2 class="h-6 w-6 animate-spin text-primary" />
-                </div>
+          <div class="relative flex flex-col items-center">
+            <div class="relative mb-5 flex size-20 items-center justify-center">
+              <div class="absolute size-20 animate-ping rounded-full bg-primary/20"></div>
+              <div
+                class="absolute size-14 animate-ping rounded-full bg-primary/25 [animation-delay:400ms]"
+              ></div>
+              <div
+                class="relative flex size-12 items-center justify-center rounded-full bg-primary/30 ring-1 ring-primary/40"
+              >
+                <Loader2 class="size-6 animate-spin text-primary" />
               </div>
             </div>
 
-            <h1 class="mb-2 text-center font-heading text-2xl font-black text-foreground">
+            <h1 class="mb-1 text-center font-heading text-2xl font-black text-white">
               Đang xếp hàng
             </h1>
             {#if queueStore.eventTitle}
-              <p class="mb-8 text-center text-sm font-medium text-primary">
+              <p class="line-clamp-1 text-center text-sm font-medium text-primary">
                 {queueStore.eventTitle}
               </p>
             {:else}
-              <p class="mb-8 text-center text-sm text-muted-foreground">
-                Vui lòng không tắt trình duyệt
-              </p>
+              <p class="text-center text-sm text-zinc-400">Vui lòng không tắt trình duyệt</p>
             {/if}
+          </div>
+        </div>
 
-            <!-- Position display -->
-            <div
-              class="mb-6 w-full rounded-2xl bg-surface-container-low p-6 text-center shadow-inner ring-outline-variant/30 sm:bg-surface sm:shadow-none sm:ring-1"
-            >
-              <p class="mb-2 text-xs font-bold tracking-widest text-muted-foreground uppercase">
-                Vị trí của bạn
-              </p>
-              <div class="px-2 font-mono text-7xl font-black text-primary">
-                #{queueStore.position}
-              </div>
-              {#if estimatedWait}
-                <div
-                  class="mt-3 flex items-center justify-center gap-1.5 text-sm text-muted-foreground"
-                >
-                  <Clock class="h-4 w-4" />
-                  <span>
-                    Thời gian chờ ước tính: <strong class="text-foreground">{estimatedWait}</strong>
-                  </span>
-                </div>
-              {/if}
+        <!-- Position display — main focus -->
+        <div class="flex flex-1 flex-col px-5 pb-4">
+          <div class="my-auto py-6 text-center">
+            <p class="mb-3 text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
+              Vị trí của bạn
+            </p>
+            <!-- Giant position number -->
+            <div class="font-mono text-[7rem] leading-none font-black text-white tabular-nums">
+              #{queueStore.position}
             </div>
-
-            <!-- Connection error -->
-            {#if pollingError}
-              <p
-                class="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-center text-xs text-destructive"
+            {#if estimatedWait}
+              <div
+                class="mt-4 inline-flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-2 text-sm text-zinc-300"
               >
-                Mất kết nối. Đang thử lại...
-              </p>
+                <Clock class="size-3.5 text-primary" />
+                <span>
+                  Chờ ước tính: <strong class="text-white">{estimatedWait}</strong>
+                </span>
+              </div>
             {/if}
-
-            <!-- Info note -->
-            <div class="flex w-full items-start gap-3 rounded-2xl bg-primary/5 p-6">
-              <Users class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <p class="text-xs leading-relaxed text-muted-foreground">
-                Hệ thống tự động thông báo khi tới lượt. Bạn có thể thu nhỏ phòng chờ và lướt web.
-              </p>
-            </div>
           </div>
 
-          <!-- Bottom Actions -->
-          <div class="mt-auto flex flex-col gap-4 pt-8 pb-12 sm:pb-0">
-            <button
-              onclick={() => {
-                queueStore.isMinimized = true;
-                goto(resolve(`/events/${eventId}`));
-              }}
-              class="w-full rounded-xl bg-surface-container-highest px-6 py-4 font-bold text-foreground shadow-lg transition-all hover:bg-surface-container-highest active:scale-95 sm:bg-surface-container-high sm:shadow-none"
-            >
-              Thu nhỏ & Xem thông tin sự kiện
-            </button>
-            <button
-              onclick={() => queueStore.leave()}
-              class="py-2 text-sm font-medium text-muted-foreground transition hover:text-destructive"
-            >
-              Hủy xếp hàng
-            </button>
+          {#if pollingError}
+            <p class="mb-3 rounded-xl bg-danger/15 px-4 py-2.5 text-center text-xs text-danger">
+              Mất kết nối. Đang thử lại...
+            </p>
+          {/if}
+
+          <div
+            class="mb-4 flex items-start gap-3 rounded-2xl bg-zinc-800/60 p-4 ring-1 ring-white/5"
+          >
+            <Users class="mt-0.5 size-4 shrink-0 text-primary" />
+            <p class="text-xs leading-relaxed text-zinc-400">
+              Hệ thống tự động thông báo khi tới lượt. Bạn có thể thu nhỏ phòng chờ và lướt web.
+            </p>
           </div>
+        </div>
+
+        <!-- Bottom action sheet -->
+        <div class="pb-safe border-t border-white/5 bg-zinc-900/80 px-5 pt-4 pb-6 backdrop-blur-sm">
+          <button
+            onclick={() => {
+              queueStore.isMinimized = true;
+              goto(resolve(`/events/${eventId}`));
+            }}
+            class="mb-3 w-full rounded-xl bg-white px-5 py-3.5 text-sm font-bold text-zinc-900
+                   shadow-sm transition-all active:scale-[0.98] md:hover:bg-zinc-100"
+          >
+            Thu nhỏ & Xem sự kiện
+          </button>
+          <button
+            onclick={() => queueStore.leave()}
+            class="w-full py-2.5 text-sm font-medium text-zinc-500 transition hover:text-red-400"
+          >
+            Hủy xếp hàng
+          </button>
         </div>
       </div>
 
-      <!-- ═══════════════════════════════════════════ -->
-      <!-- TRẠNG THÁI: READY (Grace Period 60s)        -->
-      <!-- ═══════════════════════════════════════════ -->
+      <!-- ══════════════════════════════════════ -->
+      <!-- READY — Grace period 60s              -->
+      <!-- ══════════════════════════════════════ -->
     {:else if queueStore.status === 'ready'}
       <div
-        class="relative flex flex-1 flex-col justify-center bg-gradient-to-b from-emerald-500 to-emerald-700 p-6 text-white sm:overflow-hidden sm:rounded-2xl sm:from-emerald-600 sm:to-emerald-700 sm:p-8 sm:shadow-2xl sm:shadow-emerald-900/40"
+        class="relative flex flex-1 flex-col overflow-hidden bg-emerald-950 text-white md:rounded-2xl md:shadow-2xl"
       >
-        <!-- Background decoration -->
-        <div class="absolute -top-12 -right-12 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
-        <div class="absolute -bottom-12 -left-12 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
+        <!-- Noise overlay -->
+        <div
+          class="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style="background: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/></filter><rect width=%22200%22 height=%22200%22 filter=%22url(%23n)%22 opacity=%221%22/></svg>'); background-size: 200px;"
+        ></div>
 
-        <div class="relative flex flex-1 flex-col justify-between sm:justify-center">
-          <div class="flex flex-1 flex-col justify-center">
-            <!-- Checkmark icon -->
-            <div class="mb-8 flex justify-center">
+        <!-- Glow blobs -->
+        <div
+          class="pointer-events-none absolute top-0 left-1/2 size-72 -translate-x-1/2 rounded-full bg-emerald-400/25 blur-3xl"
+        ></div>
+        <div
+          class="pointer-events-none absolute bottom-0 left-0 size-48 rounded-full bg-teal-500/20 blur-3xl"
+        ></div>
+
+        <!-- Top section -->
+        <div class="relative flex flex-col items-center px-5 pt-14 md:pt-10">
+          <div
+            class="mb-5 flex size-20 items-center justify-center rounded-full bg-white/15 shadow-lg ring-1 shadow-emerald-900/50 ring-white/30"
+          >
+            <svg
+              class="size-10 drop-shadow"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2.5"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 class="mb-1 text-center font-heading text-3xl font-black tracking-tight">
+            ĐÃ TỚI LƯỢT!
+          </h1>
+          <p class="text-center text-sm text-emerald-200/80">
+            {queueStore.eventTitle || 'Bạn có 1 phút để xác nhận.'}
+          </p>
+        </div>
+
+        <!-- Main countdown — visual anchor -->
+        <div class="relative flex flex-1 flex-col items-center justify-center px-5 py-8">
+          <div class="mb-6 text-center">
+            <p class="mb-2 text-[10px] font-bold tracking-[0.2em] text-emerald-300/60 uppercase">
+              Xác nhận trong vòng
+            </p>
+            <p
+              class=" text-[6rem] leading-none font-black tabular-nums drop-shadow-lg
+                      {timeLeft <= 15 ? 'text-yellow-300' : 'text-white'}"
+            >
+              {formatTime(timeLeft)}
+            </p>
+          </div>
+
+          <!-- Segmented progress ring feel — horizontal bar with glow -->
+          <div class="w-full max-w-xs">
+            <div class="h-2 overflow-hidden rounded-full bg-white/10">
               <div
-                class="flex h-24 w-24 items-center justify-center rounded-full bg-white/20 ring-8 ring-white/10"
-              >
-                <svg
-                  class="h-12 w-12"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="3"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
+                class="h-full rounded-full shadow-[0_0_8px_currentColor] transition-all duration-1000
+                       {timeLeft <= 15
+                  ? 'bg-yellow-300 text-yellow-300'
+                  : 'bg-emerald-300 text-emerald-300'}"
+                style="width: {totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0}%"
+              ></div>
             </div>
+          </div>
+        </div>
 
-            <h1 class="mb-2 text-center font-heading text-4xl font-black sm:text-3xl">
-              ĐÃ TỚI LƯỢT!
-            </h1>
-            {#if queueStore.eventTitle}
-              <p class="mb-8 text-center text-base font-medium opacity-90 sm:text-sm">
-                {queueStore.eventTitle}
-              </p>
-            {:else}
-              <p class="mb-8 text-center text-sm opacity-90">
-                Bạn có 1 phút để vào chọn ghế trước khi hệ thống nhường chỗ.
+        <!-- Bottom action sheet -->
+        <div
+          class="pb-safe relative border-t border-white/10 bg-black/20 px-5 pt-4 pb-6 backdrop-blur-md"
+        >
+          <button
+            onclick={handleConfirm}
+            disabled={isConfirming}
+            class="w-full rounded-xl bg-emerald-400 px-5 py-4 text-base font-black text-emerald-950
+                   shadow-lg shadow-emerald-900/50 transition-all
+                   hover:bg-emerald-300 focus-visible:ring-2
+                   focus-visible:ring-white focus-visible:ring-offset-2
+                   focus-visible:ring-offset-emerald-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isConfirming ? 'Đang xử lý...' : 'Vào chọn ghế ngay →'}
+          </button>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════ -->
+      <!-- HOLDING — Đang chọn ghế (300s)        -->
+      <!-- ══════════════════════════════════════ -->
+    {:else if queueStore.status === 'holding'}
+      <div
+        class="relative flex flex-1 flex-col overflow-hidden bg-blue-950 text-white md:rounded-2xl md:shadow-2xl"
+      >
+        <!-- Noise overlay -->
+        <div
+          class="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style="background: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/></filter><rect width=%22200%22 height=%22200%22 filter=%22url(%23n)%22 opacity=%221%22/></svg>'); background-size: 200px;"
+        ></div>
+
+        <!-- Glow blobs -->
+        <div
+          class="pointer-events-none absolute top-0 left-1/2 size-72 -translate-x-1/2 rounded-full bg-blue-400/20 blur-3xl"
+        ></div>
+        <div
+          class="pointer-events-none absolute right-0 bottom-0 size-48 rounded-full bg-indigo-500/20 blur-3xl"
+        ></div>
+
+        <!-- Top section -->
+        <div class="relative flex flex-col items-center px-5 pt-14 md:pt-10">
+          <div
+            class="mb-5 flex size-20 items-center justify-center rounded-full bg-white/15 shadow-lg ring-1 shadow-blue-900/50 ring-white/30"
+          >
+            <Ticket class="size-10 drop-shadow" aria-hidden="true" />
+          </div>
+          <h1 class="mb-1 text-center font-heading text-3xl font-black tracking-tight">
+            ĐANG GIỮ CHỖ
+          </h1>
+          <p class="text-center text-sm text-blue-200/80">
+            {queueStore.eventTitle || 'Hoàn tất đặt ghế trước khi hết giờ.'}
+          </p>
+        </div>
+
+        <!-- Main countdown -->
+        <div class="relative flex flex-1 flex-col items-center justify-center px-5 py-8">
+          <div class="mb-6 text-center">
+            <p class="mb-2 text-[10px] font-bold tracking-[0.2em] text-blue-300/60 uppercase">
+              Thời gian giữ chỗ còn lại
+            </p>
+            <p
+              class="font-mono text-[6rem] leading-none font-black tabular-nums drop-shadow-lg transition-colors duration-500
+                      {timeLeft <= 60 ? 'text-yellow-300' : 'text-white'}"
+            >
+              {formatTime(timeLeft)}
+            </p>
+            {#if timeLeft <= 60}
+              <p class="mt-2 text-xs font-semibold text-yellow-300/90">
+                ⚠ Sắp hết hạn — đặt ghế ngay!
               </p>
             {/if}
+          </div>
 
-            <!-- Countdown ring -->
-            <div
-              class="mb-8 rounded-3xl bg-black/10 py-6 text-center backdrop-blur-sm sm:bg-transparent sm:py-0 sm:backdrop-blur-none"
-            >
-              <p class="mb-2 text-sm font-bold tracking-widest uppercase opacity-80">
-                Xác nhận trong vòng
-              </p>
-              <p class="font-mono text-7xl leading-none font-black tabular-nums sm:text-6xl">
-                {formatTime(timeLeft)}
-              </p>
+          <div class="w-full max-w-xs">
+            <div class="h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                class="h-full rounded-full shadow-[0_0_8px_currentColor] transition-all duration-1000
+                       {timeLeft <= 60
+                  ? 'bg-yellow-300 text-yellow-300'
+                  : 'bg-blue-300 text-blue-300'}"
+                style="width: {totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0}%"
+              ></div>
             </div>
           </div>
+        </div>
 
-          <!-- Progress bar -->
-          <div class="mb-6 h-1.5 overflow-hidden rounded-full bg-white/20">
-            <div
-              class="h-full rounded-full bg-white transition-all duration-1000"
-              style="width: {Math.min(100, (timeLeft / 60) * 100)}%"
-            ></div>
-          </div>
+        <!-- Bottom action sheet -->
+        <div
+          class="pb-safe relative border-t border-white/10 bg-black/20 px-5 pt-4 pb-6 backdrop-blur-md"
+        >
+          <button
+            onclick={() =>
+              goto(
+                resolve(
+                  queueStore.showId
+                    ? `/events/${eventId}/shows/${queueStore.showId}/seats`
+                    : `/events/${eventId}`,
+                ),
+              )}
+            class="mb-3 w-full rounded-xl bg-blue-400 px-5 py-4 text-base font-black text-blue-950
+                   shadow-lg shadow-blue-900/50 transition-all
+                   hover:bg-blue-300 focus-visible:ring-2
+                   focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-800 active:scale-[0.98]"
+          >
+            Tiếp tục chọn ghế →
+          </button>
+          <button
+            onclick={() => queueStore.leave()}
+            class="w-full py-2.5 text-sm font-medium text-white/40 transition hover:text-white/70"
+          >
+            Hủy & nhường chỗ
+          </button>
+        </div>
+      </div>
 
-          <div class="mt-auto pt-8 pb-12 sm:pb-0">
-            <button
-              onclick={handleConfirm}
-              disabled={isConfirming}
-              class="w-full animate-pulse rounded-xl bg-white px-6 py-4 text-lg font-black text-emerald-700
-                     shadow-[0_8px_30px_rgb(0,0,0,0.2)] transition-all hover:animate-none hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70
-                     sm:shadow-xl sm:shadow-black/20"
-            >
-              {isConfirming ? 'Đang xử lý...' : 'VÀO CHỌN GHẾ NGAY →'}
-            </button>
+      <!-- ══════════════════════════════════════ -->
+      <!-- MISSED                                -->
+      <!-- ══════════════════════════════════════ -->
+    {:else if queueStore.status === 'missed'}
+      <div class="flex flex-1 flex-col bg-zinc-950 md:rounded-2xl md:shadow-2xl">
+        <div class="flex flex-1 flex-col items-center justify-center px-5">
+          <div
+            class="mb-6 flex size-20 items-center justify-center rounded-full bg-red-500/15 ring-1 ring-red-500/30"
+          >
+            <Clock class="size-10 text-red-400" aria-hidden="true" />
           </div>
+          <h1 class="mb-2 text-center font-heading text-2xl font-black text-white">
+            Đã hết thời gian
+          </h1>
+          <p class="text-center text-sm text-zinc-400">
+            Slot đã được nhường cho người tiếp theo. Bạn sẽ phải xếp hàng lại.
+          </p>
+        </div>
+        <div class="pb-safe border-t border-white/5 bg-zinc-900/80 px-5 pt-4 pb-6">
+          <button
+            onclick={() => goto(resolve(`/events/${eventId}`))}
+            class="w-full rounded-xl bg-white px-5 py-3.5 text-sm font-bold text-zinc-900
+                   transition-all hover:bg-zinc-100 active:scale-[0.98]"
+          >
+            Quay lại sự kiện
+          </button>
         </div>
       </div>
     {/if}
