@@ -14,7 +14,15 @@ const contactSchema = z.object({
 export const actions = {
   default: async ({ request, getClientAddress }) => {
     const ip = getClientAddress();
-    const { success: allowed } = await contactFormLimiter.limit(ip);
+    let allowed = true;
+    try {
+      ({ success: allowed } = await contactFormLimiter.limit(ip));
+    } catch {
+      return fail(503, {
+        success: false,
+        error: 'Hệ thống đang bận, vui lòng thử lại sau.',
+      });
+    }
     if (!allowed) {
       return fail(429, {
         success: false,
@@ -71,9 +79,7 @@ export const actions = {
           message,
         }),
         signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
+      }).finally(() => clearTimeout(timeoutId));
 
       const json = await res.json();
 

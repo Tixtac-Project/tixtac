@@ -78,6 +78,7 @@
   let timeLeft = $state<number | null>(null);
   let totalHoldSeconds = $state<number>(300); // fallback 5 min
   let hasExpired = $state(false);
+  let expireLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   $effect(() => {
     if (!queueStore.expiresAt || queueStore.status !== 'holding') {
@@ -98,8 +99,11 @@
         hasExpired = true;
         queueStore.status = 'missed';
         toast.error('Phiên giữ vé đã hết hạn! Vui lòng xếp hàng lại để tiếp tục.', 0);
-        setTimeout(() => {
-          queueStore.leave();
+        queueStore.leave();
+        if (expireLeaveTimer) clearTimeout(expireLeaveTimer);
+        expireLeaveTimer = setTimeout(() => {
+          expireLeaveTimer = null;
+          if (queueStore.status === 'missed') queueStore.leave();
         }, 500);
       }
     };
@@ -332,6 +336,10 @@
 
   // Abort any in-flight request and close SSE when the component is destroyed
   onDestroy(() => {
+    if (expireLeaveTimer) {
+      clearTimeout(expireLeaveTimer);
+      expireLeaveTimer = null;
+    }
     abortPendingRequest();
     closeSSE();
   });

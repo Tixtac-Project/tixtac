@@ -127,7 +127,7 @@
     seatCfg?.startColIndex ?? (gridCols.length > 0 ? Math.min(...gridCols) : 1),
   );
 
-  const hasGridData = $derived(gridKeys.length > 0 && gridCols.length > 0);
+  const hasGridData = $derived(!!seatCfg && gridKeys.length > 0 && gridCols.length > 0);
 
   function seatColor(status: string): string {
     switch (status) {

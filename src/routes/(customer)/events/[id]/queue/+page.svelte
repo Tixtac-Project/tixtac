@@ -26,7 +26,7 @@
     }
     const update = () => {
       timeLeft = Math.max(0, Math.floor((queueStore.expiresAt! - Date.now()) / 1000));
-      if (timeLeft === 0 && queueStore.status === 'ready') {
+      if (timeLeft === 0 && (queueStore.status === 'ready' || queueStore.status === 'holding')) {
         queueStore.status = 'missed';
         queueStore.leave();
       }

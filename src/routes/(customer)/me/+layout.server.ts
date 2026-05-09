@@ -1,9 +1,9 @@
+import type { RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
-
-export const load: LayoutServerLoad = async ({ fetch, locals }) => {
+export const load: LayoutServerLoad = async ({ fetch, locals, url }: RequestEvent) => {
   if (!locals.user) {
-    throw redirect(302, '/login');
+    throw redirect(302, `/login?redirect=${encodeURIComponent(url.pathname)}`);
   }
 
   // Fetch profile once for sidebar (name, email) — non-critical

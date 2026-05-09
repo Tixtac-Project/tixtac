@@ -1,5 +1,4 @@
 <script lang="ts">
-  import favicon from '$lib/assets/favicon.svg';
   import ToastContainer from '$lib/components/ToastContainer.svelte';
   import { ModeWatcher } from 'mode-watcher';
   import { onMount } from 'svelte';
@@ -22,7 +21,6 @@
 </script>
 
 <svelte:head>
-  <link rel="icon" href={favicon} />
   <link rel="icon" type="image/svg+xml" href={faviconHref} />
 </svelte:head>
 <ModeWatcher />

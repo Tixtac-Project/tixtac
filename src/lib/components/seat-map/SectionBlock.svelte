@@ -194,6 +194,7 @@
           class="flex size-6 cursor-pointer items-center justify-center rounded-lg bg-white/60 text-foreground transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-30"
           disabled={quantity <= 0}
           onclick={decrement}
+          aria-label="Giảm số lượng vé"
         >
           <Minus class="size-3" />
         </button>
@@ -205,6 +206,7 @@
           class="flex size-6 cursor-pointer items-center justify-center rounded-lg bg-cta text-cta-foreground shadow-sm transition-all hover:bg-cta-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none"
           disabled={quantity >= availableCount}
           onclick={increment}
+          aria-label="Tăng số lượng vé"
         >
           <Plus class="size-3" />
         </button>
@@ -258,6 +260,7 @@
         class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary/90 text-primary-foreground shadow-sm transition-all hover:bg-primary hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none"
         disabled={quantity <= 0}
         onclick={decrement}
+        aria-label="Giảm số lượng vé"
       >
         <Minus class="size-4" />
       </button>
@@ -272,6 +275,7 @@
         class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-cta text-cta-foreground shadow-sm shadow-cta/25 transition-all hover:bg-cta-hover hover:shadow-md hover:shadow-cta/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none"
         disabled={quantity >= availableCount}
         onclick={increment}
+        aria-label="Tăng số lượng vé"
       >
         <Plus class="size-4" />
       </button>
