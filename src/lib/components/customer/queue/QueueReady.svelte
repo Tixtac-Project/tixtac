@@ -12,31 +12,36 @@
   let { isDocked = false, onUndock, formattedTime, onGoToSeats }: Props = $props();
 </script>
 
-<div class="bg-emerald-600 p-2 sm:p-4 text-white shadow-inner sm:shadow-none">
+<div class="bg-emerald-600 p-2 text-white shadow-inner sm:p-4 sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center sm:hidden text-white">
+  <div class="flex items-center text-white sm:hidden">
     <!-- Clickable area to undock when docked -->
-    <button 
+    <button
       class="flex items-center gap-3"
       onclick={isDocked ? onUndock : undefined}
-      aria-label={isDocked ? "Mở rộng widget" : undefined}
+      aria-label={isDocked ? 'Mở rộng widget' : undefined}
     >
-      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md">
+      <div
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md"
+      >
         <AlertCircle class="h-5 w-5 text-green-600" />
       </div>
-      
+
       <span class="font-mono text-xl font-black drop-shadow-sm">{formattedTime}</span>
     </button>
-    
+
     {#if !isDocked}
-      <div class="flex items-center gap-3 overflow-hidden pl-3" transition:slide={{ axis: 'x', duration: 250 }}>
-        <div class="h-6 w-px bg-white/20 shrink-0"></div>
-        
+      <div
+        class="flex items-center gap-3 overflow-hidden pl-3"
+        transition:slide={{ axis: 'x', duration: 250 }}
+      >
+        <div class="h-6 w-px shrink-0 bg-white/20"></div>
+
         <button
           onclick={onGoToSeats}
-          class="action-btn flex h-10 w-auto px-4 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-emerald-700 animate-pulse shadow-md transition active:scale-95"
+          class="action-btn flex h-10 w-auto shrink-0 animate-pulse items-center justify-center gap-1.5 rounded-full bg-white px-4 text-sm font-bold text-emerald-700 shadow-md transition active:scale-95"
         >
           CHỌN GHẾ
           <ArrowRight class="h-4 w-4" />
@@ -48,10 +53,10 @@
   <!-- ═══════════════════════════════════════════ -->
   <!-- DESKTOP CARD VIEW (>= 640px)                -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="hidden sm:block relative">
+  <div class="relative hidden sm:block">
     <!-- Pulse ring decoration -->
     <div class="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-white/10 blur-xl"></div>
-    
+
     <div class="mb-3 flex items-center gap-3">
       <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20">
         <AlertCircle class="h-5 w-5" />

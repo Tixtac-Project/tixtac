@@ -76,19 +76,35 @@
 
   // ── Countdown Timer cho phiên giữ chỗ ──
   let timeLeft = $state<number | null>(null);
+  let totalHoldSeconds = $state<number>(300); // fallback 5 min
+  let hasExpired = $state(false);
+  let expireLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   $effect(() => {
     if (!queueStore.expiresAt || queueStore.status !== 'holding') {
       timeLeft = null;
+      totalHoldSeconds = 300;
+      hasExpired = false;
       return;
     }
+
+    // Capture total hold duration once when the session begins
+    const initialRemaining = Math.max(1, Math.floor((queueStore.expiresAt - Date.now()) / 1000));
+    totalHoldSeconds = initialRemaining;
 
     const update = () => {
       const remaining = Math.max(0, Math.floor((queueStore.expiresAt! - Date.now()) / 1000));
       timeLeft = remaining;
-      if (remaining === 0) {
+      if (remaining === 0 && !hasExpired) {
+        hasExpired = true;
         queueStore.status = 'missed';
+        toast.error('Phiên giữ vé đã hết hạn! Vui lòng xếp hàng lại để tiếp tục.', 0);
         queueStore.leave();
+        if (expireLeaveTimer) clearTimeout(expireLeaveTimer);
+        expireLeaveTimer = setTimeout(() => {
+          expireLeaveTimer = null;
+          if (queueStore.status === 'missed') queueStore.leave();
+        }, 500);
       }
     };
 
@@ -320,6 +336,10 @@
 
   // Abort any in-flight request and close SSE when the component is destroyed
   onDestroy(() => {
+    if (expireLeaveTimer) {
+      clearTimeout(expireLeaveTimer);
+      expireLeaveTimer = null;
+    }
     abortPendingRequest();
     closeSSE();
   });
@@ -438,9 +458,9 @@
 </svelte:head>
 
 <div class="min-h-screen bg-surface pb-24">
-  <!-- Header -->
+  <!-- Header — sits below desktop navbar (md:h-16) -->
   <header
-    class="sticky top-0 z-20 border-b border-border/30 bg-surface-container-lowest/90 backdrop-blur-md"
+    class="sticky top-0 z-20 border-b border-border/30 bg-surface-container-lowest/90 backdrop-blur-md md:top-16"
   >
     <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
       <button
@@ -460,13 +480,65 @@
         </p>
       </div>
 
-      <!-- Đếm ngược phiên chọn ghế -->
       {#if timeLeft !== null}
-        <div class="flex items-center gap-2 rounded-xl border border-orange-600/40 bg-orange-400/10 px-3 py-1.5 text-orange-700 sm:px-4 sm:py-2">
-          <Clock class="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
-          <div class="text-right">
-            <p class="text-[9px] font-bold tracking-widest uppercase opacity-80 sm:text-[10px]">Thời gian</p>
-            <p class="font-mono text-sm font-black tabular-nums leading-none sm:text-base">{formatCountdown(timeLeft)}</p>
+        {@const isCritical = timeLeft <= 60}
+        {@const progress =
+          totalHoldSeconds > 0 ? Math.max(0, Math.min(1, timeLeft / totalHoldSeconds)) : 0}
+        <div
+          class="flex shrink-0 items-center gap-2 rounded-2xl border-2 px-3 py-1.5 shadow-md transition-colors duration-500 md:gap-3 md:px-4 md:py-2.5 {isCritical
+            ? 'animate-countdown-pulse border-danger/70 bg-danger-muted text-danger-muted-foreground'
+            : 'border-warning/60 bg-warning-muted text-warning-muted-foreground'}"
+          role="timer"
+          aria-label="Phiên giữ vé còn {formatCountdown(timeLeft)}"
+        >
+          <!-- Ring progress indicator -->
+          <div class="relative shrink-0">
+            <svg
+              class="size-8 -rotate-90 md:size-10"
+              viewBox="0 0 40 40"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <!-- Background track -->
+              <circle
+                cx="20"
+                cy="20"
+                r="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                class="opacity-15"
+              />
+              <!-- Progress arc -->
+              <circle
+                cx="20"
+                cy="20"
+                r="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-dasharray="100.53"
+                stroke-dashoffset={100.53 * (1 - progress)}
+                class="transition-[stroke-dashoffset] duration-1000 ease-linear {isCritical
+                  ? 'text-danger'
+                  : 'text-warning'}"
+              />
+            </svg>
+            <Clock
+              class="absolute inset-0 m-auto size-3.5 md:size-4.5 {isCritical
+                ? 'text-danger'
+                : 'text-warning'}"
+            />
+          </div>
+
+          <!-- Time display -->
+          <div>
+            <p class="text-[9px] font-semibold tracking-wider uppercase opacity-85 md:text-[10px]">
+              {isCritical ? 'Sắp hết hạn' : 'Thời gian giữ vé'}
+            </p>
+            <p class="text-base leading-none font-extrabold tracking-tight tabular-nums md:text-xl">
+              {formatCountdown(timeLeft)}
+            </p>
           </div>
         </div>
       {/if}
@@ -476,7 +548,7 @@
   <!-- Show Switcher (only if multiple shows) -->
   {#if allShows.length > 1}
     <div
-      class="relative z-20 border-b border-border/20 bg-surface-container-lowest/70 backdrop-blur-sm"
+      class="relative z-10 border-b border-border/20 bg-surface-container-lowest/70 backdrop-blur-sm"
     >
       <div class="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
         <div class="relative z-20">
@@ -634,3 +706,18 @@
     onClose={() => (showConflictModal = false)}
   />
 </div>
+
+<style>
+  @keyframes countdown-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 oklch(0.6 0.18 25 / 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 10px oklch(0.6 0.18 25 / 0);
+    }
+  }
+  .animate-countdown-pulse {
+    animation: countdown-pulse 1.4s ease-in-out infinite;
+  }
+</style>

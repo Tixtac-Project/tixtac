@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { CalendarDays, LayoutDashboard, Ticket } from 'lucide-svelte';
 
+  const version = __APP_VERSION__;
   let {
     open = $bindable(false),
   }: {
@@ -101,11 +102,11 @@
   <div class="px-6 py-4">
     <div class="flex items-center justify-between">
       <p class="text-[11px] text-muted-foreground/60">&copy; {currentYear} TixTac</p>
-      <span
+      <p
         class="rounded-md bg-muted/60 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-muted-foreground/50 uppercase"
       >
-        v1.0.0
-      </span>
+        v{version}
+      </p>
     </div>
   </div>
 </aside>

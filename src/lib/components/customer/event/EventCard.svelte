@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import type { EventListItem } from '$lib/types/event-detail';
   import { formatPrice } from '$lib/utils/price';
-  import { MapPin, Ticket } from 'lucide-svelte';
+  import { Calendar, MapPin, Ticket } from 'lucide-svelte';
 
   interface Props {
     event: EventListItem;
@@ -38,8 +38,8 @@
   href={resolve(`/events/${event.id}`)}
   class="bento-card-interactive group flex h-full flex-col overflow-hidden p-0!"
 >
-  <!-- Banner -->
-  <div class="relative h-48 overflow-hidden bg-muted">
+  <!-- ═══════════ BANNER ═══════════ -->
+  <div class="relative aspect-[16/9] overflow-hidden bg-muted md:aspect-auto md:h-44">
     {#if event.bannerImageUrl}
       <img
         src={event.bannerImageUrl}
@@ -56,21 +56,31 @@
       </div>
     {/if}
 
-    <!-- Overlay gradient -->
-    <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent"></div>
+    <div class="absolute inset-0 bg-linear-to-t from-black/25 to-transparent"></div>
 
-    <!-- Badge (HOT/LIVE) - top left, only when no availability status -->
+    <!-- Category (mobile: overlaid on banner) -->
+    {#if event.categoryName}
+      <div class="absolute bottom-2 left-2 z-10 md:hidden">
+        <span
+          class="inline-block rounded-md bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm"
+        >
+          {event.categoryName}
+        </span>
+      </div>
+    {/if}
+
+    <!-- Badges (top-right, consistent across breakpoints) -->
     {#if badge && !availabilityStatus}
-      <div class="absolute top-3 left-3 z-10">
+      <div class="absolute top-2.5 right-2.5 z-10">
         {#if badge === 'hot'}
           <span
-            class="inline-block rounded-md bg-danger px-2.5 py-1 text-xs font-bold text-danger-foreground"
+            class="inline-block rounded-md bg-danger px-2 py-0.5 text-[10px] font-bold text-danger-foreground md:px-2.5 md:py-1 md:text-xs"
           >
             🔥 HOT
           </span>
         {:else if badge === 'live'}
           <span
-            class="inline-block rounded-md bg-warning px-2.5 py-1 text-xs font-bold text-warning-foreground"
+            class="inline-block rounded-md bg-warning px-2 py-0.5 text-[10px] font-bold text-warning-foreground md:px-2.5 md:py-1 md:text-xs"
           >
             🔴 LIVE
           </span>
@@ -78,19 +88,18 @@
       </div>
     {/if}
 
-    <!-- Availability badge - top left -->
     {#if availabilityStatus === 'soldout'}
-      <div class="absolute top-3 left-3 z-10">
+      <div class="absolute top-2.5 right-2.5 z-10">
         <span
-          class="inline-block rounded-md bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground"
+          class="inline-block rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground md:px-2.5 md:py-1 md:text-xs"
         >
           Sold out
         </span>
       </div>
     {:else if availabilityStatus === 'limited'}
-      <div class="absolute top-3 left-3 z-10">
+      <div class="absolute top-2.5 right-2.5 z-10">
         <span
-          class="inline-block rounded-md bg-warning-muted px-2.5 py-1 text-xs font-bold text-warning-muted-foreground"
+          class="inline-block rounded-md bg-warning-muted px-2 py-0.5 text-[10px] font-bold text-warning-muted-foreground md:px-2.5 md:py-1 md:text-xs"
         >
           Sắp hết vé
         </span>
@@ -98,62 +107,89 @@
     {/if}
   </div>
 
-  <!-- Card body -->
-  <div class="flex flex-1 flex-col p-5">
-    <!-- Category tag -->
-    {#if event.categoryName}
-      <span
-        class="mb-2 inline-block w-fit rounded-md bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary"
-      >
-        {event.categoryName}
-      </span>
-    {/if}
-
-    <!-- Title -->
-    <h3
-      class="mb-3 line-clamp-2 font-heading text-lg leading-tight font-extrabold tracking-tight text-foreground transition-colors group-hover:text-primary"
-    >
-      {event.title}
-    </h3>
-
-    <!-- Meta: Date block on left + venue on right -->
-    <div class="mb-3 flex items-start gap-3">
-      <!-- Date block - calendar style with year -->
-      {#if showDate}
-        <div
-          class="flex min-w-[52px] shrink-0 flex-col items-center rounded-md bg-primary-light px-2 py-1.5 text-center"
+  <!-- ═══════════ CARD BODY ═══════════ -->
+  <div class="flex flex-1 flex-col gap-3 p-3.5 md:gap-4 md:p-5">
+    <!-- Category + Title block -->
+    <div class="space-y-1.5">
+      {#if event.categoryName}
+        <span
+          class="hidden w-fit rounded-md bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary md:inline-block"
         >
-          <span class="text-xl leading-none font-extrabold text-primary">{showDate.getDate()}</span>
-          <span class="text-[10px] font-bold tracking-wider text-primary/70 uppercase">
-            {showDate.toLocaleString('vi-VN', { month: 'short' })}
-          </span>
-          <span class="mt-0.5 text-[9px] leading-none font-semibold text-primary/50">
-            {showDate.getFullYear()}
-          </span>
-        </div>
+          {event.categoryName}
+        </span>
       {/if}
 
-      <!-- Venue (top-aligned, uses remaining space, truncates if needed) -->
-      <div class="min-w-0 flex-1 text-sm text-muted-foreground">
-        <div class="flex items-start gap-1.5">
-          <MapPin class="mt-0.5 size-3.5 shrink-0" />
-          <span class="line-clamp-2 wrap-break-word">{event.venue}</span>
-        </div>
-      </div>
+      <h3
+        class="line-clamp-2 font-heading text-sm leading-snug font-extrabold tracking-tight text-foreground transition-colors group-hover:text-primary md:text-base"
+      >
+        {event.title}
+      </h3>
     </div>
 
-    <!-- Footer with price + CTA -->
-    <div class="mt-auto flex items-center justify-between border-t border-border pt-3">
-      <div class="flex flex-col">
-        <span class="text-[10px] tracking-wider text-muted-foreground uppercase">Giá từ</span>
-        <span class="text-base font-extrabold text-foreground">{formatPrice(event.min_price)}</span>
+    <!-- Meta — pushed to bottom regardless of title height -->
+    <div class="mt-auto flex flex-col gap-3">
+      <!-- Mobile meta -->
+      <div class="flex flex-col gap-1 text-xs text-muted-foreground md:hidden">
+        {#if showDate}
+          <span class="inline-flex items-center gap-1.5 font-semibold text-foreground">
+            <Calendar class="size-3.5 shrink-0 text-primary" />
+            {showDate.toLocaleDateString('vi-VN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </span>
+        {/if}
+        <span class="inline-flex items-center gap-1.5">
+          <MapPin class="size-3.5 shrink-0" />
+          <span class="line-clamp-1">{event.venue}</span>
+        </span>
       </div>
-      <span
-        class="inline-flex items-center gap-1.5 rounded-md bg-cta px-4 py-2 text-xs font-bold text-cta-foreground shadow-sm shadow-cta/15 transition-all group-hover:scale-105 group-hover:shadow-md group-hover:shadow-cta/20"
-      >
-        <Ticket class="size-3.5" />
-        Mua vé
-      </span>
+
+      <!-- Desktop meta -->
+      <div class="hidden items-start gap-3 md:flex">
+        {#if showDate}
+          <div
+            class="flex w-20 shrink-0 flex-col items-center self-start rounded-lg bg-primary-light px-3 py-2.5 text-center"
+          >
+            <span class="text-xl leading-none font-extrabold text-primary">
+              {showDate.getDate()}
+            </span>
+            <span class="mt-0.5 text-[11px] font-bold tracking-wider text-primary/70 uppercase">
+              THG {showDate.toLocaleString('vi-VN', { month: 'numeric' })}
+            </span>
+            <span class="mt-0.5 text-[10px] leading-none font-medium text-primary/50">
+              {showDate.getFullYear()}
+            </span>
+          </div>
+        {/if}
+        <div class="min-w-0 flex-1 pt-0.5 text-sm text-muted-foreground">
+          <div class="flex items-start gap-1.5">
+            <MapPin class="mt-0.5 size-3.5 shrink-0" />
+            <span class="line-clamp-2 break-words">{event.venue}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-between border-t border-border pt-3">
+        <div class="flex flex-col gap-0.5">
+          <span
+            class="text-[9px] font-medium tracking-wider text-muted-foreground uppercase md:text-[10px]"
+          >
+            Giá từ
+          </span>
+          <span class="text-sm font-extrabold text-foreground md:text-base">
+            {formatPrice(event.min_price)}
+          </span>
+        </div>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-lg bg-cta px-3 py-1.5 text-xs font-bold text-cta-foreground shadow-sm shadow-cta/15 transition-all group-hover:scale-105 group-hover:shadow-md group-hover:shadow-cta/20 md:px-4 md:py-2"
+        >
+          <Ticket class="size-3.5" />
+          Mua vé
+        </span>
+      </div>
     </div>
   </div>
 </a>

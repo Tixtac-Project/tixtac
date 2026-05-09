@@ -13,9 +13,7 @@
     >
       <Scale class="h-8 w-8" />
     </div>
-    <h1 class="font-heading text-4xl font-black tracking-tight md:text-5xl">
-      Điều khoản & Điều kiện
-    </h1>
+    <h1 class="font-heading text-4xl font-black tracking-tight md:text-5xl">Điều khoản sử dụng</h1>
     <p class="mt-4 text-muted-foreground">Cập nhật lần cuối: {lastUpdated}</p>
   </div>
 

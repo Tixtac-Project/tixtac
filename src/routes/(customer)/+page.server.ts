@@ -3,7 +3,6 @@ import { eventService } from '$lib/server/services/event.service';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {
-  const categorySlug = url.searchParams.get('category') || '';
   const rawPage = parseInt(url.searchParams.get('page') || '1', 10);
   const page = rawPage > 0 ? rawPage : 1;
 
@@ -11,7 +10,6 @@ export const load: PageServerLoad = async ({ url }) => {
     categoryService.listCategories(),
     eventService.listFeaturedEvents(6),
     eventService.listEvents({
-      category: categorySlug || undefined,
       page,
       limit: 8,
     }),

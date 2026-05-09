@@ -21,7 +21,7 @@
   <div>
     <h2
       class={`font-heading font-bold tracking-tight text-foreground
-        ${variant === 'small' ? 'text-xl' : 'text-2xl md:text-3xl'}
+        ${variant === 'small' ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl md:text-3xl'}
       `}
     >
       {title}

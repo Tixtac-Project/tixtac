@@ -12,11 +12,11 @@
   let { isDocked = false, onUndock, onExpand, onExitClick }: Props = $props();
 </script>
 
-<div class="bg-primary sm:bg-surface-container-highest p-2 sm:p-4 shadow-inner sm:shadow-none">
+<div class="bg-primary p-2 shadow-inner sm:bg-surface-container-highest sm:p-4 sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center sm:hidden text-white">
+  <div class="flex items-center text-white sm:hidden">
     <!-- Clickable area to undock when docked -->
     <button
       type="button"
@@ -25,15 +25,22 @@
       disabled={!isDocked}
       aria-label="Mở rộng widget"
     >
-      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md">
+      <div
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md"
+      >
         <Loader2 class="h-5 w-5 animate-spin text-primary" />
       </div>
-      <span class="font-mono text-xl font-black text-white drop-shadow-sm">#{queueStore.position}</span>
+      <span class="font-mono text-xl font-black text-white drop-shadow-sm">
+        #{queueStore.position}
+      </span>
     </button>
 
     {#if !isDocked}
-      <div class="flex items-center gap-3 overflow-hidden pl-3" transition:slide={{ axis: 'x', duration: 250 }}>
-        <div class="h-6 w-px bg-white/20 shrink-0"></div>
+      <div
+        class="flex items-center gap-3 overflow-hidden pl-3"
+        transition:slide={{ axis: 'x', duration: 250 }}
+      >
+        <div class="h-6 w-px shrink-0 bg-white/20"></div>
 
         <button
           type="button"

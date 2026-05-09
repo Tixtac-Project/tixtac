@@ -26,7 +26,7 @@
 </script>
 
 <svelte:head>
-  <title>TixTac - Nền tảng đặt vé sự kiện số 1</title>
+  <title>TixTac - Nền tảng đặt vé sự kiện hàng đầu</title>
   <meta
     name="description"
     content="Khám phá và đặt vé concert, festival, thể thao hàng đầu Việt Nam. Nhanh chóng, bảo mật, tiện lợi trên TixTac."
@@ -39,7 +39,7 @@
 {/if}
 
 <!-- Events Section -->
-<section class="mx-auto max-w-7xl px-6 py-16 lg:py-24" id="events">
+<section class="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:py-24" id="events">
   <SectionHeader title="Sự kiện nổi bật" viewAllHref="/events" />
 
   {#if events.length === 0}

@@ -196,10 +196,10 @@ export const queueService = {
       await redis.eval<[string, string], number>(
         leaveQueueScript,
         [
-          userCurrentKey, 
-          `active_users:${eventId}`, 
+          userCurrentKey,
+          `active_users:${eventId}`,
           `waiting_queue:${eventId}`,
-          `confirmed:${eventId}:${userId}`
+          `confirmed:${eventId}:${userId}`,
         ],
         [String(eventId), String(userId)],
       );

@@ -13,11 +13,11 @@
   let { isDocked = false, onUndock, formattedTime, onGoToSeats, onExitClick }: Props = $props();
 </script>
 
-<div class="bg-orange-500 p-2 sm:p-4 text-white shadow-inner sm:shadow-none">
+<div class="bg-orange-500 p-2 text-white shadow-inner sm:p-4 sm:shadow-none">
   <!-- ═══════════════════════════════════════════ -->
   <!-- MOBILE PILL VIEW (< 640px)                  -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="flex items-center sm:hidden text-white">
+  <div class="flex items-center text-white sm:hidden">
     <!-- Clickable area to undock when docked -->
     <button
       type="button"
@@ -26,7 +26,9 @@
       disabled={!isDocked}
       aria-label="Mở rộng widget"
     >
-      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md">
+      <div
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-md"
+      >
         <Timer class="h-5 w-5 text-orange-600" />
       </div>
 
@@ -34,8 +36,11 @@
     </button>
 
     {#if !isDocked}
-      <div class="flex items-center gap-3 overflow-hidden pl-3" transition:slide={{ axis: 'x', duration: 250 }}>
-        <div class="h-6 w-px bg-white/20 shrink-0"></div>
+      <div
+        class="flex items-center gap-3 overflow-hidden pl-3"
+        transition:slide={{ axis: 'x', duration: 250 }}
+      >
+        <div class="h-6 w-px shrink-0 bg-white/20"></div>
 
         <button
           type="button"
@@ -63,7 +68,7 @@
   <!-- ═══════════════════════════════════════════ -->
   <!-- DESKTOP CARD VIEW (>= 640px)                -->
   <!-- ═══════════════════════════════════════════ -->
-  <div class="hidden sm:block relative">
+  <div class="relative hidden sm:block">
     <!-- Decoration -->
     <div class="absolute -top-10 -left-10 h-24 w-24 rounded-full bg-white/10 blur-xl"></div>
 

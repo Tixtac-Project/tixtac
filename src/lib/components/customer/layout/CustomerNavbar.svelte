@@ -1,10 +1,12 @@
 <!-- src/lib/components/customer/layout/CustomerNavbar.svelte -->
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page as pageState } from '$app/state';
   import Logo2 from '$lib/assets/Logo2.svelte';
   import CategoryFilterBar from '$lib/components/customer/event/CategoryFilterBar.svelte';
+  import { AnimatedThemeToggler } from '$lib/components/magic/animated-theme-toggler';
   import { Button } from '$lib/components/ui/button';
   import {
     DropdownMenu,
@@ -15,12 +17,17 @@
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
   import type { CategoryInfo, UserInfo } from '$lib/types/layout';
-  import MoonIcon from '@lucide/svelte/icons/moon';
-  import SunIcon from '@lucide/svelte/icons/sun';
-  import { CircleUserRound, House, LogOut, Search, Ticket, User } from 'lucide-svelte';
-  import { toggleMode } from 'mode-watcher';
+  import { handleLogout as sharedLogout } from '$lib/utils/auth';
+  import {
+    CircleUserRound,
+    House,
+    LayoutDashboard,
+    LogOut,
+    Search,
+    Ticket,
+    User,
+  } from 'lucide-svelte';
   import { onMount, tick } from 'svelte';
-  import { queueStore } from '$lib/stores/queue.svelte';
 
   interface Props {
     user?: UserInfo;
@@ -29,12 +36,6 @@
   }
 
   let { user, searchQuery = '', categories = [] }: Props = $props();
-
-  let activeCategory = $state('');
-
-  $effect(() => {
-    activeCategory = pageState.url.searchParams.get('category') ?? '';
-  });
 
   let isSearchOpen = $state(false);
   let isUserMenuOpen = $state(false);
@@ -68,28 +69,8 @@
     isSearchOpen = !isSearchOpen;
   }
 
-  /**
-   * Handles the logout flow:
-   * 1. Calls the server-side logout API (which releases any Redis queue slot).
-   * 2. Clears the client-side queue store (removes localStorage data + hides widget).
-   * 3. Forces a full page reload to `/` to ensure all reactive state is reset.
-   */
-  async function handleLogout(event: Event) {
-    event.preventDefault();
-
-    try {
-      const res = await fetch(resolve('/api/auth/logout'), { method: 'POST' });
-
-      if (!res.ok) {
-        console.warn('Logout thất bại, nhưng đã xóa local state!');
-      }
-    } catch (err) {
-      console.error(err);
-      console.warn('Lỗi mạng trong quá trình Logout, xóa local state!');
-    } finally {
-      queueStore.clear();
-      window.location.href = resolve('/');
-    }
+  function handleLogout() {
+    return () => sharedLogout();
   }
 
   let currentPath = $derived(pageState.url.pathname);
@@ -98,6 +79,24 @@
     if (path === '/') return currentPath === '/';
     return currentPath.startsWith(path);
   }
+
+  let isAdmin = $derived(user?.role === 'admin');
+
+  // Bottom nav tabs dynamic — admin sees Quản lý instead of Vé của tôi
+  let bottomTabs = $derived(
+    isAdmin
+      ? (['/', '/search', '/admin', '/me/profile'] as const)
+      : (['/', '/search', '/me/tickets', '/me/profile'] as const),
+  );
+  let activeTabIndex = $derived.by(() => {
+    const rawIndex = bottomTabs.findIndex((p) => {
+      if (p === '/') return currentPath === '/';
+      return currentPath.startsWith(p);
+    });
+    const clampedIndex = rawIndex < 0 ? 0 : rawIndex;
+    const hasActive = rawIndex >= 0;
+    return { clampedIndex, hasActive };
+  });
 </script>
 
 <!-- ═══════════════════════════════════════════════════ -->
@@ -105,7 +104,9 @@
 <!-- ═══════════════════════════════════════════════════ -->
 <header class="relative z-40 w-full md:sticky md:top-0">
   <div class="glass-nav border-b border-outline-variant/10">
-    <div class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-6 px-4 sm:px-6">
+    <div
+      class="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-3 sm:h-16 sm:gap-6 sm:px-6"
+    >
       <!-- Brand -->
 
       <a
@@ -115,7 +116,9 @@
         <span class="size-6 fill-primary">
           <Logo2 />
         </span>
-        <span class="font-heading text-2xl font-extrabold tracking-tight text-primary">TixTac</span>
+        <span class="font-heading text-xl font-extrabold tracking-tight text-primary sm:text-2xl">
+          TixTac
+        </span>
       </a>
 
       <!-- Center nav links (desktop only) -->
@@ -142,17 +145,31 @@
             <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
           {/if}
         </a>
-        <a
-          href={resolve('/me/tickets')}
-          class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/me/tickets')
-            ? 'text-foreground'
-            : 'text-muted-foreground hover:text-foreground'}"
-        >
-          Vé của tôi
-          {#if isActive('/me/tickets')}
-            <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
-          {/if}
-        </a>
+        {#if isAdmin}
+          <a
+            href={resolve('/admin')}
+            class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/admin')
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground'}"
+          >
+            Trang quản lý
+            {#if isActive('/admin')}
+              <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+            {/if}
+          </a>
+        {:else}
+          <a
+            href={resolve('/me/tickets')}
+            class="relative px-4 py-2 text-sm font-medium transition-colors {isActive('/me/tickets')
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground'}"
+          >
+            Vé của tôi
+            {#if isActive('/me/tickets')}
+              <span class="absolute right-4 bottom-0 left-4 h-0.5 rounded-full bg-primary"></span>
+            {/if}
+          </a>
+        {/if}
       </nav>
 
       <!-- Right side: search + profile -->
@@ -212,20 +229,7 @@
         </div>
 
         <!-- Theme toggle -->
-        <Button
-          onclick={toggleMode}
-          variant="ghost"
-          size="icon"
-          class="h-9 w-9 shrink-0 rounded-full text-muted-foreground transition-colors duration-200 hover:text-foreground"
-        >
-          <SunIcon
-            class="size-max scale-100 rotate-0 transition-all! dark:scale-0 dark:-rotate-90"
-          />
-          <MoonIcon
-            class="absolute size-max scale-0 rotate-90 transition-all! dark:scale-100 dark:rotate-0"
-          />
-          <span class="sr-only">Toggle theme</span>
-        </Button>
+        <AnimatedThemeToggler class="text-muted-foreground" />
 
         <!-- Profile / Auth -->
         {#if user}
@@ -248,18 +252,31 @@
                   <User class="size-4 text-muted-foreground" />
                   <span>Trang cá nhân</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onclick={() => {
-                    goto(resolve('/me/tickets'));
-                    isUserMenuOpen = false;
-                  }}
-                  class="cursor-pointer"
-                >
-                  <Ticket class="size-4 text-muted-foreground" />
-                  <span>Vé của tôi</span>
-                </DropdownMenuItem>
+                {#if isAdmin}
+                  <DropdownMenuItem
+                    onclick={() => {
+                      goto(resolve('/admin'));
+                      isUserMenuOpen = false;
+                    }}
+                    class="cursor-pointer"
+                  >
+                    <LayoutDashboard class="size-4 text-muted-foreground" />
+                    <span>Trang quản lý</span>
+                  </DropdownMenuItem>
+                {:else}
+                  <DropdownMenuItem
+                    onclick={() => {
+                      goto(resolve('/me/tickets'));
+                      isUserMenuOpen = false;
+                    }}
+                    class="cursor-pointer"
+                  >
+                    <Ticket class="size-4 text-muted-foreground" />
+                    <span>Vé của tôi</span>
+                  </DropdownMenuItem>
+                {/if}
                 <DropdownMenuSeparator />
-                <form onsubmit={handleLogout}>
+                <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
                   <DropdownMenuItem variant="destructive" class="cursor-pointer">
                     <button
                       type="submit"
@@ -281,7 +298,7 @@
             href={resolve('/login')}
             class="hidden h-9 w-9 rounded-full text-muted-foreground transition-all hover:bg-primary-light hover:text-primary md:inline-flex"
           >
-            <CircleUserRound class="size-5" />
+            <CircleUserRound class="size-6" />
           </Button>
         {/if}
       </div>
@@ -291,8 +308,8 @@
   <!-- CATEGORY FILTER BAR — hidden on /search which has its own filter sidebar -->
   {#if categories.length > 0 && !currentPath.startsWith('/search')}
     <div class="border-b border-outline-variant/10 bg-surface-container-lowest">
-      <div class="mx-auto flex h-12 w-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-        <CategoryFilterBar {categories} bind:activeCategory />
+      <div class="mx-auto flex h-10 w-full max-w-7xl items-center px-3 sm:h-12 sm:px-6 lg:px-8">
+        <CategoryFilterBar {categories} />
       </div>
     </div>
   {/if}
@@ -306,50 +323,119 @@
     ? 'translate-y-0'
     : 'translate-y-full'}"
 >
-  <div class="rounded-t-2xl border-t border-outline-variant/10 bg-accent">
-    <div class="mx-auto flex h-18 max-w-lg items-center justify-around px-2">
+  <div
+    class="rounded-t-xl border-t border-outline-variant/10 bg-surface-container-lowest shadow-[0_-4px_20px_oklch(0.35_0.12_260/0.06)] backdrop-blur-xl"
+  >
+    <div
+      class="relative mx-auto grid h-[4.25rem] max-w-lg grid-cols-4 items-center"
+      style="--active-idx: {activeTabIndex.clampedIndex}"
+    >
+      <!-- Sliding pill background — 1/4 width, centered in its column -->
+      <div
+        class="absolute top-1.5 left-[calc(var(--active-idx)*25%+0.375rem)] h-[calc(100%-0.75rem)] w-[calc(25%-0.75rem)] rounded-2xl bg-primary-light transition-all duration-350 ease-(--ease-architectural) {activeTabIndex.hasActive
+          ? ''
+          : 'hidden'}"
+      ></div>
+
       <!-- Home -->
       <a
         href={resolve('/')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/')
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
         <House class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Home</span>
+        <span class="text-[10px] font-bold tracking-wider uppercase">Home</span>
       </a>
 
       <!-- Search -->
       <a
         href={resolve('/search')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/search')
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/search',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/search',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
         <Search class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Tìm kiếm</span>
+        <span class="text-[10px] font-bold tracking-wider uppercase">Tìm kiếm</span>
       </a>
 
-      <!-- My Tickets -->
-      <a
-        href={resolve('/me/tickets')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/me/tickets')
-          ? 'text-primary'
-          : 'text-muted-foreground'}"
-      >
-        <Ticket class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Vé của tôi</span>
-      </a>
+      <!-- My Tickets / Admin -->
+      {#if isAdmin}
+        <a
+          href={resolve('/admin')}
+          class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+            '/admin',
+          )
+            ? 'text-primary'
+            : 'text-muted-foreground'}"
+        >
+          <span
+            class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+              '/admin',
+            )
+              ? 'scale-100 opacity-100'
+              : 'scale-0 opacity-0'}"
+          ></span>
+          <LayoutDashboard class="h-5 w-5" />
+          <span class="text-[10px] font-bold tracking-wider uppercase">Quản lý</span>
+        </a>
+      {:else}
+        <a
+          href={resolve('/me/tickets')}
+          class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+            '/me/tickets',
+          )
+            ? 'text-primary'
+            : 'text-muted-foreground'}"
+        >
+          <span
+            class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+              '/me/tickets',
+            )
+              ? 'scale-100 opacity-100'
+              : 'scale-0 opacity-0'}"
+          ></span>
+          <Ticket class="h-5 w-5" />
+          <span class="text-[10px] font-bold tracking-wider uppercase">Vé của tôi</span>
+        </a>
+      {/if}
 
       <!-- Profile -->
       <a
-        href={resolve(user ? '/profile' : '/login')}
-        class="flex flex-col items-center gap-0.5 px-3 py-1 {isActive('/profile')
+        href={resolve(user ? '/me/profile' : '/login')}
+        class="relative z-10 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-350 ease-(--ease-architectural) {isActive(
+          '/me/profile',
+        )
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
+        <span
+          class="absolute -top-1.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full bg-primary transition-all duration-350 ease-(--ease-architectural) {isActive(
+            '/me/profile',
+          )
+            ? 'scale-100 opacity-100'
+            : 'scale-0 opacity-0'}"
+        ></span>
         <User class="h-5 w-5" />
-        <span class="text-[10px] font-semibold tracking-wider uppercase">Cá nhân</span>
+        <span class="text-[10px] font-bold tracking-wider uppercase">Cá nhân</span>
       </a>
     </div>
   </div>

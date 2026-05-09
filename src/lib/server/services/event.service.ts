@@ -206,8 +206,8 @@ export const eventService = {
         max_tickets_per_user: r.maxTicketsPerUser,
         status: r.status,
         min_price: r.minPrice ? Number(r.minPrice) : 0,
-        total_seats: r.totalSeats,
-        available_seats: r.availableSeats,
+        total_seats: Number(r.totalSeats),
+        available_seats: Number(r.availableSeats),
       })),
       pagination: {
         page,

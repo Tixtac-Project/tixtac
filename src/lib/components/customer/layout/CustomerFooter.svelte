@@ -117,22 +117,6 @@
         <ul class="space-y-3 text-sm">
           <li>
             <a
-              href={resolve('/faq')}
-              class="text-secondary-foreground transition-colors hover:text-primary"
-            >
-              FAQ
-            </a>
-          </li>
-          <li>
-            <a
-              href={resolve('/refund-policy')}
-              class="text-secondary-foreground transition-colors hover:text-primary"
-            >
-              Chính sách hoàn vé
-            </a>
-          </li>
-          <li>
-            <a
               href={resolve('/terms')}
               class="text-secondary-foreground transition-colors hover:text-primary"
             >
@@ -145,6 +129,14 @@
               class="text-secondary-foreground transition-colors hover:text-primary"
             >
               Chính sách bảo mật
+            </a>
+          </li>
+          <li>
+            <a
+              href={resolve('/faq')}
+              class="text-secondary-foreground transition-colors hover:text-primary"
+            >
+              FAQ
             </a>
           </li>
         </ul>
@@ -164,7 +156,7 @@
               <span class="font-semibold">Email:</span>
               <a
                 href="mailto:support@tixtac.io.vn"
-                class="text-primary transition-colors hover:text-primary-foreground"
+                class="text-primary transition-colors hover:text-primary-container"
               >
                 support@tixtac.io.vn
               </a>
@@ -173,7 +165,7 @@
               <span class="font-semibold">Điện thoại:</span>
               <a
                 href="tel:+84123456789"
-                class="text-primary transition-colors hover:text-primary-foreground"
+                class="text-primary transition-colors hover:text-primary-container"
               >
                 +84 123 456 789
               </a>

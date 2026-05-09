@@ -17,3 +17,9 @@ export const forgotPasswordIpLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(5, '1 h'),
   prefix: 'forgot-pw-ip',
 });
+
+export const contactFormLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, '10 m'),
+  prefix: 'contact-form',
+});

@@ -20,12 +20,16 @@
   }: Props = $props();
 </script>
 
-<div class="bento-card border-2 border-dashed border-border bg-muted/50 px-6 py-20 text-center">
-  <div class="mb-4 text-5xl">{icon}</div>
+<div
+  class="bento-card border-2 border-dashed border-border bg-muted/50 px-4 py-12 text-center sm:px-6 sm:py-20"
+>
+  <div class="mb-3 text-4xl sm:mb-4 sm:text-5xl">{icon}</div>
 
-  <h3 class="mb-2 text-2xl font-bold text-foreground">{title}</h3>
+  <h3 class="mb-2 text-xl font-bold text-foreground sm:text-2xl">{title}</h3>
 
-  <p class="mx-auto mb-8 max-w-md text-muted-foreground">{description}</p>
+  <p class="mx-auto mb-6 max-w-md text-sm text-muted-foreground sm:mb-8 sm:text-base">
+    {description}
+  </p>
 
   {#if ctaLabel}
     <a
@@ -36,10 +40,10 @@
           onCtaClick();
         }
       }}
-      class="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-lg"
+      class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-lg sm:px-7 sm:py-3 sm:text-sm"
     >
       {ctaLabel}
-      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           stroke-linecap="round"
           stroke-linejoin="round"

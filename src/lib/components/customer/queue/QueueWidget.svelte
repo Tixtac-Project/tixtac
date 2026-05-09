@@ -132,7 +132,9 @@
           return;
         } else {
           console.error('[Widget] Confirm failed: Server rejected');
-          alert('Không thể xác nhận slot. Có thể phiên của bạn đã hết hạn. Vui lòng tải lại trang!');
+          alert(
+            'Không thể xác nhận slot. Có thể phiên của bạn đã hết hạn. Vui lòng tải lại trang!',
+          );
           return;
         }
       } catch (err) {
@@ -207,7 +209,7 @@
 
   function handlePointerMove(e: PointerEvent) {
     if (!isDragging || !widgetEl) return;
-    
+
     const dx = e.clientX - startPointer.x;
     const dy = e.clientY - startPointer.y;
 
@@ -293,7 +295,7 @@
 
     dragOffset = {
       x: targetX,
-      y: dragOffset.y // keep current Y
+      y: dragOffset.y, // keep current Y
     };
 
     if (isMobile) {
@@ -332,18 +334,20 @@
 {#if shouldShow}
   <div
     transition:fly={{ y: 20, duration: 300 }}
-    class="fixed bottom-24 z-50 w-max sm:bottom-5 sm:w-[320px] sm:!right-5 sm:!left-auto"
-    style="{anchorSide === 'left' ? 'left: 16px; right: auto;' : 'right: 16px; left: auto;'}"
+    class="fixed bottom-24 z-50 w-max sm:!right-5 sm:bottom-5 sm:!left-auto sm:w-[320px]"
+    style={anchorSide === 'left' ? 'left: 16px; right: auto;' : 'right: 16px; left: auto;'}
   >
     <div
       bind:this={widgetEl}
       role="none"
-      class="w-full overflow-hidden rounded-full sm:rounded-2xl ring-1 ring-black/10 backdrop-blur-sm
+      class="w-full overflow-hidden rounded-full ring-1 ring-black/10 backdrop-blur-sm sm:rounded-2xl
              {isDragging ? 'cursor-grabbing shadow-2xl ring-black/20' : 'cursor-grab shadow-xl'}"
       style="
         transform: translate({dragOffset.x}px, {dragOffset.y}px) scale({isDragging ? 1.02 : 1});
         touch-action: none;
-        transition: {isDragging || disableTransition ? 'none' : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'};
+        transition: {isDragging || disableTransition
+        ? 'none'
+        : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'};
       "
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
@@ -351,9 +355,19 @@
       onpointercancel={handlePointerUp}
     >
       {#if queueStore.status === 'waiting'}
-        <QueueWaiting {isDocked} onUndock={handleUndock} onExpand={expandQueue} onExitClick={() => (showExitConfirm = true)} />
+        <QueueWaiting
+          {isDocked}
+          onUndock={handleUndock}
+          onExpand={expandQueue}
+          onExitClick={() => (showExitConfirm = true)}
+        />
       {:else if queueStore.status === 'ready'}
-        <QueueReady {isDocked} onUndock={handleUndock} formattedTime={formatTime(timeLeft)} onGoToSeats={goToSeats} />
+        <QueueReady
+          {isDocked}
+          onUndock={handleUndock}
+          formattedTime={formatTime(timeLeft)}
+          onGoToSeats={goToSeats}
+        />
       {:else if queueStore.status === 'holding'}
         <QueueHolding
           {isDocked}

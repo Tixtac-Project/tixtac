@@ -1,12 +1,14 @@
 <!--
   SectionDetail.svelte
-  Renders a single section's detail view — adaptive to assigned (seat grid) vs general admission (summary card).
+  Renders a single section's detail view — adaptive to assigned (seat grid or summary)
+  vs general admission (progress card). Works with both full seat data and aggregated counters.
 -->
 <script lang="ts">
   import * as Tooltip from '$lib/components/ui/tooltip';
   import { formatPrice } from '$lib/utils/price';
   import { getRowLabel } from '$lib/utils/seat-label';
-  import { Armchair, Users } from 'lucide-svelte';
+  import { Users } from 'lucide-svelte';
+  import { SvelteSet } from 'svelte/reactivity';
 
   type SeatInfo = { status: string; label: string };
 
@@ -16,7 +18,7 @@
     type: string;
     price: number;
     capacity: number;
-    layoutConfig: {
+    layout_config?: {
       x: number;
       y: number;
       width: number;
@@ -24,7 +26,7 @@
       rotation?: number;
       color?: string;
     };
-    seatConfig: {
+    seat_config?: {
       rows: number;
       cols: number;
       prefix: string | null;
@@ -33,36 +35,99 @@
       startRowIndex?: number;
       startColIndex?: number;
     } | null;
-    stats: {
-      total: number;
-      available: number;
-      locked: number;
-      sold: number;
-      disabled: number;
+    stats?: {
+      total?: number;
+      available?: number;
+      locked?: number;
+      sold?: number;
+      disabled?: number;
     };
-    seatGrid: Record<string, Record<number, SeatInfo>>;
+    // From event-detail API: materialized counters
+    seat_count?: number;
+    available_count?: number;
+    disabled_count?: number;
+    sold_count?: number;
+    seatGrid?: Record<string, Record<number, SeatInfo>> | null;
   };
 
   let { section }: { section: SectionData } = $props();
 
   const isAssigned = $derived(section.type === 'assigned');
-  const seatCfg = $derived(section.seatConfig);
-  const sectionRows = $derived(seatCfg?.rows ?? 0);
-  const sectionCols = $derived(seatCfg?.cols ?? 0);
-  const sectionStartRowIndex = $derived(seatCfg?.startRowIndex ?? 1);
-  const sectionStartColIndex = $derived(seatCfg?.startColIndex ?? 1);
-  const color = $derived(section.layoutConfig?.color || '#3b82f6');
+  const color = $derived(section.layout_config?.color || '#3b82f6');
 
-  // GA stats
+  // Normalized stats from either source
+  const statTotal = $derived(section.stats?.total ?? section.seat_count ?? 0);
+  const statAvailable = $derived(section.stats?.available ?? section.available_count ?? 0);
+  const statDisabled = $derived(section.stats?.disabled ?? section.disabled_count ?? 0);
+  const statSold = $derived(section.stats?.sold ?? section.sold_count ?? 0);
+  const statLocked = $derived(section.stats?.locked ?? 0);
+  const statUsed = $derived(statSold + statLocked);
+
+  // GA
   const gaCapacity = $derived(section.capacity);
-  // For GA sections, stats.total represents sold/locked count from order system
-  // available = capacity - sold - locked (simplified)
-  const gaSold = $derived(section.stats.sold);
-  const gaLocked = $derived(section.stats.locked);
-  const gaAvailable = $derived(gaCapacity - gaSold - gaLocked);
-  const usedPercent = $derived(
-    gaCapacity > 0 ? Math.round(((gaSold + gaLocked) / gaCapacity) * 100) : 0,
+  const gaUsed = $derived(statUsed);
+  const gaAvailable = $derived(gaCapacity - gaUsed);
+  const usedPercent = $derived(gaCapacity > 0 ? Math.round((gaUsed / gaCapacity) * 100) : 0);
+
+  // Clamped percentages for GA progress bar (prevent sum > 100%)
+  const safeSold = $derived(gaCapacity > 0 ? Math.min(statSold, gaCapacity) : 0);
+  const safeLocked = $derived(gaCapacity > 0 ? Math.min(statLocked, gaCapacity - safeSold) : 0);
+  const safeAvail = $derived(gaCapacity > 0 ? Math.max(gaCapacity - safeSold - safeLocked, 0) : 0);
+
+  const soldPctGa = $derived(gaCapacity > 0 ? (safeSold / gaCapacity) * 100 : 0);
+  const lockedPctGa = $derived(gaCapacity > 0 ? (safeLocked / gaCapacity) * 100 : 0);
+  const availablePctGa = $derived(gaCapacity > 0 ? (safeAvail / gaCapacity) * 100 : 0);
+
+  // Clamped percentages for assigned summary progress bar
+  const assignedBase = $derived(statTotal + statDisabled);
+  const assignedSafeSold = $derived(assignedBase > 0 ? Math.min(statSold, assignedBase) : 0);
+  const assignedSafeLocked = $derived(
+    assignedBase > 0 ? Math.min(statLocked, assignedBase - assignedSafeSold) : 0,
   );
+  const assignedSafeDisabled = $derived(
+    assignedBase > 0
+      ? Math.min(statDisabled, assignedBase - assignedSafeSold - assignedSafeLocked)
+      : 0,
+  );
+  const assignedSafeAvail = $derived(
+    assignedBase > 0
+      ? Math.max(assignedBase - assignedSafeSold - assignedSafeLocked - assignedSafeDisabled, 0)
+      : 0,
+  );
+
+  const soldPctAssigned = $derived(assignedBase > 0 ? (assignedSafeSold / assignedBase) * 100 : 0);
+  const lockedPctAssigned = $derived(
+    assignedBase > 0 ? (assignedSafeLocked / assignedBase) * 100 : 0,
+  );
+  const disabledPctAssigned = $derived(
+    assignedBase > 0 ? (assignedSafeDisabled / assignedBase) * 100 : 0,
+  );
+  const availablePctAssigned = $derived(
+    assignedBase > 0 ? (assignedSafeAvail / assignedBase) * 100 : 0,
+  );
+
+  // Grid dimensions from seatConfig OR inferred from seatGrid
+  const seatCfg = $derived(section.seat_config ?? null);
+  const gridKeys = $derived(Object.keys(section.seatGrid ?? {}));
+
+  const gridCols = $derived.by(() => {
+    const cols = new SvelteSet<number>();
+    for (const row of Object.values(section.seatGrid ?? {})) {
+      for (const c of Object.keys(row)) cols.add(Number(c));
+    }
+    return [...cols].sort((a, b) => a - b);
+  });
+
+  const sectionRows = $derived(seatCfg?.rows ?? gridKeys.length);
+  const sectionCols = $derived(
+    seatCfg?.cols ?? (gridCols.length > 0 ? Math.max(...gridCols) - Math.min(...gridCols) + 1 : 0),
+  );
+  const sectionStartRowIndex = $derived(seatCfg?.startRowIndex ?? 1);
+  const sectionStartColIndex = $derived(
+    seatCfg?.startColIndex ?? (gridCols.length > 0 ? Math.min(...gridCols) : 1),
+  );
+
+  const hasGridData = $derived(!!seatCfg && gridKeys.length > 0 && gridCols.length > 0);
 
   function seatColor(status: string): string {
     switch (status) {
@@ -104,8 +169,7 @@
         <div class="flex items-center gap-2">
           <h2 class="text-base font-semibold text-foreground">{section.name}</h2>
           <span
-            class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase
-              {isAssigned
+            class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {isAssigned
               ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}"
           >
@@ -114,55 +178,42 @@
         </div>
         <p class="text-xs text-muted-foreground">
           Giá: {formatPrice(section.price)}
+          {#if isAssigned}
+            · {statTotal} ghế ({statAvailable} trống{statDisabled > 0
+              ? ` · ${statDisabled} vô hiệu`
+              : ''})
+          {/if}
         </p>
       </div>
     </div>
 
     <!-- Stats pills -->
     <div class="flex flex-wrap gap-2">
-      {#if isAssigned}
-        <span
-          class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-400"
-        >
-          {section.stats.available} trống
-        </span>
+      <span
+        class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-400"
+      >
+        {isAssigned ? statAvailable : gaAvailable} trống
+      </span>
+      {#if statLocked > 0}
         <span
           class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400"
         >
-          {section.stats.locked} giữ
+          {statLocked} giữ
         </span>
+      {/if}
+      {#if statSold > 0}
         <span
           class="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
         >
-          {section.stats.sold} bán
+          {statSold} bán
         </span>
-        {#if section.stats.disabled > 0}
-          <span
-            class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-600"
-          >
-            {section.stats.disabled} vô hiệu
-          </span>
-        {/if}
-      {:else}
+      {/if}
+      {#if statDisabled > 0}
         <span
-          class="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-400"
+          class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-600"
         >
-          {gaAvailable} trống
+          {statDisabled} vô hiệu
         </span>
-        {#if gaLocked > 0}
-          <span
-            class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400"
-          >
-            {gaLocked} giữ
-          </span>
-        {/if}
-        {#if gaSold > 0}
-          <span
-            class="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
-          >
-            {gaSold} bán
-          </span>
-        {/if}
       {/if}
     </div>
   </div>
@@ -185,87 +236,117 @@
           </p>
         </div>
       </div>
-
-      <!-- Progress bar -->
       <div class="mt-4 space-y-1.5">
         <div class="flex justify-between text-xs text-muted-foreground">
-          <span>Đã sử dụng {usedPercent}%</span>
+          <span>{gaUsed > 0 ? `Đã sử dụng ${usedPercent}%` : 'Chưa có giao dịch'}</span>
           <span>{gaAvailable} còn trống</span>
         </div>
-        <div class="h-2.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
-          {#if gaSold > 0}
+        <div class="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+          {#if soldPctGa > 0}
             <div
-              class="inline-block h-full bg-gray-700 dark:bg-gray-500"
-              style="width: {gaCapacity > 0 ? (gaSold / gaCapacity) * 100 : 0}%;"
+              class="h-full shrink-0 bg-primary transition-all duration-300"
+              style="width: {soldPctGa}%"
             ></div>
           {/if}
-          {#if gaLocked > 0}
+          {#if lockedPctGa > 0}
             <div
-              class="inline-block h-full bg-red-500"
-              style="width: {gaCapacity > 0 ? (gaLocked / gaCapacity) * 100 : 0}%;"
+              class="h-full shrink-0 bg-warning transition-all duration-300"
+              style="width: {lockedPctGa}%"
+            ></div>
+          {/if}
+          {#if availablePctGa > 0}
+            <div
+              class="h-full shrink-0 bg-emerald-500 transition-all duration-300"
+              style="width: {availablePctGa}%"
             ></div>
           {/if}
         </div>
-        <div class="flex gap-4 text-[11px] text-muted-foreground">
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
           <span class="flex items-center gap-1">
-            <span class="inline-block h-2 w-2 rounded-full bg-gray-700 dark:bg-gray-500"></span>
-            Đã bán ({gaSold})
+            <span class="inline-block h-2 w-2 rounded-full bg-primary"></span>
+            Đã bán ({statSold})
           </span>
+          {#if statLocked > 0}
+            <span class="flex items-center gap-1">
+              <span class="inline-block h-2 w-2 rounded-full bg-warning"></span>
+              Đang giữ ({statLocked})
+            </span>
+          {/if}
           <span class="flex items-center gap-1">
-            <span class="inline-block h-2 w-2 rounded-full bg-red-500"></span>
-            Đang giữ ({gaLocked})
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+            <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
             Còn trống ({gaAvailable})
           </span>
         </div>
       </div>
     </div>
-  {:else if sectionRows > 0 && sectionCols > 0}
-    <!-- ═══ ASSIGNED: Seat grid ═══ -->
-    <div class="overflow-x-auto">
+  {:else if hasGridData && sectionRows > 0 && sectionCols > 0}
+    <!-- ═══ ASSIGNED: Full seat grid (only when seatGrid data is available) ═══ -->
+    <div class="overflow-x-auto rounded-lg border border-border/30 bg-muted/10 p-4">
       <div class="inline-block min-w-fit">
+        <!-- Legend -->
+        <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block h-3 w-3 rounded bg-green-500"></span>
+            Trống ({statAvailable})
+          </span>
+          {#if statLocked > 0}
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block h-3 w-3 rounded bg-red-500"></span>
+              Giữ ({statLocked})
+            </span>
+          {/if}
+          {#if statSold > 0}
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block h-3 w-3 rounded bg-gray-700 dark:bg-gray-500"></span>
+              Bán ({statSold})
+            </span>
+          {/if}
+          {#if statDisabled > 0}
+            <span class="flex items-center gap-1.5">
+              <span
+                class="inline-block h-3 w-3 rounded border border-dashed border-gray-400 bg-gray-200 dark:bg-gray-800"
+              ></span>
+              Vô hiệu ({statDisabled})
+            </span>
+          {/if}
+        </div>
+
         <!-- Column headers -->
-        <div class="mb-1 flex items-center gap-1">
-          <div class="w-8 shrink-0"></div>
+        <div class="mb-1.5 flex items-center gap-1.5">
+          <div class="w-9 shrink-0"></div>
           {#each Array.from({ length: sectionCols }, (_, i) => sectionStartColIndex + i) as col (col)}
             <div
-              class="flex h-6 w-8 shrink-0 items-center justify-center text-xs font-medium text-muted-foreground"
+              class="flex h-7 w-9 shrink-0 items-center justify-center rounded text-[11px] font-semibold text-muted-foreground"
             >
               {col}
             </div>
           {/each}
         </div>
 
-        <!-- Rows -->
         {#each Array.from({ length: sectionRows }, (_, i) => i) as rowIdx (rowIdx)}
           {@const rowLabel = getRowLabel(sectionStartRowIndex + rowIdx - 1)}
-          <div class="mb-1 flex items-center gap-1">
-            <!-- Row label -->
+          <div class="mb-1.5 flex items-center gap-1.5">
             <div
-              class="flex h-8 w-8 shrink-0 items-center justify-center text-xs font-semibold text-muted-foreground"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded text-xs font-bold text-muted-foreground"
             >
               {rowLabel}
             </div>
-
-            <!-- Seats -->
             {#each Array.from({ length: sectionCols }, (_, i) => sectionStartColIndex + i) as col (col)}
-              {@const seatInfo = section.seatGrid[rowLabel]?.[col]}
+              {@const seatInfo = section.seatGrid?.[rowLabel]?.[col]}
               {#if seatInfo}
                 <Tooltip.Root>
                   <Tooltip.Trigger aria-label="{seatInfo.label} — {statusLabelVi(seatInfo.status)}">
                     {#if seatInfo.status === 'disabled'}
                       <div
-                        class="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded border border-dashed border-gray-300 dark:border-gray-700 {seatColor(
+                        class="flex h-9 w-9 shrink-0 cursor-default items-center justify-center rounded-md border border-dashed border-gray-300 dark:border-gray-700 {seatColor(
                           seatInfo.status,
-                        )} text-[10px]"
+                        )} text-[10px] font-medium"
                       >
                         ✕
                       </div>
                     {:else}
                       <div
-                        class="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded text-xs font-medium transition-colors {seatColor(
+                        class="flex h-9 w-9 shrink-0 cursor-default items-center justify-center rounded-md text-[11px] font-semibold transition-colors {seatColor(
                           seatInfo.status,
                         )}"
                       >
@@ -278,20 +359,91 @@
                   </Tooltip.Content>
                 </Tooltip.Root>
               {:else}
-                <div class="h-8 w-8 shrink-0"></div>
+                <div class="h-9 w-9 shrink-0"></div>
               {/if}
             {/each}
           </div>
         {/each}
       </div>
     </div>
-  {:else}
-    <!-- Assigned but no seat config -->
-    <div
-      class="flex items-center gap-3 rounded-xl border border-dashed border-border/50 bg-muted/10 px-5 py-8 text-center"
-    >
-      <Armchair class="mx-auto h-8 w-8 text-muted-foreground/40" />
-      <p class="text-sm text-muted-foreground">Khu vực này chưa có cấu hình ghế.</p>
+  {:else if isAssigned}
+    <!-- ═══ ASSIGNED: Summary card (no seat grid data available from API) ═══ -->
+    <div class="rounded-xl border border-border/50 bg-muted/10 p-5">
+      <div class="flex items-center gap-4">
+        <div
+          class="flex h-14 w-14 items-center justify-center rounded-2xl"
+          style="background-color: {color}20;"
+        >
+          <Users class="h-7 w-7" style="color: {color};" />
+        </div>
+        <div class="flex-1">
+          <p class="text-sm font-medium text-muted-foreground">Tổng ghế khu vực</p>
+          <p class="text-3xl font-extrabold tracking-tight text-foreground">
+            {statTotal.toLocaleString('vi-VN')}
+            <span class="text-base font-normal text-muted-foreground">ghế</span>
+          </p>
+        </div>
+      </div>
+      <div class="mt-4 space-y-1.5">
+        <div class="flex justify-between text-xs text-muted-foreground">
+          <span>
+            {statUsed > 0
+              ? `Đã sử dụng ${assignedBase > 0 ? Math.round((statUsed / assignedBase) * 100) : 0}%`
+              : 'Chưa có giao dịch'}
+          </span>
+          <span>{statAvailable} còn trống</span>
+        </div>
+        <div class="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+          {#if soldPctAssigned > 0}
+            <div
+              class="h-full shrink-0 bg-primary transition-all duration-300"
+              style="width: {soldPctAssigned}%"
+            ></div>
+          {/if}
+          {#if lockedPctAssigned > 0}
+            <div
+              class="h-full shrink-0 bg-warning transition-all duration-300"
+              style="width: {lockedPctAssigned}%"
+            ></div>
+          {/if}
+          {#if disabledPctAssigned > 0}
+            <div
+              class="h-full shrink-0 bg-muted-foreground/40 transition-all duration-300"
+              style="width: {disabledPctAssigned}%"
+            ></div>
+          {/if}
+          {#if availablePctAssigned > 0}
+            <div
+              class="h-full shrink-0 bg-emerald-500 transition-all duration-300"
+              style="width: {availablePctAssigned}%"
+            ></div>
+          {/if}
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span class="flex items-center gap-1">
+            <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+            Còn trống ({statAvailable})
+          </span>
+          {#if statLocked > 0}
+            <span class="flex items-center gap-1">
+              <span class="inline-block h-2 w-2 rounded-full bg-warning"></span>
+              Đang giữ ({statLocked})
+            </span>
+          {/if}
+          {#if statSold > 0}
+            <span class="flex items-center gap-1">
+              <span class="inline-block h-2 w-2 rounded-full bg-primary"></span>
+              Đã bán ({statSold})
+            </span>
+          {/if}
+          {#if statDisabled > 0}
+            <span class="flex items-center gap-1">
+              <span class="inline-block h-2 w-2 rounded-full bg-muted-foreground/40"></span>
+              Vô hiệu ({statDisabled})
+            </span>
+          {/if}
+        </div>
+      </div>
     </div>
   {/if}
 </div>

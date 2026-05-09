@@ -1,26 +1,16 @@
-// src/routes/(customer)/me/profile/+page.server.ts
-import type { PageServerLoad } from '.$types';
 import { redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ fetch, locals }) => {
-  const user = locals.user;
-
-  if (!user) {
-    throw redirect(302, '/login');
+export const load: PageServerLoad = async ({ locals }) => {
+  if (!locals.user) {
+    throw redirect(302, '/login?redirect=/me/profile');
   }
 
-  if (user.role !== 'customer') {
+  // Both admin and customer can manage their own profile
+  if (locals.user.role !== 'customer' && locals.user.role !== 'admin') {
     throw redirect(303, '/');
   }
 
-  const res = await fetch('/api/me/profile');
-  if (!res.ok) {
-    return { user: locals.user, profile: null };
-  }
-  const { data: profile } = await res.json();
-
-  return {
-    user: locals.user,
-    profile,
-  };
+  // profile is already loaded by +layout.server.ts — no duplicate fetch needed
+  return {};
 };

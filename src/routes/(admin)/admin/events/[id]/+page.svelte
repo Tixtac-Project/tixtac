@@ -75,6 +75,7 @@
   // If all sections sit at default position (0,0) with default size (100×100)
   // and there's no stage layout, the admin skipped the map builder.
   const hasInteractiveMap = $derived.by(() => {
+    if (!event.mapConfig) return false;
     const hasStage = Array.isArray(event.stageLayout) && event.stageLayout.length > 0;
     if (hasStage) return true;
 
@@ -153,7 +154,7 @@
   }
 </script>
 
-<div class="space-y-6 md:space-y-8">
+<div class="space-y-6">
   <!-- Back + Header -->
   <div class="space-y-4">
     <Button variant="ghost" size="sm" href={resolve('/admin/events')} class="gap-2">
@@ -549,16 +550,24 @@
 
     <!-- ═══ SEATMAP: Visual SVG preview ═══ -->
     {#if viewMode === 'seatmap' && sections.length > 0}
-      <div class="bento-card space-y-3">
-        <h2 class="text-base font-semibold">Sơ đồ chỗ ngồi</h2>
-        <SeatMap
-          mapConfig={event.mapConfig}
-          stageLayout={Array.isArray(event.stageLayout) ? event.stageLayout : []}
-          {sections}
-          readonly={true}
-          showAvailability={true}
-        />
-      </div>
+      {#if event.mapConfig}
+        <div class="bento-card space-y-3">
+          <h2 class="text-base font-semibold">Sơ đồ chỗ ngồi</h2>
+          <SeatMap
+            mapConfig={event.mapConfig}
+            stageLayout={Array.isArray(event.stageLayout) ? event.stageLayout : []}
+            {sections}
+            readonly={true}
+            showAvailability={true}
+          />
+        </div>
+      {:else}
+        <div class="rounded-lg border bg-card p-8 text-center md:p-12">
+          <p class="text-muted-foreground">
+            Chưa có cấu hình sơ đồ. Vui lòng chỉnh sửa sự kiện để thiết lập sơ đồ chỗ ngồi.
+          </p>
+        </div>
+      {/if}
     {/if}
 
     <!-- ═══ INDIVIDUAL SECTION VIEWS ═══ -->

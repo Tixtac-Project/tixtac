@@ -91,15 +91,31 @@
 
   function handleMouseUp() {
     isPanning = false;
+    setTimeout(() => {
+      didDrag = false;
+    }, 0);
   }
 
-  // ── Touch pan ──
+  // ── Touch pan + pinch zoom ──
   let lastTouchX = $state(0);
   let lastTouchY = $state(0);
   let isTouchPanning = $state(false);
+  let lastPinchDist = $state(0);
+
+  function getPinchDist(touches: TouchList): number {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
 
   function handleTouchStart(e: TouchEvent) {
-    if (e.touches.length === 1) {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      isTouchPanning = false;
+      lastPinchDist = getPinchDist(e.touches);
+    } else if (e.touches.length === 1) {
+      // Allow single-touch events to proceed (don't preventDefault)
       isTouchPanning = true;
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
@@ -107,16 +123,28 @@
   }
 
   function handleTouchMove(e: TouchEvent) {
-    if (isTouchPanning && e.touches.length === 1) {
+    if (e.touches.length === 1 && isTouchPanning) {
+      e.preventDefault();
       panX += e.touches[0].clientX - lastTouchX;
       panY += e.touches[0].clientY - lastTouchY;
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
+    } else if (e.touches.length >= 2) {
+      e.preventDefault();
+      const dist = getPinchDist(e.touches);
+      if (lastPinchDist > 0) {
+        const scale = dist / lastPinchDist;
+        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * scale));
+      }
+      lastPinchDist = dist;
+      // Stop panning state if user adds a second finger mid-pan
+      isTouchPanning = false;
     }
   }
 
   function handleTouchEnd() {
     isTouchPanning = false;
+    lastPinchDist = 0;
   }
 
   // ── Stage element helpers ──
@@ -156,7 +184,8 @@
   // Estimates text width as charCount * fontSize * 0.6
   function fitFontSize(text: string, maxW: number, maxH: number, maxFs: number): number {
     const charW = 0.6; // approximate ratio
-    const byWidth = maxW / (text.length * charW || 1);
+    const charCount = Math.max(1, text.length);
+    const byWidth = maxW / (charCount * charW);
     const byHeight = maxH;
     return Math.max(6, Math.min(maxFs, byWidth, byHeight));
   }
@@ -406,7 +435,7 @@
     <div
       bind:this={containerEl}
       class="relative min-h-0 flex-1 cursor-grab overflow-hidden select-none active:cursor-grabbing"
-      style="min-height:500px; max-height:80vh;"
+      style="min-height:380px; max-height:55vh; touch-action:none;"
       role="application"
       aria-label="Sơ đồ chỗ ngồi"
       onwheel={handleWheel}
