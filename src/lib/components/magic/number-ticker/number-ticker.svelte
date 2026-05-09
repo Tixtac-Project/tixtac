@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { useInView } from 'motion-sv';
   import { cn } from '$lib/utils';
 
@@ -28,13 +28,26 @@
   }: NumberTickerProps = $props();
 
   let spanRef: HTMLSpanElement | null = $state(null);
+  let animatedValue = $state(direction === 'down' ? value : startValue);
+  let activeRafId: number | null = null;
 
   // Spring configuration
   const damping = 60;
   const stiffness = 100;
 
+  function formatValue(val: number): string {
+    return `${prefix}${Intl.NumberFormat('en-US', {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces,
+    }).format(Number(val.toFixed(decimalPlaces)))}${suffix}`;
+  }
+
   // Spring physics simulation
   function animateValue(from: number, to: number) {
+    if (activeRafId !== null) {
+      cancelAnimationFrame(activeRafId);
+    }
+
     const startTime = performance.now();
     const duration = 2000; // Duration in ms
 
@@ -54,28 +67,21 @@
       velocity += acceleration * dt;
       position += velocity * dt;
 
-      // Update display
-      if (spanRef) {
-        spanRef.textContent = `${prefix}${Intl.NumberFormat('en-US', {
-          minimumFractionDigits: decimalPlaces,
-          maximumFractionDigits: decimalPlaces,
-        }).format(Number(position.toFixed(decimalPlaces)))}${suffix}`;
-      }
+      // Update animated value
+      animatedValue = position;
 
       // Continue animation if not settled
       const isSettled = Math.abs(velocity) < 0.01 && Math.abs(position - target) < 0.01;
       if (!isSettled && elapsed < duration * 2) {
-        requestAnimationFrame(step);
-      } else if (spanRef) {
+        activeRafId = requestAnimationFrame(step);
+      } else {
         // Ensure final value is exact
-        spanRef.textContent = `${prefix}${Intl.NumberFormat('en-US', {
-          minimumFractionDigits: decimalPlaces,
-          maximumFractionDigits: decimalPlaces,
-        }).format(Number(target.toFixed(decimalPlaces)))}${suffix}`;
+        animatedValue = target;
+        activeRafId = null;
       }
     }
 
-    requestAnimationFrame(step);
+    activeRafId = requestAnimationFrame(step);
   }
 
   const view = useInView(
@@ -100,7 +106,17 @@
       if (timer !== null) {
         clearTimeout(timer);
       }
+      if (activeRafId !== null) {
+        cancelAnimationFrame(activeRafId);
+        activeRafId = null;
+      }
     };
+  });
+
+  onDestroy(() => {
+    if (activeRafId !== null) {
+      cancelAnimationFrame(activeRafId);
+    }
   });
 </script>
 
@@ -108,10 +124,5 @@
   bind:this={spanRef}
   class={cn('inline-block tracking-wider text-black tabular-nums dark:text-white', className)}
 >
-  {prefix}
-  {Intl.NumberFormat('en-US', {
-    minimumFractionDigits: decimalPlaces,
-    maximumFractionDigits: decimalPlaces,
-  }).format(Number((direction === 'down' ? value : startValue).toFixed(decimalPlaces)))}
-  {suffix}
+  {formatValue(animatedValue)}
 </span>

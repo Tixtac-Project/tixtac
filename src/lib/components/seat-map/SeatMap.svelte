@@ -107,19 +107,22 @@
   }
 
   function handleTouchStart(e: TouchEvent) {
-    e.preventDefault();
-    if (e.touches.length === 1) {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      isTouchPanning = false;
+      lastPinchDist = getPinchDist(e.touches);
+    } else if (e.touches.length === 1) {
+      // Allow single-touch events to proceed (don't preventDefault)
       isTouchPanning = true;
       lastTouchX = e.touches[0].clientX;
       lastTouchY = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
-      isTouchPanning = false;
-      lastPinchDist = getPinchDist(e.touches);
     }
   }
 
   function handleTouchMove(e: TouchEvent) {
-    e.preventDefault();
+    if (e.touches.length >= 2 || (isTouchPanning && lastPinchDist > 0)) {
+      e.preventDefault();
+    }
     if (isTouchPanning && e.touches.length === 1) {
       panX += e.touches[0].clientX - lastTouchX;
       panY += e.touches[0].clientY - lastTouchY;

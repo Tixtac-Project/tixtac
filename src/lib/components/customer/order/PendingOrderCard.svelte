@@ -74,7 +74,7 @@
   <Card
     class="flex h-full flex-col overflow-hidden border-border bg-card shadow-sm transition-all hover:shadow-md"
   >
-    <CardHeader class="border-b border-border md:!px-6">
+    <CardHeader class="border-b border-border md:px-6!">
       <div class="flex items-start justify-between gap-2 md:gap-3">
         <div class="min-w-0">
           <h3 class="flex items-center gap-1.5 text-sm font-bold text-foreground md:text-lg">
@@ -94,7 +94,7 @@
       </div>
     </CardHeader>
 
-    <CardContent class="flex-1 md:!px-6">
+    <CardContent class="flex-1 md:px-6!">
       <h4 class="mb-3 line-clamp-2 text-sm font-bold text-foreground md:mb-4 md:text-lg">
         {eventTitle}
       </h4>
@@ -143,7 +143,7 @@
       </div>
     </CardContent>
 
-    <CardFooter class="flex-col gap-3 md:flex-row md:items-center md:justify-between md:!px-6">
+    <CardFooter class="flex-col gap-3 md:flex-row md:items-center md:justify-between md:px-6!">
       <div class="w-full text-center md:w-auto md:text-left">
         <p
           class="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase md:text-xs"

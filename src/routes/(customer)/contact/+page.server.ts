@@ -57,6 +57,9 @@ export const actions = {
 
     // Submit to Web3Forms
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const res = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -67,7 +70,10 @@ export const actions = {
           subject,
           message,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const json = await res.json();
 
@@ -79,7 +85,10 @@ export const actions = {
       }
 
       return { success: true };
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return fail(504, { success: false, error: 'Yêu cầu hết thời gian chờ, vui lòng thử lại.' });
+      }
       return fail(500, { success: false, error: 'Lỗi máy chủ, vui lòng thử lại.' });
     }
   },

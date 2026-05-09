@@ -37,7 +37,7 @@
             ai cả, hãy nhanh chóng tìm cho mình một sự kiện hấp dẫn khác nào!
           {:else}
             Có vẻ như đã xảy ra lỗi không mong muốn. Đừng lo, đội ngũ của chúng tôi đã được thông
-            báo và đang làm việc để khắc phục. {message}
+            báo và đang làm việc để khắc phục.
           {/if}
         </p>
 

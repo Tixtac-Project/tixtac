@@ -156,6 +156,7 @@
             type="search"
             bind:value={query}
             placeholder="Tìm kiếm câu hỏi..."
+            aria-label="Tìm kiếm câu hỏi"
             class="w-full rounded-full border border-border bg-surface px-5 py-3 pl-11 text-sm text-foreground transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
           />
         </div>

@@ -55,9 +55,11 @@
 
   function handleSelectCategory(slug: string) {
     activeCategory = slug;
-    const params = new SvelteURLSearchParams();
+    const params = new SvelteURLSearchParams(window.location.search);
     if (slug) {
       params.set('category', slug);
+    } else {
+      params.delete('category');
     }
     goto(resolve(`/search?${params.toString()}`), { keepFocus: true });
   }
