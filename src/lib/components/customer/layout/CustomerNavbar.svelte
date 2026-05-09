@@ -76,7 +76,7 @@
   }
 
   function handleLogout() {
-    sharedLogout();
+    return () => sharedLogout();
   }
 
   let currentPath = $derived(pageState.url.pathname);

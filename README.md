@@ -113,6 +113,8 @@ Mở file `.env` và điền các thông tin sau:
   Đăng ký tại [Resend.com](https://resend.com) -> Mục API Keys -> Create API Key.
 - **GEO_API_KEY (Optional):**
   Đăng ký tại [ipgeolocation.io](https://ipgeolocation.io) -> Sign Up -> API Keys. Email đặt lại mật khẩu sẽ hiển thị thành phố/quốc gia của người yêu cầu.
+- **WEB3FORMS_KEY (Optional):**
+  Đăng ký tại [Web3Forms.com](https://web3forms.com) -> Dashboard -> Access Key. Key này có thể công khai.
 
 ### 3. Database Migration & Seed
 

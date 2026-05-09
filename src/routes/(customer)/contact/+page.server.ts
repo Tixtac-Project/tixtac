@@ -1,40 +1,59 @@
+import { config } from '$lib/server/config';
+import { contactFormLimiter } from '$lib/server/rate-limiter';
 import { fail } from '@sveltejs/kit';
+import { z } from 'zod';
 import type { Actions } from './$types';
 
-const WEB3FORMS_KEY = '2fe33d39-dd60-4a96-8beb-3b807daf571e';
+const contactSchema = z.object({
+  name: z.string().trim().min(1, 'Vui lòng nhập họ tên'),
+  email: z.email('Email không hợp lệ').trim(),
+  subject: z.string().trim().min(1, 'Vui lòng nhập tiêu đề'),
+  message: z.string().trim().min(10, 'Nội dung quá ngắn (tối thiểu 10 ký tự)'),
+});
 
 export const actions = {
-  default: async ({ request }) => {
+  default: async ({ request, getClientAddress }) => {
+    const ip = getClientAddress();
+    const { success: allowed } = await contactFormLimiter.limit(ip);
+    if (!allowed) {
+      return fail(429, {
+        success: false,
+        error: 'Bạn gửi quá nhiều yêu cầu. Vui lòng thử lại sau.',
+      });
+    }
+
     const data = await request.formData();
-    const name = data.get('name')?.toString() ?? '';
-    const email = data.get('email')?.toString() ?? '';
-    const subject = data.get('subject')?.toString() ?? '';
-    const message = data.get('message')?.toString() ?? '';
-    const botcheck = data.get('_hp')?.toString() ?? '';
+    const raw = Object.fromEntries(data) as Record<string, string>;
 
     // Honeypot — silently accept
-    if (botcheck) {
+    if (raw._hp) {
       return { success: true };
     }
 
-    // Time check from hidden field
-    const _time = Number(data.get('_time') ?? 0);
-    if (Date.now() - _time < 2000) {
+    // Time check from hidden field — only blocks actual bots that fill forms instantly
+    const _time = Number(raw._time ?? 0);
+    const diff = Date.now() - _time;
+    if (diff >= 0 && diff < 2000) {
       return fail(400, { success: false, error: 'Gửi quá nhanh, vui lòng thử lại.' });
     }
 
-    // Validation
-    const errors: Record<string, string> = {};
-    if (!name.trim()) errors.name = 'Vui lòng nhập họ tên';
-    if (!email.trim()) errors.email = 'Vui lòng nhập email';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Email không hợp lệ';
-    if (!subject.trim()) errors.subject = 'Vui lòng nhập tiêu đề';
-    if (!message.trim()) errors.message = 'Vui lòng nhập nội dung';
-    else if (message.trim().length < 10) errors.message = 'Nội dung quá ngắn (tối thiểu 10 ký tự)';
+    // Validation with Zod (trim transforms handle whitespace)
+    const result = contactSchema.safeParse(raw);
 
-    if (Object.keys(errors).length > 0) {
-      return fail(400, { success: false, errors, values: { name, email, subject, message } });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as string;
+        if (!fieldErrors[field]) fieldErrors[field] = issue.message;
+      }
+      return fail(400, {
+        success: false,
+        errors: fieldErrors,
+        values: { name: raw.name, email: raw.email, subject: raw.subject, message: raw.message },
+      });
     }
+
+    const { name, email, subject, message } = result.data;
 
     // Submit to Web3Forms
     try {
@@ -42,11 +61,11 @@ export const actions = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
-          name: name.trim(),
-          email: email.trim(),
-          subject: subject.trim(),
-          message: message.trim(),
+          access_key: config.web3formsKey,
+          name,
+          email,
+          subject,
+          message,
         }),
       });
 
