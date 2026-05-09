@@ -21,8 +21,11 @@ export const queueService = {
       const waitingKey = `waiting_queue:${eventId}`;
       const now = Date.now();
       const maxUsers = config.maxConcurrentUsers ?? 200;
-      const expiresAt = now + config.accessTokenDuration * 1000;
-      const activeTtl = config.accessTokenDuration + 5;
+      // Users promoted immediately (no waiting) receive a short grace period (60s).
+      // They must explicitly call /confirm to receive the full holding duration.
+      const initialDuration = 60;
+      const expiresAt = now + initialDuration * 1000;
+      const activeTtl = initialDuration + 5;
       const waitingTtl = 3600;
 
       // ── Atomic Lua script: cross-queue guard, already‑active check,
@@ -89,10 +92,10 @@ export const queueService = {
 
       // ── Dispatch based on return code ──
       if (code === -1) {
-        throwError(Errors.EVENT_NOT_AVAILABLE, 'Bạn đang tham gia hàng chờ của một sự kiện khác');
+        throwError(Errors.QUEUE_ALREADY_JOINED);
       }
 
-      // Already active
+      // code 2: User already has an active (unexpired) slot — return its remaining time.
       if (code === 2) {
         const activeExpiresAt = value;
         const expiresInSeconds = Math.max(1, Math.ceil((activeExpiresAt - now) / 1000));
@@ -100,18 +103,18 @@ export const queueService = {
         return { status: 'active', expiresAt: activeExpiresAt, token };
       }
 
-      // Already waiting — no SET, just return position
+      // code 3: User is already in the waiting list — return their current position.
       if (code === 3) {
         return { status: 'waiting', position: value };
       }
 
-      // Newly promoted to active
+      // code 1: User was promoted immediately to active — mint a grace-period token.
       if (code === 1) {
-        const token = await encryptSeatToken({ userId, eventId }, config.accessTokenDuration);
+        const token = await encryptSeatToken({ userId, eventId }, initialDuration);
         return { status: 'active', expiresAt: value, token };
       }
 
-      // Newly enqueued as waiting
+      // code 0: User was added to the waiting list.
       return { status: 'waiting', position: value };
     });
   },
@@ -121,21 +124,32 @@ export const queueService = {
       const activeKey = `active_users:${eventId}`;
       const now = Date.now();
 
-      // Atomic check: Ensures user is strictly active before minting fresh token.
-      // Does NOT extend the slot — only mints a token for the remaining time.
-      // Sets user_current_queue TTL to (remaining_active_time + 5s grace) so it
-      // never outlives the ZSET score by more than the grace window.
+      /**
+       * Atomic Lua script: verifies the user is still active (within the grace period),
+       * then extends the slot score in the sorted set and refreshes the TTL on
+       * `user_current_queue` to grant the full holding duration.
+       */
       const luaScript = `
         local raw = redis.call('ZSCORE', KEYS[1], ARGV[1])
         local currentScore = raw and tonumber(raw) or 0
         local now = tonumber(ARGV[2])
         local eventId = ARGV[3]
-        local grace = tonumber(ARGV[4])
+        local holdingDuration = tonumber(ARGV[4]) -- e.g. 300 seconds
+        local confirmedKey = KEYS[3]
 
+        -- Only extend if the slot is still valid (within grace period).
         if currentScore > now then
-          local ttl = math.max(1, math.ceil((currentScore - now) / 1000) + grace)
-          redis.call('SET', KEYS[2], eventId, 'EX', ttl)
-          return currentScore
+          -- If already confirmed, return the existing expiry without extending
+          local alreadyConfirmed = redis.call('GET', confirmedKey)
+          if alreadyConfirmed then
+            return currentScore
+          end
+
+          local newExpiresAt = now + (holdingDuration * 1000)
+          redis.call('ZADD', KEYS[1], newExpiresAt, ARGV[1])
+          redis.call('SET', KEYS[2], eventId, 'EX', holdingDuration + 5)
+          redis.call('SET', confirmedKey, '1', 'EX', holdingDuration + 5)
+          return newExpiresAt
         end
 
         return 0
@@ -143,12 +157,12 @@ export const queueService = {
 
       const activeExpiresAt = await redis.eval<[string, number, string, number], number>(
         luaScript,
-        [activeKey, `user_current_queue:${userId}`],
-        [String(userId), now, String(eventId), 5],
+        [activeKey, `user_current_queue:${userId}`, `confirmed:${eventId}:${userId}`],
+        [String(userId), now, String(eventId), config.accessTokenDuration],
       );
 
       if (!activeExpiresAt) {
-        throwError(Errors.FORBIDDEN, 'Slot của bạn không tồn tại hoặc đã hết hạn');
+        throwError(Errors.QUEUE_SESSION_EXPIRED);
       }
 
       const expiresInSeconds = Math.max(1, Math.ceil((activeExpiresAt - now) / 1000));
@@ -162,13 +176,18 @@ export const queueService = {
     return await withRedisErrorHandling(async () => {
       const userCurrentKey = `user_current_queue:${userId}`;
 
-      // Atomic: only remove if user_current_queue still points to this event
-      // at the moment of deletion. Prevents cross-queue race conditions.
+      /**
+       * Atomic Lua script: removes the user from both the active sorted set and the
+       * waiting sorted set, but only if `user_current_queue` still maps to this event.
+       * Prevents cross-queue race conditions where a stale cleanup could evict a user
+       * who has already joined a different event.
+       */
       const leaveQueueScript = `
         if redis.call('GET', KEYS[1]) == ARGV[1] then
           redis.call('DEL', KEYS[1])
           redis.call('ZREM', KEYS[2], ARGV[2])
           redis.call('ZREM', KEYS[3], ARGV[2])
+          redis.call('DEL', KEYS[4])
           return 1
         end
         return 0
@@ -176,7 +195,12 @@ export const queueService = {
 
       await redis.eval<[string, string], number>(
         leaveQueueScript,
-        [userCurrentKey, `active_users:${eventId}`, `waiting_queue:${eventId}`],
+        [
+          userCurrentKey,
+          `active_users:${eventId}`,
+          `waiting_queue:${eventId}`,
+          `confirmed:${eventId}:${userId}`,
+        ],
         [String(eventId), String(userId)],
       );
 
@@ -197,13 +221,19 @@ export const queueService = {
         const token =
           expiresInSeconds <= 30
             ? await encryptSeatToken({ userId, eventId }, expiresInSeconds)
-            : null;
+            : null; // Re-use the existing token if more than 30s remain.
         return { status: 'active', expiresAt: activeScore, token };
       }
 
       const position = await redis.zrank(waitingKey, userId);
       if (position !== null) {
         return { status: 'waiting', position: position + 1 };
+      }
+
+      // Cross-queue check: If not in this event, check if they are in ANY event
+      const currentEventId = await redis.get(`user_current_queue:${userId}`);
+      if (currentEventId && Number(currentEventId) !== eventId) {
+        return { status: 'other', eventId: Number(currentEventId) };
       }
 
       return { status: 'none' };

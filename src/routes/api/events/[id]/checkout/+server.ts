@@ -1,4 +1,3 @@
-// src/routes/api/events/[id]/checkout/+server.ts
 import { requireCustomer } from '$lib/server/auth/guards';
 import { apiHandler } from '$lib/server/handler';
 import { purchaseService } from '$lib/server/services/purchase.service';
@@ -23,5 +22,6 @@ export const POST = apiHandler(async ({ params, request, locals }) => {
 
   // 4. Gọi service (apiHandler handles AppError serialization + unknown-error logging)
   const result = await purchaseService.purchaseTickets(customerId, eventId, body, idempotencyKey);
+
   return json({ data: result }, { status: 201 });
 });

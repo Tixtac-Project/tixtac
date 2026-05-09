@@ -17,6 +17,7 @@
     DropdownMenuTrigger,
   } from '$lib/components/ui/dropdown-menu';
   import type { CategoryInfo, UserInfo } from '$lib/types/layout';
+  import { handleLogout as sharedLogout } from '$lib/utils/auth';
   import {
     CircleUserRound,
     House,
@@ -27,7 +28,6 @@
     User,
   } from 'lucide-svelte';
   import { onMount, tick } from 'svelte';
-  import { handleLogout as sharedLogout } from '$lib/utils/auth';
 
   interface Props {
     user?: UserInfo;
@@ -76,7 +76,7 @@
   }
 
   function handleLogout() {
-    return () => sharedLogout();
+    sharedLogout();
   }
 
   let currentPath = $derived(pageState.url.pathname);

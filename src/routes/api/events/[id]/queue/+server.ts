@@ -17,7 +17,7 @@ export const POST = apiHandler(async ({ params, locals }) => {
   return json({ data: result }, { status: result.status === 'waiting' ? 202 : 200 });
 });
 
-// DELETE: Hủy/Rời hàng chờ
+/** DELETE /api/events/:id/queue — Leaves (cancels) the current queue slot for the authenticated user. */
 export const DELETE = apiHandler(async ({ params, locals }) => {
   const user = requireCustomer(locals);
 
