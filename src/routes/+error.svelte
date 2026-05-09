@@ -4,8 +4,47 @@
   import { ArrowRight, Headset, House } from 'lucide-svelte';
 
   let status = $derived(page.status);
-  let message = $derived(page.error?.message || 'Something went wrong');
   let role = $derived(page.data?.user?.role || 'customer');
+
+  let statusDigits = $derived(String(status).split(''));
+
+  let title = $derived(
+    status === 404
+      ? 'Lỡ hẹn mất rồi?'
+      : status === 403
+        ? 'Cửa đóng, then cài!'
+        : status >= 500
+          ? 'Sân khấu đang tạm nghỉ'
+          : 'Một nốt trầm bất ngờ',
+  );
+
+  let subtitle = $derived(
+    status === 404
+      ? 'Rất tiếc, trang này đã "bốc hơi" hoặc chưa từng tồn tại. Nhưng thời gian không chờ đợi ai cả, hãy nhanh chóng tìm cho mình một sự kiện hấp dẫn khác nào!'
+      : status === 403
+        ? 'Khu vực này được bảo mật cho những vị khách đặc biệt. Bạn không có quyền truy cập, hãy thử kiểm tra tài khoản hoặc đăng nhập lại nhé.'
+        : status === 500
+          ? 'Máy chủ đang "hụt hơi" một chút. Đội kỹ thuật đã nhận được tín hiệu và đang tức tốc mang "bình oxy" đến đây rồi!'
+          : status === 502
+            ? 'Có vẻ như kết nối giữa các cánh gà đang bị gián đoạn. Đội ngũ của chúng tôi đang tích cực nối lại dây dẫn.'
+            : status === 503
+              ? 'Chúng tôi đang "đại tu" sân khấu để mang đến trải nghiệm tốt hơn. Hãy quay lại sau ít phút nữa nhé!'
+              : `Có một lỗi nhỏ vừa xảy ra (mã ${status}). Cảm ơn bạn đã kiên nhẫn chờ đợi, chúng tôi sẽ sớm xử lý xong thôi.`,
+  );
+
+  let visualLabel = $derived(
+    status === 404
+      ? 'Lạc nhịp giữa đám đông'
+      : status === 403
+        ? 'Cánh cửa bị khóa'
+        : status === 500
+          ? 'Hậu trường đang rối ren'
+          : status === 502
+            ? 'Mất kết nối hậu đài'
+            : status === 503
+              ? 'Sân khấu đang bảo trì'
+              : 'Sự cố không mong muốn',
+  );
 </script>
 
 <svelte:head>
@@ -27,18 +66,12 @@
         <h1
           class="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-7xl"
         >
-          <span class="text-primary italic">Lỡ hẹn</span>
-          mất rồi?
+          <span class="text-primary italic">{title.split(' ')[0]}</span>
+          {title.slice(title.split(' ')[0].length)}
         </h1>
 
         <p class="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">
-          {#if status === 404}
-            Rất tiếc, trang này đã "bốc hơi" hoặc chưa từng tồn tại. Nhưng thời gian không chờ đợi
-            ai cả, hãy nhanh chóng tìm cho mình một sự kiện hấp dẫn khác nào!
-          {:else}
-            Có vẻ như đã xảy ra lỗi không mong muốn. Đừng lo, đội ngũ của chúng tôi đã được thông
-            báo và đang làm việc để khắc phục.
-          {/if}
+          {subtitle}
         </p>
 
         <div class="mt-7">
@@ -52,7 +85,7 @@
         </div>
       </section>
 
-      <!-- ── 404 visual card ── -->
+      <!-- ── Dynamic status code visual card ── -->
       <section
         class="arch-enter relative flex min-h-52 flex-col items-center justify-center overflow-hidden rounded-2xl p-8 md:col-span-4 md:row-span-2 md:min-h-0"
         style="background: linear-gradient(135deg, var(--primary), var(--primary-container)); animation-delay: 100ms"
@@ -63,18 +96,19 @@
           style="background: radial-gradient(circle at center, white, transparent 70%)"
         ></div>
 
-        <!-- Ticket digits -->
+        <!-- Dynamic status digits -->
         <div class="relative flex gap-2">
-          {#each ['4', '0', '4'] as digit, i (`${digit}-${i}`)}
+          {#each statusDigits as digit, i (`${digit}-${i}`)}
             <div
               class="flex h-20 w-14 items-center justify-center rounded-sm sm:h-24 sm:w-16 md:h-28 md:w-20 {i ===
-              1
+              Math.floor(statusDigits.length / 2)
                 ? 'bg-white/20'
                 : 'bg-white'}"
               style="clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 15% 50%)"
             >
               <span
-                class="font-heading text-3xl font-black sm:text-4xl md:text-5xl {i === 1
+                class="font-heading text-3xl font-black sm:text-4xl md:text-5xl {i ===
+                Math.floor(statusDigits.length / 2)
                   ? 'text-white'
                   : 'text-primary'}"
               >
@@ -85,7 +119,7 @@
         </div>
 
         <p class="relative mt-6 text-xs font-bold tracking-[0.25em] text-white/80 uppercase">
-          Lạc nhịp giữa đám đông
+          {visualLabel}
         </p>
 
         <div
