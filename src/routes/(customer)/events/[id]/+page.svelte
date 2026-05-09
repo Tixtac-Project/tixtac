@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { queueStore } from '$lib/stores/queue.svelte';
-  import CrossQueueModal from '$lib/components/customer/queue/CrossQueueModal.svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -8,13 +6,15 @@
   import AmenityBadge from '$lib/components/customer/event/AmenityBadge.svelte';
   import EventTimeline from '$lib/components/customer/event/EventTimeline.svelte';
   import SeatMapPreview from '$lib/components/customer/event/SeatMapPreview.svelte';
+  import CrossQueueModal from '$lib/components/customer/queue/CrossQueueModal.svelte';
   import * as Accordion from '$lib/components/ui/accordion';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index';
+  import { queueStore } from '$lib/stores/queue.svelte';
   import type { EventDetail, EventDetailSection, EventDetailShow } from '$lib/types/event-detail';
   import type { SeatLayoutConfig } from '$lib/types/seat-map';
+  import { api } from '$lib/utils/api';
   import { formatDate, formatTime } from '$lib/utils/datetime';
   import { formatPrice } from '$lib/utils/price';
-  import { api } from '$lib/utils/api';
   import {
     ArrowRight,
     Building,
@@ -334,7 +334,7 @@
             </div>
           </div>
 
-          {#if earliestShow}
+          {#if earliestShow && user?.role !== 'admin'}
             <div class="mt-3 md:mt-5">
               <button
                 onclick={() => handleBuyTicket(activeShow?.id ?? earliestShow.id)}
@@ -604,8 +604,8 @@
 
             <!-- ── Right Column: CTA + Timeline ── -->
             <aside class="self-start lg:col-span-4 lg:self-stretch">
-              <!-- Sticky CTA (desktop only) -->
-              {#if activeShow}
+              <!-- Sticky CTA (desktop only) — hidden for admin -->
+              {#if activeShow && user?.role !== 'admin'}
                 <div class="sticky top-20 z-10 hidden lg:block">
                   <div class="rounded-xl bg-surface pb-1">
                     <button
@@ -663,7 +663,7 @@
   <!-- ═══════════════════════════════════════════════════ -->
   <!-- MOBILE FLOATING CTA BAR                              -->
   <!-- ═══════════════════════════════════════════════════ -->
-  {#if activeShow && visibleShows.length > 0}
+  {#if activeShow && visibleShows.length > 0 && user?.role !== 'admin'}
     <div
       class="fixed right-0 bottom-[4.25rem] left-0 z-40 transition-transform duration-300 ease-(--ease-architectural) lg:hidden {showMobileCta
         ? 'translate-y-0'

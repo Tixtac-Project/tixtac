@@ -166,7 +166,7 @@
                     class="group/btn relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/40 sm:px-8 sm:py-3.5 sm:text-base"
                   >
                     <span class="relative z-10 flex items-center gap-1.5">
-                      Mua vé ngay
+                      Xem thêm
                       <ArrowRight
                         class="size-3.5 transition-transform duration-300 group-hover/btn:translate-x-1 sm:size-4"
                       />
