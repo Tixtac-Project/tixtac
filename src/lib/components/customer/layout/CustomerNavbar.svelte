@@ -1,7 +1,6 @@
 <!-- src/lib/components/customer/layout/CustomerNavbar.svelte -->
 <script lang="ts">
-  import { enhance } from '$app/forms';
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page as pageState } from '$app/state';
   import Logo2 from '$lib/assets/Logo2.svelte';
@@ -21,6 +20,7 @@
   import { CircleUserRound, House, LogOut, Search, Ticket, User } from 'lucide-svelte';
   import { toggleMode } from 'mode-watcher';
   import { onMount, tick } from 'svelte';
+  import { queueStore } from '$lib/stores/queue.svelte';
 
   interface Props {
     user?: UserInfo;
@@ -68,11 +68,28 @@
     isSearchOpen = !isSearchOpen;
   }
 
-  function handleLogout() {
-    return async () => {
-      await invalidateAll();
-      await goto(resolve('/'));
-    };
+  /**
+   * Handles the logout flow:
+   * 1. Calls the server-side logout API (which releases any Redis queue slot).
+   * 2. Clears the client-side queue store (removes localStorage data + hides widget).
+   * 3. Forces a full page reload to `/` to ensure all reactive state is reset.
+   */
+  async function handleLogout(event: Event) {
+    event.preventDefault();
+
+    try {
+      const res = await fetch(resolve('/api/auth/logout'), { method: 'POST' });
+
+      if (!res.ok) {
+        console.warn('Logout thất bại, nhưng đã xóa local state!');
+      }
+    } catch (err) {
+      console.error(err);
+      console.warn('Lỗi mạng trong quá trình Logout, xóa local state!');
+    } finally {
+      queueStore.clear();
+      window.location.href = resolve('/');
+    }
   }
 
   let currentPath = $derived(pageState.url.pathname);
@@ -242,7 +259,7 @@
                   <span>Vé của tôi</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <form action={resolve('/api/auth/logout')} method="POST" use:enhance={handleLogout}>
+                <form onsubmit={handleLogout}>
                   <DropdownMenuItem variant="destructive" class="cursor-pointer">
                     <button
                       type="submit"
