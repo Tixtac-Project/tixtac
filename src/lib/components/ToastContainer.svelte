@@ -13,7 +13,7 @@
     success: 'border-success-border bg-success-muted text-success-muted-foreground',
     error: 'border-danger-border bg-danger-muted text-danger-muted-foreground',
     warning: 'border-warning-border bg-warning-muted text-warning-muted-foreground',
-    info: 'border-info-border bg-info-muted text-info-muted-foreground',
+    info: 'border-info-border bg-info-muted/40 text-info-muted-foreground',
   };
 
   const iconClass: Record<ToastType, string> = {
