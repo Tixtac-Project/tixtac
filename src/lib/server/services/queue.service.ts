@@ -71,9 +71,11 @@ export const queueService = {
         local capRaw = redis.call('GET', capKey)
         local cap = capRaw and tonumber(capRaw) or defaultCap
 
-        -- 4. Available slot → promote immediately
+        -- 4. Available slot → promote immediately ONLY if waiting queue is empty.
+        --    Otherwise, user must join the end of the line to preserve FIFO.
         local activeCount = redis.call('ZCOUNT', activeKey, now, '+inf')
-        if activeCount < cap then
+        local waitingCount = redis.call('ZCARD', waitingKey)
+        if activeCount < cap and waitingCount == 0 then
           redis.call('ZREM', waitingKey, userId)
           redis.call('ZADD', activeKey, expiresAt, userId)
           redis.call('SET', userCurrentKey, eventId, 'EX', activeTtl)

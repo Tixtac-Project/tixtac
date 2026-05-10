@@ -11,7 +11,7 @@ const envSchema = z.object({
   // Per-event dynamic cap configuration
   QUEUE_DEFAULT_EVENT_CAP: z.coerce.number().int().positive().default(10),
   QUEUE_MAX_EVENT_CAP: z.coerce.number().int().positive().default(200),
-  QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().default(0.1),
+  QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().max(1).default(0.1),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
   UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
@@ -30,6 +30,15 @@ const envSchema = z.object({
   APP_URL: z.url().default('https://tixtac.io.vn'),
   GEO_API_KEY: z.string().default(''),
   RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
+})
+.superRefine((value, ctx) => {
+  if (value.QUEUE_DEFAULT_EVENT_CAP > value.QUEUE_MAX_EVENT_CAP) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['QUEUE_DEFAULT_EVENT_CAP'],
+      message: 'QUEUE_DEFAULT_EVENT_CAP must be <= QUEUE_MAX_EVENT_CAP',
+    });
+  }
 });
 
 // Parse & validate (fail fast in ALL environments)
