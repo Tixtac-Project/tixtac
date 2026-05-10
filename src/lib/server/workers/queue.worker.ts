@@ -177,7 +177,7 @@ async function runQueueWorker(): Promise<WorkerResult> {
       // cap stays stale. This is intentional: the queue only throttles DB access, it does
       // NOT enforce seat inventory. Seat locking and oversell prevention happen downstream
       // in purchase.service.ts via SELECT ... FOR UPDATE.
-      const nextUserIds = await redis.zrange(waitingKey, 0, eventCap - 1);
+      const nextUserIds = eventCap > 0 ? await redis.zrange(waitingKey, 0, eventCap - 1) : [];
 
       if (nextUserIds.length > 0) {
         const pipeline = redis.pipeline();
