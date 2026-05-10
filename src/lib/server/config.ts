@@ -8,7 +8,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   JWT_EXPIRES_IN: z.string().default('24h'),
   SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
-  MAX_CONCURRENT_USERS: z.coerce.number().int().positive().default(200),
+  // Per-event dynamic cap configuration
+  QUEUE_DEFAULT_EVENT_CAP: z.coerce.number().int().positive().default(10),
+  QUEUE_MAX_EVENT_CAP: z.coerce.number().int().positive().default(200),
+  QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().max(1).default(0.1),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
   UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
@@ -28,6 +31,15 @@ const envSchema = z.object({
   GEO_API_KEY: z.string().default(''),
   WEB3FORMS_KEY: z.string().default('2fe33d39-dd60-4a96-8beb-3b807daf571e'),
   RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
+})
+.superRefine((value, ctx) => {
+  if (value.QUEUE_DEFAULT_EVENT_CAP > value.QUEUE_MAX_EVENT_CAP) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['QUEUE_DEFAULT_EVENT_CAP'],
+      message: 'QUEUE_DEFAULT_EVENT_CAP must be <= QUEUE_MAX_EVENT_CAP',
+    });
+  }
 });
 
 // Parse & validate (fail fast in ALL environments)
@@ -35,7 +47,9 @@ const result = envSchema.safeParse({
   JWT_SECRET: env.JWT_SECRET,
   JWT_EXPIRES_IN: env.JWT_EXPIRES_IN,
   SEAT_LOCK_DURATION: env.SEAT_LOCK_DURATION,
-  MAX_CONCURRENT_USERS: env.MAX_CONCURRENT_USERS,
+  QUEUE_DEFAULT_EVENT_CAP: env.QUEUE_DEFAULT_EVENT_CAP,
+  QUEUE_MAX_EVENT_CAP: env.QUEUE_MAX_EVENT_CAP,
+  QUEUE_DYNAMIC_CAP_RATIO: env.QUEUE_DYNAMIC_CAP_RATIO,
   ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
   CLOUDAMQP_URL: env.CLOUDAMQP_URL,
   UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
@@ -72,8 +86,25 @@ export const config = {
   jwtExpiresIn: parsed.JWT_EXPIRES_IN,
   /** Seat lock duration in seconds */
   seatLockDuration: parsed.SEAT_LOCK_DURATION,
-  /** Virtual queue threshold */
-  maxConcurrentUsers: parsed.MAX_CONCURRENT_USERS,
+  /** Per-event queue cap fallback when dynamic cap hasn't been computed yet */
+  queueDefaultEventCap: parsed.QUEUE_DEFAULT_EVENT_CAP,
+  /** Hard ceiling for per-event dynamic cap */
+  queueMaxEventCap: parsed.QUEUE_MAX_EVENT_CAP,
+  /** Fraction of remaining seats used to compute dynamic cap (e.g. 0.1 = 10%).
+   *
+   * Recommended range: 0.05 – 0.30
+   *  - 0.05 (5%) : Very conservative. Good for high-demand events. Fewer users
+   *                compete for the last seats, but queue moves slower.
+   *  - 0.10 (10%): Default. Balanced throttle for most events.
+   *  - 0.30 (30%): Loose throttle. Still 3× more users than seats, so late-stage
+   *                conflicts are possible but load is still controlled.
+   *  - 1.00 (100%): cap = remainingSeats → NO throttle effect. Avoid.
+   *
+   * cap = min(QUEUE_MAX_EVENT_CAP, ceil(remaining * ratio))
+   * When remaining < LOW_SEATS_THRESHOLD (20), the cache TTL drops to 30s
+   * so the cap reacts faster to late-stage purchases.
+   */
+  queueDynamicCapRatio: parsed.QUEUE_DYNAMIC_CAP_RATIO,
   /** Access token lifetime in seconds after queue*/
   accessTokenDuration: parsed.ACCESS_TOKEN_DURATION,
   /** CloudAMQP connection URL */

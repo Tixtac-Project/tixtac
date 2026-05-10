@@ -109,6 +109,10 @@ Mở file `.env` và điền các thông tin sau:
   Mở terminal chạy lệnh `bunx @pushforge/builder vapid`. Copy `VAPID_PUBLIC_KEY` và `VAPID_PRIVATE_KEY_JWK` từ màn hình kết quả.
 - **UPSTASH_REDIS (Queue & Cache):**
   Đăng ký tại [Upstash.com](https://upstash.com) -> Tạo Redis Database -> Copy `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`.
+- **Virtual Queue (Cấu hình hàng chờ):**
+  - `QUEUE_DEFAULT_EVENT_CAP`: Giới hạn người vào thẳng khi hệ thống chưa tính toán xong (mặc định 10).
+  - `QUEUE_MAX_EVENT_CAP`: Giới hạn tối đa cho một sự kiện, kể cả khi sự kiện đó còn rất nhiều vé (mặc định 200).
+  - `QUEUE_DYNAMIC_CAP_RATIO`: Tỉ lệ cấp quyền vào dựa trên số ghế còn lại (ví dụ 0.1 = cho phép 10% số ghế còn lại vào Active cùng lúc).
 - **RESEND_API_KEY (Email):**
   Đăng ký tại [Resend.com](https://resend.com) -> Mục API Keys -> Create API Key.
 - **GEO_API_KEY (Optional):**
