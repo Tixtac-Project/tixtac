@@ -4,14 +4,9 @@ import { db } from '$lib/server/db';
 import { orderItems, orders } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { apiHandler } from '$lib/server/handler';
+import { TicketCheckSchema } from '$lib/shared/schemas/ticket-check';
 import { json } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
-
-const querySchema = z.object({
-  event_id: z.coerce.number().int().positive(),
-  show_id: z.coerce.number().int().positive(),
-});
 
 export const GET = apiHandler(async ({ locals, url }) => {
   const user = requireAuth(locals);
@@ -22,8 +17,7 @@ export const GET = apiHandler(async ({ locals, url }) => {
     throwError(Errors.FORBIDDEN, 'Chỉ nhân viên soát vé mới được đồng bộ dữ liệu.');
   }
 
-  // TODO: Validate query parameters will be restructured in shared/schema later; they are currently for testing purposes.
-  const result = querySchema.safeParse(Object.fromEntries(url.searchParams));
+  const result = TicketCheckSchema.safeParse(Object.fromEntries(url.searchParams));
   if (!result.success) {
     throwError(Errors.BAD_REQUEST, 'Thiếu hoặc ID không hợp lệ.');
   }
