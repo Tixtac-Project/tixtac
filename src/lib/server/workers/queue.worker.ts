@@ -160,9 +160,10 @@ async function runQueueWorker(): Promise<WorkerResult> {
       } catch (capErr) {
         // Non-fatal: fallback to cached cap or default
         const cached = await redis.get(capKey);
-        eventCap = cached ? Number(cached) : defaultCap;
+        eventCap = cached !== null && cached !== undefined ? Number(cached) : defaultCap;
         console.warn(
           `[QueueWorker] ⚠️ Cap computation failed for Event ${eventId}, using ${eventCap}`,
+          capErr,
         );
       }
 
