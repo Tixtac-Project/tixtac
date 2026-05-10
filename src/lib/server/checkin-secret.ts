@@ -9,11 +9,9 @@ const SECRET_LENGTH = 12;
  * Returns a 12-character string (normalized, no hyphens).
  */
 export function generateCheckinSecret(): string {
-  const bytes = crypto.randomBytes(SECRET_LENGTH); // mỗi byte cho 1 ký tự
   let secret = '';
   for (let i = 0; i < SECRET_LENGTH; i++) {
-    // Giới hạn byte trong khoảng [0, alphabet.length)
-    const index = bytes[i] % ALPHABET.length;
+    const index = crypto.randomInt(ALPHABET.length);
     secret += ALPHABET[index];
   }
   return secret;

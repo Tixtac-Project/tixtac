@@ -18,15 +18,15 @@ export const GET = apiHandler(async ({ locals, url }) => {
 
   // Trong thực tế: lấy event_id/show_id từ phân quyền của staff.
   // Tạm lấy từ query params để test: ?event_id=12&show_id=34
-  const eventId = Number(url.searchParams.get('event_id'));
-  const showId = Number(url.searchParams.get('show_id'));
+  const eventId = parseInt(url.searchParams.get('event_id') ?? '', 10);
+  const showId = parseInt(url.searchParams.get('show_id') ?? '', 10);
 
-  if (!eventId) {
-    throwError(Errors.EVENT_NOT_AVAILABLE, 'Thiếu event_id hoặc show_id.');
+  if (!eventId || isNaN(eventId)) {
+    throwError(Errors.BAD_REQUEST, 'Thiếu hoặc event_id không hợp lệ.');
   }
 
-  if (!showId) {
-    throwError(Errors.SHOW_NOT_AVAILABLE, 'Thiếu event_id hoặc show_id.');
+  if (!showId || isNaN(showId)) {
+    throwError(Errors.BAD_REQUEST, 'Thiếu hoặc show_id không hợp lệ.');
   }
 
   // Lấy tất cả vé có trạng thái 'paid' (hoặc 'issued') chưa check-in, thuộc event/show được chỉ định.

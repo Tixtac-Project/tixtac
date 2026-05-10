@@ -121,6 +121,7 @@ export const Errors = {
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),
   INTERNAL_ERROR: new AppError('INTERNAL_ERROR', 500, 'Đã có lỗi xảy ra, vui lòng thử lại'),
   INVALID_ID: new AppError('INVALID_ID', 400, 'ID không hợp lệ'),
+  BAD_REQUEST: new AppError('BAD_REQUEST', 400, 'Yêu cầu không hợp lệ'),
 
   // Validation (factory — accepts dynamic details)
   VALIDATION: (details?: Record<string, string>) =>

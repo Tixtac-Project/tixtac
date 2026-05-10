@@ -10,5 +10,5 @@ export function formatCheckinSecret(secret: string): string {
  * Remove hyphens and uppercase a formatted secret to get the normalized version.
  */
 export function normalizeCheckinSecret(formatted: string): string {
-  return formatted.replace(/-/g, '').toUpperCase();
+  return formatted.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
