@@ -6,6 +6,12 @@ import { Errors, throwError } from '$lib/server/errors';
 import { apiHandler } from '$lib/server/handler';
 import { json } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
+
+const querySchema = z.object({
+  event_id: z.coerce.number().int().positive(),
+  show_id: z.coerce.number().int().positive(),
+});
 
 export const GET = apiHandler(async ({ locals, url }) => {
   const user = requireAuth(locals);
@@ -16,21 +22,16 @@ export const GET = apiHandler(async ({ locals, url }) => {
     throwError(Errors.FORBIDDEN, 'Chỉ nhân viên soát vé mới được đồng bộ dữ liệu.');
   }
 
-  // Trong thực tế: lấy event_id/show_id từ phân quyền của staff.
-  // Tạm lấy từ query params để test: ?event_id=12&show_id=34
-  const eventId = parseInt(url.searchParams.get('event_id') ?? '', 10);
-  const showId = parseInt(url.searchParams.get('show_id') ?? '', 10);
-
-  if (!eventId || isNaN(eventId)) {
-    throwError(Errors.BAD_REQUEST, 'Thiếu hoặc event_id không hợp lệ.');
+  // TODO: Validate query parameters will be restructured in shared/schema later; they are currently for testing purposes.
+  const result = querySchema.safeParse(Object.fromEntries(url.searchParams));
+  if (!result.success) {
+    throwError(Errors.BAD_REQUEST, 'Thiếu hoặc ID không hợp lệ.');
   }
 
-  if (!showId || isNaN(showId)) {
-    throwError(Errors.BAD_REQUEST, 'Thiếu hoặc show_id không hợp lệ.');
-  }
+  const { event_id: eventId, show_id: showId } = result.data;
 
   // Lấy tất cả vé có trạng thái 'paid' (hoặc 'issued') chưa check-in, thuộc event/show được chỉ định.
-  // Cho vào service sau, API này để test trước.
+  // TODO: Database Query will be restructured in service later; they are currently for testing purposes.
   const rows = await db
     .select({
       orderItemId: orderItems.id,
