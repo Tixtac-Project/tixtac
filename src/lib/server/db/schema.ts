@@ -2,6 +2,7 @@
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
+  char,
   check,
   date,
   decimal,
@@ -332,11 +333,15 @@ export const orderItems = pgTable(
     ticketCode: varchar('ticket_code', { length: 20 }).notNull().unique(), // e.g. "TIX-A3F8K2"
     qrCode: text('qr_code'),
     isCheckedIn: boolean('is_checked_in').notNull().default(false),
+    checkinSecret: varchar('checkin_secret', { length: 12 }).notNull().unique(),
+    checkinSecretHash: char('checkin_secret_hash', { length: 64 }).notNull().unique(),
     checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('uq_ticket_code').on(table.ticketCode),
+    uniqueIndex('uq_checkin_secret').on(table.checkinSecret),
+    uniqueIndex('uq_checkin_secret_hash').on(table.checkinSecretHash),
     check(
       'chk_checked_in_consistency',
       sql`${table.isCheckedIn} = (${table.checkedInAt} IS NOT NULL)`,
@@ -345,6 +350,7 @@ export const orderItems = pgTable(
     index('idx_order_items_event_order').on(table.eventId, table.orderId),
     index('idx_order_items_show').on(table.showId),
     index('idx_order_items_order').on(table.orderId),
+    index('idx_order_items_sync').on(table.eventId, table.showId),
   ],
 );
 
