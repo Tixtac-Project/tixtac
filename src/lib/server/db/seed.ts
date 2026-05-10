@@ -1,5 +1,6 @@
 // src/lib/server/db/seed.ts
 import { hashPassword } from '$lib/server/auth/password';
+import { generateCheckinSecret, hashCheckinSecret } from '$lib/server/checkin-secret';
 import { db } from '$lib/server/db';
 import {
   categories,
@@ -355,6 +356,8 @@ export async function seed() {
         const price = priceMap.get(s.sectionId) || 500000;
         orderTotal += price;
         const code = generateTicketCode();
+        const secret = generateCheckinSecret();
+        const secretHash = hashCheckinSecret(secret);
         itemValues.push({
           orderId: 0, // placeholder, cập nhật sau
           seatId: s.id,
@@ -363,6 +366,8 @@ export async function seed() {
           priceSnapshot: String(price),
           ticketCode: code,
           qrCode: code,
+          checkinSecret: secret, // random string for check-in secret
+          checkinSecretHash: secretHash, // hash of the secret for verification at check-in
         });
       }
 
