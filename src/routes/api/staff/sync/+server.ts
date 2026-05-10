@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import { orderItems, orders } from '$lib/server/db/schema';
 import { Errors, throwError } from '$lib/server/errors';
 import { apiHandler } from '$lib/server/handler';
-import { TicketCheckSchema } from '$lib/shared/schemas/ticket-check';
+import { TicketCheckSchema } from '$lib/shared/schemas/ticket-check.schema';
 import { json } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 
