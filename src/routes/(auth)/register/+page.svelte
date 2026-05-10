@@ -4,24 +4,26 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
+  import { PasswordInput } from '$lib/components/ui/password-input';
   import * as Select from '$lib/components/ui/select';
-  import { formatZodErrors } from '$lib/shared/format-errors';
   import { registerSchema } from '$lib/shared/schemas/auth.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
-  import { Eye, EyeOff, Loader } from 'lucide-svelte';
+  import { Loader } from 'lucide-svelte';
+  import { superForm } from 'sveltekit-superforms';
+  import { zod4Client } from 'sveltekit-superforms/adapters';
+  import type { PageData } from './$types';
 
-  let loading = $state(false);
-  let showPassword = $state(false);
-  let form = $state({
-    email: '',
-    password: '',
-    full_name: '',
-    date_of_birth: '',
-    gender: '',
-  });
+  let { data }: { data: PageData } = $props();
 
-  let errors = $state<Record<string, string>>({});
+  const { form, errors, validateForm, validate } = $derived(
+    superForm(data.form, {
+      validators: zod4Client(registerSchema),
+    }),
+  );
+
+  let submitting = $state(false);
+  let apiMessage = $state<string | undefined>(undefined);
 
   const genderOptions = [
     { value: 'male', label: 'Nam' },
@@ -29,50 +31,27 @@
     { value: 'other', label: 'Khác' },
   ];
 
-  let genderLabel = $derived(genderOptions.find((o) => o.value === form.gender)?.label);
+  let genderLabel = $derived(genderOptions.find((o) => o.value === $form.gender)?.label);
 
-  function clearError(field: string) {
-    if (!errors[field]) return;
-    const next = { ...errors };
-    delete next[field];
-    errors = next;
-  }
+  async function handleSubmit(e: SubmitEvent) {
+    e.preventDefault();
 
-  function validateField(field: string) {
-    const result = registerSchema.safeParse(form);
-    if (!result.success) {
-      const allErrors = formatZodErrors(result.error);
-      if (allErrors[field]) {
-        errors = { ...errors, [field]: allErrors[field] };
-      } else {
-        clearError(field);
-      }
-    } else {
-      clearError(field);
-    }
-  }
+    const result = await validateForm({ update: true });
+    if (!result.valid) return;
 
-  async function handleRegister() {
-    const result = registerSchema.safeParse(form);
-    if (!result.success) {
-      errors = formatZodErrors(result.error);
-      return;
-    }
-    errors = {};
+    submitting = true;
+    apiMessage = undefined;
 
-    loading = true;
-    const res = await api.post('/auth/register', result.data, { silent: true });
-    loading = false;
+    const res = await api.post('/auth/register', $form, { silent: true });
+    submitting = false;
 
     if (res.details) {
-      errors = res.details;
       return;
     }
 
     if (res.error) {
-      // Show inline error on email field for duplicate email
       if (res.status === 409) {
-        errors = { email: res.error };
+        apiMessage = res.error;
       } else {
         toast.error(res.error);
       }
@@ -81,20 +60,6 @@
 
     toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
     goto(resolve('/login'));
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === ' ') {
-      e.preventDefault();
-    }
-  }
-
-  function stripWhitespace(field: 'email' | 'password', e: Event) {
-    const target = e.currentTarget as HTMLInputElement;
-    const sanitized = target.value.replace(/\s+/g, '');
-    if (sanitized !== target.value) {
-      form[field] = sanitized;
-    }
   }
 </script>
 
@@ -108,25 +73,20 @@
   </div>
 
   <!-- Form -->
-  <form
-    onsubmit={(e) => {
-      e.preventDefault();
-      handleRegister();
-    }}
-    class="grid gap-5"
-  >
+  <form onsubmit={handleSubmit} class="grid gap-5" novalidate>
     <div class="grid gap-2">
       <Label for="full_name">Họ và tên</Label>
       <Input
         id="full_name"
-        bind:value={form.full_name}
+        name="full_name"
+        bind:value={$form.full_name}
         placeholder="Nguyễn Văn A"
-        class="rounded-xl"
-        onfocus={() => clearError('full_name')}
-        onblur={() => validateField('full_name')}
+        onblur={() => validate('full_name')}
+        aria-invalid={$errors.full_name ? 'true' : undefined}
+        class={$errors.full_name ? 'border-destructive focus-visible:ring-destructive/20' : ''}
       />
-      {#if errors.full_name}
-        <span class="text-xs text-destructive">{errors.full_name}</span>
+      {#if $errors.full_name}
+        <span class="text-xs text-destructive">{$errors.full_name[0]}</span>
       {/if}
     </div>
 
@@ -134,80 +94,56 @@
       <Label for="email">Email</Label>
       <Input
         id="email"
+        name="email"
         type="email"
-        bind:value={form.email}
+        bind:value={$form.email}
         placeholder="name@example.com"
-        onfocus={() => clearError('email')}
-        onblur={() => validateField('email')}
-        onkeydown={handleKeydown}
-        oninput={(e) => stripWhitespace('email', e)}
+        onblur={() => validate('email')}
+        aria-invalid={$errors.email ? 'true' : undefined}
+        class={$errors.email ? 'border-destructive focus-visible:ring-destructive/20' : ''}
       />
-      {#if errors.email}
-        <span class="text-xs text-destructive">{errors.email}</span>
+      {#if $errors.email}
+        <span class="text-xs text-destructive">{$errors.email[0]}</span>
       {/if}
     </div>
 
     <div class="grid gap-2">
       <Label for="password">Mật khẩu</Label>
-      <div
-        class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-      >
-        <input
-          id="password"
-          type={showPassword ? 'text' : 'password'}
-          bind:value={form.password}
-          placeholder="••••••••"
-          class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
-          onfocus={() => clearError('password')}
-          onblur={() => validateField('password')}
-          onkeydown={handleKeydown}
-          oninput={(e) => stripWhitespace('password', e)}
-        />
-        <button
-          type="button"
-          class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
-          onclick={() => (showPassword = !showPassword)}
-          tabindex={-1}
-          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-        >
-          {#if showPassword}
-            <EyeOff class="size-4 shrink-0" />
-          {:else}
-            <Eye class="size-4 shrink-0" />
-          {/if}
-        </button>
-      </div>
-      {#if errors.password}
-        <span class="text-xs text-destructive">{errors.password}</span>
+      <PasswordInput
+        id="password"
+        name="password"
+        bind:value={$form.password}
+        onblur={() => validate('password')}
+        disabled={submitting}
+        error={!!$errors.password}
+      />
+      {#if $errors.password}
+        <span class="text-xs text-destructive">{$errors.password[0]}</span>
       {/if}
     </div>
 
     <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
       <div class="grid gap-2">
-        <Label for="dob">Ngày sinh</Label>
+        <Label for="date_of_birth">Ngày sinh</Label>
         <Input
-          id="dob"
+          id="date_of_birth"
+          name="date_of_birth"
           type="date"
-          bind:value={form.date_of_birth}
-          onfocus={() => clearError('date_of_birth')}
-          onchange={() => validateField('date_of_birth')}
-          onblur={() => validateField('date_of_birth')}
+          bind:value={$form.date_of_birth}
+          onblur={() => validate('date_of_birth')}
+          aria-invalid={$errors.date_of_birth ? 'true' : undefined}
+          class={$errors.date_of_birth
+            ? 'border-destructive focus-visible:ring-destructive/20'
+            : ''}
         />
-        {#if errors.date_of_birth}
-          <span class="text-xs text-destructive">{errors.date_of_birth}</span>
+        {#if $errors.date_of_birth}
+          <span class="text-xs text-destructive">{$errors.date_of_birth[0]}</span>
         {/if}
       </div>
       <div class="grid gap-2">
         <Label for="gender">Giới tính</Label>
-        <Select.Root
-          type="single"
-          bind:value={form.gender}
-          onOpenChange={(open) => {
-            if (open) clearError('gender');
-            else validateField('gender');
-          }}
-        >
-          <Select.Trigger class="w-full">
+        <Select.Root type="single" bind:value={$form.gender}>
+          <Select.Trigger class="w-full" aria-invalid={$errors.gender ? 'true' : undefined}>
             {#if genderLabel}
               {genderLabel}
             {:else}
@@ -223,14 +159,20 @@
             </Select.Group>
           </Select.Content>
         </Select.Root>
-        {#if errors.gender}
-          <span class="text-xs text-destructive">{errors.gender}</span>
+        {#if $errors.gender}
+          <span class="text-xs text-destructive">{$errors.gender[0]}</span>
         {/if}
       </div>
     </div>
 
-    <Button type="submit" class="mt-1 w-full  py-5 text-sm font-semibold" disabled={loading}>
-      {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
+    {#if apiMessage}
+      <div role="alert" class="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        {apiMessage}
+      </div>
+    {/if}
+
+    <Button type="submit" class="mt-1 w-full py-5 text-sm font-semibold" disabled={submitting}>
+      {#if submitting}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
       Đăng ký
     </Button>
   </form>

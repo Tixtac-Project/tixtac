@@ -1,20 +1,44 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
   import { page } from '$app/state';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
+  import { contactSchema } from '$lib/shared/schemas/contact.schema';
   import { CheckCircle, Clock, Mail, MapPin, MessageSquare, Phone, Send } from 'lucide-svelte';
   import { motion } from 'motion-sv';
+  import { superForm } from 'sveltekit-superforms';
+  import { zod4Client } from 'sveltekit-superforms/adapters';
+  import type { PageData } from './$types';
+
+  let { data }: { data: PageData } = $props();
+  const superform = $derived(
+    superForm(data.form, {
+      validators: zod4Client(contactSchema),
+    }),
+  );
+
+  const { form, enhance, errors, constraints, message, submitting, reset } = superform;
 
   let submitted = $state(false);
-  let serverError = $state('');
-  let loading = $state(false);
+  let errorMessage = $state<string | undefined>(undefined);
+
+  $effect(() => {
+    const m = $message;
+    if (!m) return;
+    // Error messages have status >= 400 — show inline error
+    // Success messages have status 200 — show success screen
+    if (page.status >= 400) {
+      errorMessage = typeof m === 'string' ? m : undefined;
+    } else {
+      submitted = true;
+    }
+  });
 
   function showForm() {
     submitted = false;
-    serverError = '';
+    errorMessage = undefined;
+    reset();
   }
 
   const CONTACT_INFO = [
@@ -134,26 +158,7 @@
           </div>
         {:else}
           <!-- ── Form ── -->
-          <form
-            method="POST"
-            use:enhance={() => {
-              loading = true;
-              serverError = '';
-              return async ({ result }) => {
-                loading = false;
-                if (result.type === 'success') {
-                  if (result.data?.success) submitted = true;
-                  else
-                    serverError =
-                      String(result.data?.error ?? '') || 'Gửi thất bại, vui lòng thử lại.';
-                } else if (result.type === 'failure') {
-                  serverError =
-                    String(result.data?.error ?? '') || 'Gửi thất bại, vui lòng thử lại.';
-                }
-              };
-            }}
-            novalidate
-          >
+          <form method="POST" use:enhance novalidate>
             <!-- Honeypot + time — hidden -->
             <div class="absolute -left-[9999px] opacity-0" aria-hidden="true">
               <input type="text" name="_hp" autocomplete="off" tabindex="-1" />
@@ -179,13 +184,13 @@
                   <Input
                     id="name"
                     name="name"
+                    bind:value={$form.name}
                     placeholder="Nguyễn Văn A"
-                    class={page.form?.errors?.name
-                      ? 'border-destructive focus-visible:ring-destructive/20'
-                      : ''}
+                    aria-invalid={$errors.name ? 'true' : undefined}
+                    {...$constraints.name}
                   />
-                  {#if page.form?.errors?.name}
-                    <p class="text-xs text-destructive">{page.form.errors.name}</p>
+                  {#if $errors.name}
+                    <p class="text-xs text-destructive">{$errors.name[0]}</p>
                   {/if}
                 </div>
                 <div class="space-y-2">
@@ -194,13 +199,13 @@
                     id="email"
                     name="email"
                     type="email"
+                    bind:value={$form.email}
                     placeholder="name@example.com"
-                    class={page.form?.errors?.email
-                      ? 'border-destructive focus-visible:ring-destructive/20'
-                      : ''}
+                    aria-invalid={$errors.email ? 'true' : undefined}
+                    {...$constraints.email}
                   />
-                  {#if page.form?.errors?.email}
-                    <p class="text-xs text-destructive">{page.form.errors.email}</p>
+                  {#if $errors.email}
+                    <p class="text-xs text-destructive">{$errors.email[0]}</p>
                   {/if}
                 </div>
               </div>
@@ -211,13 +216,13 @@
                 <Input
                   id="subject"
                   name="subject"
+                  bind:value={$form.subject}
                   placeholder="Tôi cần hỗ trợ về..."
-                  class={page.form?.errors?.subject
-                    ? 'border-destructive focus-visible:ring-destructive/20'
-                    : ''}
+                  aria-invalid={$errors.subject ? 'true' : undefined}
+                  {...$constraints.subject}
                 />
-                {#if page.form?.errors?.subject}
-                  <p class="text-xs text-destructive">{page.form.errors.subject}</p>
+                {#if $errors.subject}
+                  <p class="text-xs text-destructive">{$errors.subject[0]}</p>
                 {/if}
               </div>
 
@@ -227,14 +232,14 @@
                 <Textarea
                   id="message"
                   name="message"
+                  bind:value={$form.message}
                   placeholder="Mô tả chi tiết vấn đề của bạn..."
                   rows={5}
-                  class={page.form?.errors?.message
-                    ? 'border-destructive focus-visible:ring-destructive/20'
-                    : ''}
+                  aria-invalid={$errors.message ? 'true' : undefined}
+                  {...$constraints.message}
                 />
-                {#if page.form?.errors?.message}
-                  <p class="text-xs text-destructive">{page.form.errors.message}</p>
+                {#if $errors.message}
+                  <p class="text-xs text-destructive">{$errors.message[0]}</p>
                 {/if}
               </div>
             </div>
@@ -244,8 +249,8 @@
               class="flex items-center justify-between gap-4 border-t border-border bg-muted/20 px-6 py-4 md:px-8"
             >
               <div class="min-w-0 flex-1">
-                {#if serverError}
-                  <p class="truncate text-xs text-destructive">{serverError}</p>
+                {#if errorMessage && !submitted}
+                  <p class="truncate text-xs text-destructive">{errorMessage}</p>
                 {:else}
                   <p class="text-xs text-muted-foreground">
                     Phản hồi trong vòng <span class="font-medium text-foreground">24 giờ</span>
@@ -254,10 +259,10 @@
               </div>
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={$submitting}
                 class="shrink-0 gap-2 rounded-full font-bold shadow-sm shadow-primary/15 transition-shadow hover:shadow-primary/25"
               >
-                {#if loading}
+                {#if $submitting}
                   <span
                     class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                   ></span>

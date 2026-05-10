@@ -114,15 +114,23 @@ export const updateProfileSchema = z.object({
   avatar_url: z.url('Avatar phải là một đường dẫn URL hợp lệ').optional().or(z.literal('')),
 });
 
-export const updateSecuritySchema = z
+export const updateEmailSchema = z.object({
+  current_password: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+  new_email: z
+    .email('Email không đúng định dạng')
+    .max(255, 'Email tối đa 255 ký tự')
+    .transform((v) => v.trim().toLowerCase()),
+});
+
+export const updatePasswordSchema = z
   .object({
-    current_password: z.string().min(8, 'Mật khẩu hiện tại phải có ít nhất 8 ký tự'),
-    new_password: registerSchema.shape.password.optional(),
-    new_email: registerSchema.shape.email.optional(),
+    current_password: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+    new_password: registerSchema.shape.password,
+    confirm_password: z.string().min(1, 'Vui lòng xác nhận mật khẩu mới'),
   })
-  .refine((data) => data.new_password || data.new_email, {
-    message: 'Phải cung cấp ít nhất một trong hai trường new_password hoặc new_email',
-    path: ['new_password'],
+  .refine((data) => data.new_password === data.confirm_password, {
+    path: ['confirm_password'],
+    message: 'Mật khẩu mới không khớp',
   });
 
 export const passwordSchema = z
@@ -147,7 +155,8 @@ export const resetPasswordSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
-export type UpdateSecurityInput = z.infer<typeof updateSecuritySchema>;
+export type UpdateEmailInput = z.infer<typeof updateEmailSchema>;
+export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
 export type PasswordInput = z.infer<typeof passwordSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

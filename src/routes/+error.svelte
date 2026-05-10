@@ -66,8 +66,7 @@
         <h1
           class="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-7xl"
         >
-          <span class="text-primary italic">{title.split(' ')[0]}</span>
-          {title.slice(title.split(' ')[0].length)}
+          {title}
         </h1>
 
         <p class="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground md:text-lg">
@@ -164,7 +163,7 @@
             {#each [{ icon: '🎭', label: 'Hài kịch' }, { icon: '⚽', label: 'Thể thao' }, { icon: '🎵', label: 'Âm nhạc' }, { icon: '🎨', label: 'Nghệ thuật' }] as cat (cat.label)}
               <a
                 href={resolve(
-                  `/?category=${cat.label
+                  `/search?category=${cat.label
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
                     .replace(/đ/g, 'd')

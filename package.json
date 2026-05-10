@@ -87,6 +87,7 @@
     "pg": "^8.20.0",
     "resend": "^6.12.3",
     "svelte-adapter-bun": "^1.0.1",
+    "sveltekit-superforms": "^2.30.1",
     "tiny-lru": "^13.0.0",
     "ws": "^8.20.0",
     "zod": "^4.4.3"
