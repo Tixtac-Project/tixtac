@@ -3,7 +3,7 @@
 
   interface Props {
     name: string;
-    value: string;
+    value: string | undefined;
     autocomplete?: 'current-password' | 'new-password' | 'one-time-code' | 'off';
     placeholder?: string;
     disabled?: boolean;

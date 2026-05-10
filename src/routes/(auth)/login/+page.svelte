@@ -5,20 +5,29 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { formatZodErrors } from '$lib/shared/format-errors';
+  import { PasswordInput } from '$lib/components/ui/password-input';
   import { loginSchema } from '$lib/shared/schemas/auth.schema';
   import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
-  import { Eye, EyeOff, Loader } from 'lucide-svelte';
+  import { Loader } from 'lucide-svelte';
   import { onMount } from 'svelte';
+  import { superForm } from 'sveltekit-superforms';
+  import { zod4Client } from 'sveltekit-superforms/adapters';
+  import type { PageData } from './$types';
 
-  let loading = $state(false);
-  let showPassword = $state(false);
-  let email = $state('');
-  let password = $state('');
-  let authError = $state<string | null>(null);
+  let { data }: { data: PageData } = $props();
 
-  // Show toast when redirected to login page with a target page
+  const sf = $derived(
+    superForm(data.form, {
+      validators: zod4Client(loginSchema),
+    }),
+  );
+
+  const { form, errors, validateForm, validate } = sf;
+
+  let submitting = $state(false);
+  let apiMessage = $state<string | undefined>(undefined);
+
   onMount(() => {
     const redirectTo = page.url.searchParams.get('redirect');
     if (redirectTo && redirectTo.startsWith('/')) {
@@ -26,81 +35,36 @@
     }
   });
 
-  let errors = $state<Record<string, string>>({});
+  async function handleSubmit(e: SubmitEvent) {
+    e.preventDefault();
 
-  function clearError(field: string) {
-    authError = null;
-    if (!errors[field]) return;
-    const next = { ...errors };
-    delete next[field];
-    errors = next;
-  }
+    const result = await validateForm({ update: true });
+    if (!result.valid) return;
 
-  function validateField(field: string) {
-    const result = loginSchema.safeParse({ email, password });
-    if (!result.success) {
-      const allErrors = formatZodErrors(result.error);
-      if (allErrors[field]) {
-        errors = { ...errors, [field]: allErrors[field] };
-      } else {
-        clearError(field);
-      }
-    } else {
-      clearError(field);
-    }
-  }
+    submitting = true;
+    apiMessage = undefined;
 
-  async function handleLogin() {
-    const result = loginSchema.safeParse({ email, password });
-    if (!result.success) {
-      errors = formatZodErrors(result.error);
+    const res = await api.post<{ role: string }>('/auth/login', $form);
+    submitting = false;
+
+    if (res.details) {
       return;
     }
-    errors = {};
-    authError = null;
-
-    loading = true;
-    const { data, error, details } = await api.post<{ role: string }>('/auth/login', result.data);
-    loading = false;
-
-    if (details) {
-      errors = details;
+    if (res.error) {
+      apiMessage = res.error;
       return;
     }
 
-    if (error) {
-      authError = error;
-      return;
-    }
-
-    if (data) {
+    if (res.data) {
       toast.success('Đăng nhập thành công!');
-
       const redirectTo = page.url.searchParams.get('redirect');
       if (redirectTo && redirectTo.startsWith('/')) {
         goto(resolve(redirectTo), { invalidateAll: true });
-      } else if (data.role === 'admin') {
+      } else if (res.data.role === 'admin') {
         goto(resolve('/admin'), { invalidateAll: true });
       } else {
         goto(resolve('/'), { invalidateAll: true });
       }
-    }
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === ' ') {
-      e.preventDefault();
-    }
-  }
-
-  function stripWhitespace(field: 'email' | 'password', e: Event) {
-    const target = e.currentTarget as HTMLInputElement;
-    const sanitized = target.value.replace(/\s+/g, '');
-
-    if (field === 'email') {
-      email = sanitized;
-    } else {
-      password = sanitized;
     }
   }
 </script>
@@ -113,74 +77,48 @@
   </div>
 
   <!-- Form -->
-  <form
-    onsubmit={(e) => {
-      e.preventDefault();
-      handleLogin();
-    }}
-    class="grid gap-5"
-  >
+  <form onsubmit={handleSubmit} class="grid gap-5" novalidate>
     <div class="grid gap-2">
       <Label for="email">Email</Label>
       <Input
         id="email"
+        name="email"
         type="email"
         autocomplete="username"
         placeholder="name@example.com"
-        bind:value={email}
-        onfocus={() => clearError('email')}
-        onblur={() => validateField('email')}
-        onkeydown={handleKeydown}
-        oninput={(e) => stripWhitespace('email', e)}
+        bind:value={$form.email}
+        onblur={() => validate('email')}
+        aria-invalid={$errors.email ? 'true' : undefined}
+        class={$errors.email ? 'border-destructive focus-visible:ring-destructive/20' : ''}
       />
-      {#if errors.email}
-        <span class="text-xs text-destructive">{errors.email}</span>
+      {#if $errors.email}
+        <span class="text-xs text-destructive">{$errors.email[0]}</span>
       {/if}
     </div>
 
     <div class="grid gap-2">
       <Label for="password">Mật khẩu</Label>
-      <div
-        class="flex h-10 w-full rounded-md border border-input bg-transparent ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-      >
-        <input
-          id="password"
-          type={showPassword ? 'text' : 'password'}
-          bind:value={password}
-          placeholder="••••••••"
-          class="h-full flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
-          onfocus={() => clearError('password')}
-          onblur={() => validateField('password')}
-          onkeydown={handleKeydown}
-          oninput={(e) => stripWhitespace('password', e)}
-        />
-        <button
-          type="button"
-          class="flex items-center pr-3 text-muted-foreground transition-colors hover:text-foreground"
-          onclick={() => (showPassword = !showPassword)}
-          tabindex={-1}
-          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-        >
-          {#if showPassword}
-            <EyeOff class="size-4 shrink-0" />
-          {:else}
-            <Eye class="size-4 shrink-0" />
-          {/if}
-        </button>
-      </div>
-      {#if errors.password}
-        <span class="text-xs text-destructive">{errors.password}</span>
+      <PasswordInput
+        id="password"
+        name="password"
+        bind:value={$form.password}
+        onblur={() => validate('password')}
+        disabled={submitting}
+        error={!!$errors.password}
+      />
+      {#if $errors.password}
+        <span class="text-xs text-destructive">{$errors.password[0]}</span>
       {/if}
     </div>
 
-    {#if authError}
+    {#if apiMessage}
       <div role="alert" class="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-        {authError}
+        {apiMessage}
       </div>
     {/if}
 
-    <Button type="submit" class="mt-1 w-full py-5 text-sm font-semibold" disabled={loading}>
-      {#if loading}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
+    <Button type="submit" class="mt-1 w-full py-5 text-sm font-semibold" disabled={submitting}>
+      {#if submitting}<Loader class="mr-2 h-4 w-4 animate-spin" />{/if}
       Đăng nhập
     </Button>
 

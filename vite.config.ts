@@ -9,7 +9,6 @@ const json = JSON.parse(readFileSync(file, 'utf8'));
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
   server: {
-    host: true,
     strictPort: true,
     warmup: {
       clientFiles: ['./src/routes/**/*.svelte', './src/lib/components/**/*.svelte'],
