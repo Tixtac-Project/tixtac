@@ -24,6 +24,7 @@ import {
 
 export const roleEnum = pgEnum('role', ['admin', 'customer']);
 export const genderEnum = pgEnum('gender', ['male', 'female', 'other']);
+export const staffStatusEnum = pgEnum('staff_status', ['active', 'revoked']);
 
 // NOTE: "sold_out" is intentionally excluded — it is a derived/computed state
 export const eventStatusEnum = pgEnum('event_status', [
@@ -37,6 +38,12 @@ export const showStatusEnum = pgEnum('show_status', [
   'published',
   'completed',
   'cancelled',
+]);
+export const invitationStatusEnum = pgEnum('invitation_status', [
+  'pending',
+  'accepted',
+  'revoked',
+  'expired',
 ]);
 
 // 'disabled' is used when an Organizer deletes seats from a block to make irregular shapes (cutouts)
@@ -159,6 +166,148 @@ export const events = pgTable(
     index('idx_events_status').on(table.status),
     index('idx_events_category').on(table.categoryId),
     index('idx_events_status_created').on(table.status, table.createdAt),
+  ],
+);
+
+// ── Event gates ───────────────────────────────────────────────────────────
+export const eventGates = pgTable(
+  'event_gates',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: text('description'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    // Unique gate name per event
+    uniqueIndex('uq_event_gates_event_id_name').on(table.eventId, table.name),
+    index('idx_event_gates_event_id').on(table.eventId),
+  ],
+);
+
+// ── Event staff ───────────────────────────────────────────────────────────
+export const eventStaff = pgTable(
+  'event_staff',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    status: staffStatusEnum('status').notNull().default('active'),
+    invitationId: integer('invitation_id').references(() => staffInvitations.id, {
+      onDelete: 'cascade',
+    }),
+    createdBy: integer('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedBy: integer('revoked_by').references(() => users.id),
+    revokeReason: text('revoke_reason'),
+  },
+  (table) => [
+    uniqueIndex('uq_event_staff_event_user').on(table.eventId, table.userId),
+    index('idx_event_staff_event_id').on(table.eventId),
+    index('idx_event_staff_user_id').on(table.userId),
+    index('idx_event_staff_user_event').on(table.userId, table.eventId),
+    index('idx_event_staff_event_status').on(table.eventId, table.status),
+  ],
+);
+
+// ── Event staff gates ──────────────────────────────────────────────────────
+export const eventStaffGates = pgTable(
+  'event_staff_gates',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id').notNull(),
+    eventStaffId: integer('event_staff_id')
+      .notNull()
+      .references(() => eventStaff.id, { onDelete: 'cascade' }),
+    gateId: integer('gate_id')
+      .notNull()
+      .references(() => eventGates.id, { onDelete: 'cascade' }),
+    createdBy: integer('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('uq_event_staff_gates_event_staff_gate').on(
+      table.eventId,
+      table.eventStaffId,
+      table.gateId,
+    ),
+    index('idx_event_staff_gates_staff').on(table.eventStaffId),
+    index('idx_event_staff_gates_gate').on(table.gateId),
+  ],
+);
+
+// ── Staff invitation ──────────────────────────────────────────────────
+export const staffInvitations = pgTable(
+  'staff_invitations',
+  {
+    id: serial('id').primaryKey(),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    email: varchar('email', { length: 255 }).notNull(),
+    status: invitationStatusEnum('status').notNull().default('pending'),
+    invitedBy: integer('invited_by')
+      .notNull()
+      .references(() => users.id),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedBy: integer('accepted_by').references(() => users.id),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    revokedBy: integer('revoked_by').references(() => users.id),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex('uq_staff_invitations_token_hash').on(table.tokenHash),
+    index('idx_staff_invitations_event_email').on(table.eventId, table.email),
+    index('idx_staff_invitations_status').on(table.status),
+    index('idx_staff_invitations_expires_at').on(table.expiresAt),
+  ],
+);
+
+// ── Staff inviations gates ────────────────────────────────
+export const staffInvitationGates = pgTable(
+  'staff_invitation_gates',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id').notNull(),
+    invitationId: integer('invitation_id')
+      .notNull()
+      .references(() => staffInvitations.id, { onDelete: 'cascade' }),
+    gateId: integer('gate_id')
+      .notNull()
+      .references(() => eventGates.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('uq_invitation_gates_event_invitation_gate').on(
+      table.eventId,
+      table.invitationId,
+      table.gateId,
+    ),
+    index('idx_invitation_gates_invitation').on(table.invitationId),
+    index('idx_invitation_gates_gate').on(table.gateId),
   ],
 );
 
@@ -336,6 +485,15 @@ export const orderItems = pgTable(
     checkinSecret: varchar('checkin_secret', { length: 12 }).notNull().unique(),
     checkinSecretHash: char('checkin_secret_hash', { length: 64 }).notNull().unique(),
     checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+    checkedInByStaffId: integer('checked_in_by_staff_id').references(() => eventStaff.id, {
+      onDelete: 'set null',
+    }),
+    checkedInGateId: integer('checked_in_gate_id').references(() => eventGates.id, {
+      onDelete: 'set null',
+    }),
+    checkinSource: varchar('checkin_source', { length: 20 }),
+    checkinClientScanId: varchar('checkin_client_scan_id', { length: 64 }),
+    checkinSyncedAt: timestamp('checkin_synced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -351,6 +509,19 @@ export const orderItems = pgTable(
     index('idx_order_items_show').on(table.showId),
     index('idx_order_items_order').on(table.orderId),
     index('idx_order_items_sync').on(table.eventId, table.showId),
+    index('idx_order_items_checked_in_staff').on(table.checkedInByStaffId),
+    index('idx_order_items_checked_in_gate').on(table.checkedInGateId),
+    index('idx_order_items_checkin_secret_hash').on(table.checkinSecretHash),
+    index('idx_order_items_event_show_checkin').on(table.eventId, table.showId, table.checkedInAt),
+    check(
+      'chk_order_items_checkin',
+      sql`( ${table.checkedInAt} IS NULL
+      OR (
+        ${table.checkedInByStaffId} IS NOT NULL
+        AND ${table.checkedInGateId} IS NOT NULL
+      )
+    )`,
+    ),
   ],
 );
 
@@ -397,6 +568,100 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   category: one(categories, { fields: [events.categoryId], references: [categories.id] }),
   createdByUser: one(users, { fields: [events.createdBy], references: [users.id] }),
   shows: many(eventShows),
+  gates: many(eventGates),
+  eventStaff: many(eventStaff),
+  invitations: many(staffInvitations),
+}));
+
+export const eventGatesRelations = relations(eventGates, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventGates.eventId],
+    references: [events.id],
+  }),
+  staffGates: many(eventStaffGates),
+  invitationGates: many(staffInvitationGates),
+  orderItems: many(orderItems, { relationName: 'gateCheckins' }),
+}));
+
+export const eventStaffRelations = relations(eventStaff, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventStaff.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventStaff.userId],
+    references: [users.id],
+  }),
+  invitation: one(staffInvitations, {
+    fields: [eventStaff.invitationId],
+    references: [staffInvitations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [eventStaff.createdBy],
+    references: [users.id],
+    relationName: 'staffCreatedBy',
+  }),
+  revokedByUser: one(users, {
+    fields: [eventStaff.revokedBy],
+    references: [users.id],
+    relationName: 'staffRevokedBy',
+  }),
+  gates: many(eventStaffGates),
+  checkins: many(orderItems, { relationName: 'staffCheckins' }),
+}));
+
+export const eventStaffGatesRelations = relations(eventStaffGates, ({ one }) => ({
+  event: one(events, {
+    fields: [eventStaffGates.eventId],
+    references: [events.id],
+  }),
+  staff: one(eventStaff, {
+    fields: [eventStaffGates.eventStaffId],
+    references: [eventStaff.id],
+  }),
+  gate: one(eventGates, {
+    fields: [eventStaffGates.gateId],
+    references: [eventGates.id],
+  }),
+}));
+
+export const staffInvitationsRelations = relations(staffInvitations, ({ one, many }) => ({
+  event: one(events, {
+    fields: [staffInvitations.eventId],
+    references: [events.id],
+  }),
+  invitedByUser: one(users, {
+    fields: [staffInvitations.invitedBy],
+    references: [users.id],
+    relationName: 'invitedBy',
+  }),
+  acceptedByUser: one(users, {
+    fields: [staffInvitations.acceptedBy],
+    references: [users.id],
+    relationName: 'acceptedBy',
+  }),
+  revokedByUser: one(users, {
+    fields: [staffInvitations.revokedBy],
+    references: [users.id],
+    relationName: 'revokedByInvitation',
+  }),
+  gates: many(staffInvitationGates),
+  staffAssignments: many(eventStaff),
+}));
+
+export const staffInvitationGatesRelations = relations(staffInvitationGates, ({ one }) => ({
+  event: one(events, {
+    fields: [staffInvitationGates.eventId],
+    references: [events.id],
+  }),
+  invitation: one(staffInvitations, {
+    fields: [staffInvitationGates.invitationId],
+    references: [staffInvitations.id],
+  }),
+  gate: one(eventGates, {
+    fields: [staffInvitationGates.gateId],
+    references: [eventGates.id],
+  }),
 }));
 
 export const eventShowsRelations = relations(eventShows, ({ one, many }) => ({
@@ -426,4 +691,14 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   seat: one(seats, { fields: [orderItems.seatId], references: [seats.id] }),
   event: one(events, { fields: [orderItems.eventId], references: [events.id] }),
   show: one(eventShows, { fields: [orderItems.showId], references: [eventShows.id] }),
+  checkedInByStaff: one(eventStaff, {
+    fields: [orderItems.checkedInByStaffId],
+    references: [eventStaff.id],
+    relationName: 'staffCheckins',
+  }),
+  checkedInGate: one(eventGates, {
+    fields: [orderItems.checkedInGateId],
+    references: [eventGates.id],
+    relationName: 'gateCheckins',
+  }),
 }));
