@@ -203,9 +203,11 @@ export const eventStaff = pgTable(
       .references(() => events.id, { onDelete: 'cascade' }),
     userId: integer('user_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'restrict' }),
     status: staffStatusEnum('status').notNull().default('active'),
-    invitationId: integer('invitation_id'),
+    invitationId: integer('invitation_id').references(() => staffInvitations.id, {
+      onDelete: 'cascade',
+    }),
     createdBy: integer('created_by').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
