@@ -164,8 +164,15 @@ async function seedStaff() {
     const gate = gates[gateName];
     await db
       .insert(eventStaffGates)
-      .values({ eventStaffId: staffId, gateId: gate.id, createdBy })
-      .onConflictDoNothing({ target: [eventStaffGates.eventStaffId, eventStaffGates.gateId] });
+      .values({
+        eventId: targetEvent.id,
+        eventStaffId: staffId,
+        gateId: gate.id,
+        createdBy,
+      })
+      .onConflictDoNothing({
+        target: [eventStaffGates.eventId, eventStaffGates.eventStaffId, eventStaffGates.gateId],
+      });
   };
 
   // test-staff -> Cổng chính
@@ -196,7 +203,7 @@ async function seedStaff() {
     {
       email: 'invited-accepted@tixtac.io.vn',
       status: 'accepted' as const,
-      acceptedByEmail: 'staff-accepted@tixtac.io.vn', // sẽ tạo event_staff sau
+      acceptedByEmail: 'staff-accepted@tixtac.io.vn',
       acceptedAt: now,
       expiresAt: future,
       gates: ['Cổng chính', 'Cổng VIP'],
@@ -218,7 +225,6 @@ async function seedStaff() {
   ];
 
   for (const inv of invitationDefs) {
-    // Kiểm tra xem đã có lời mời nào cùng event, email, status chưa
     let finalInvitation = await db.query.staffInvitations.findFirst({
       where: and(
         eq(staffInvitations.eventId, targetEvent.id),
@@ -228,7 +234,6 @@ async function seedStaff() {
     });
 
     if (!finalInvitation) {
-      // Chỉ insert nếu chưa tồn tại
       const tokenHash = generateTokenHash();
       const [inserted] = await db
         .insert(staffInvitations)
@@ -259,9 +264,17 @@ async function seedStaff() {
       const gate = gates[gateName];
       await db
         .insert(staffInvitationGates)
-        .values({ invitationId: finalInvitation.id, gateId: gate.id })
+        .values({
+          eventId: targetEvent.id,
+          invitationId: finalInvitation.id,
+          gateId: gate.id,
+        })
         .onConflictDoNothing({
-          target: [staffInvitationGates.invitationId, staffInvitationGates.gateId],
+          target: [
+            staffInvitationGates.eventId,
+            staffInvitationGates.invitationId,
+            staffInvitationGates.gateId,
+          ],
         });
     }
 
@@ -286,9 +299,14 @@ async function seedStaff() {
       for (const ig of invGates) {
         await db
           .insert(eventStaffGates)
-          .values({ eventStaffId: staffForAccepted.id, gateId: ig.gateId, createdBy })
+          .values({
+            eventId: targetEvent.id,
+            eventStaffId: staffForAccepted.id,
+            gateId: ig.gateId,
+            createdBy,
+          })
           .onConflictDoNothing({
-            target: [eventStaffGates.eventStaffId, eventStaffGates.gateId],
+            target: [eventStaffGates.eventId, eventStaffGates.eventStaffId, eventStaffGates.gateId],
           });
       }
       console.log(`✅ Accepted invitation processed -> event_staff (id=${staffForAccepted.id})`);

@@ -232,6 +232,7 @@ export const eventStaffGates = pgTable(
   'event_staff_gates',
   {
     id: serial('id').primaryKey(),
+    eventId: integer('event_id').notNull(),
     eventStaffId: integer('event_staff_id')
       .notNull()
       .references(() => eventStaff.id, { onDelete: 'cascade' }),
@@ -242,7 +243,11 @@ export const eventStaffGates = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('uq_event_staff_gates_staff_gate').on(table.eventStaffId, table.gateId),
+    uniqueIndex('uq_event_staff_gates_event_staff_gate').on(
+      table.eventId,
+      table.eventStaffId,
+      table.gateId,
+    ),
     index('idx_event_staff_gates_staff').on(table.eventStaffId),
     index('idx_event_staff_gates_gate').on(table.gateId),
   ],
@@ -286,6 +291,7 @@ export const staffInvitationGates = pgTable(
   'staff_invitation_gates',
   {
     id: serial('id').primaryKey(),
+    eventId: integer('event_id').notNull(),
     invitationId: integer('invitation_id')
       .notNull()
       .references(() => staffInvitations.id, { onDelete: 'cascade' }),
@@ -295,7 +301,11 @@ export const staffInvitationGates = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('uq_invitation_gates_invitation_gate').on(table.invitationId, table.gateId),
+    uniqueIndex('uq_invitation_gates_event_invitation_gate').on(
+      table.eventId,
+      table.invitationId,
+      table.gateId,
+    ),
     index('idx_invitation_gates_invitation').on(table.invitationId),
     index('idx_invitation_gates_gate').on(table.gateId),
   ],
@@ -601,6 +611,10 @@ export const eventStaffRelations = relations(eventStaff, ({ one, many }) => ({
 }));
 
 export const eventStaffGatesRelations = relations(eventStaffGates, ({ one }) => ({
+  event: one(events, {
+    fields: [eventStaffGates.eventId],
+    references: [events.id],
+  }),
   staff: one(eventStaff, {
     fields: [eventStaffGates.eventStaffId],
     references: [eventStaff.id],
@@ -636,6 +650,10 @@ export const staffInvitationsRelations = relations(staffInvitations, ({ one, man
 }));
 
 export const staffInvitationGatesRelations = relations(staffInvitationGates, ({ one }) => ({
+  event: one(events, {
+    fields: [staffInvitationGates.eventId],
+    references: [events.id],
+  }),
   invitation: one(staffInvitations, {
     fields: [staffInvitationGates.invitationId],
     references: [staffInvitations.id],
