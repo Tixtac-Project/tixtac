@@ -1,5 +1,6 @@
 // src/lib/server/db/seed-tickets.ts
 import { hashPassword } from '$lib/server/auth/password';
+import { generateCheckinSecret, hashCheckinSecret } from '$lib/server/checkin-secret';
 import { db } from '$lib/server/db';
 import { eventShows, events, orderItems, orders, seats, users } from '$lib/server/db/schema';
 import { generateTicketCode } from '$lib/utils/ticket-code';
@@ -77,6 +78,8 @@ async function seedTickets() {
     .limit(2);
   for (const s of night1Seats) {
     const code = generateTicketCode();
+    const checkinSecret = generateCheckinSecret();
+    const checkinSecretHash = await hashCheckinSecret(checkinSecret);
     await db.insert(orderItems).values({
       orderId: paidOrder1.id,
       seatId: s.id,
@@ -85,6 +88,8 @@ async function seedTickets() {
       priceSnapshot: '1000000',
       ticketCode: code,
       qrCode: code,
+      checkinSecret: checkinSecret,
+      checkinSecretHash: checkinSecretHash,
     });
     await db.update(seats).set({ status: 'sold' }).where(eq(seats.id, s.id));
   }
@@ -109,6 +114,8 @@ async function seedTickets() {
     .limit(1);
   for (const s of night2Seats) {
     const code = generateTicketCode();
+    const checkinSecret = generateCheckinSecret();
+    const checkinSecretHash = await hashCheckinSecret(checkinSecret);
     await db.insert(orderItems).values({
       orderId: paidOrder2.id,
       seatId: s.id,
@@ -117,6 +124,8 @@ async function seedTickets() {
       priceSnapshot: '2000000',
       ticketCode: code,
       qrCode: code,
+      checkinSecret: checkinSecret,
+      checkinSecretHash: checkinSecretHash,
     });
     await db.update(seats).set({ status: 'sold' }).where(eq(seats.id, s.id));
   }
@@ -140,6 +149,8 @@ async function seedTickets() {
     .limit(2);
   for (const s of pendingSeats) {
     const code = generateTicketCode();
+    const checkinSecret = generateCheckinSecret();
+    const checkinSecretHash = await hashCheckinSecret(checkinSecret);
     await db.insert(orderItems).values({
       orderId: pendingOrder.id,
       seatId: s.id,
@@ -148,6 +159,8 @@ async function seedTickets() {
       priceSnapshot: '800000',
       ticketCode: code,
       qrCode: code,
+      checkinSecret: checkinSecret,
+      checkinSecretHash: checkinSecretHash,
     });
     await db
       .update(seats)

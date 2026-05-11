@@ -1,3 +1,4 @@
+import { generateCheckinSecret, hashCheckinSecret } from '$lib/server/checkin-secret';
 import { config } from '$lib/server/config';
 import { db } from '$lib/server/db';
 import {
@@ -10,6 +11,7 @@ import {
   seatSections,
   users,
 } from '$lib/server/db/schema';
+import { isUniqueViolation } from '$lib/server/db/utils';
 import { Errors, throwError } from '$lib/server/errors';
 import { eventBus, SSE_EVENTS } from '$lib/server/events/event-bus';
 import { publishOrderTimeout } from '$lib/server/mq/publisher';
@@ -440,16 +442,44 @@ export const purchaseService = {
         // PHASE 3: Resolve showId for each locked seat, then insert
         const showIdBySeatId = new Map<number, number>(lockedSeatRows.map((r) => [r.id, r.showId]));
 
-        await tx.insert(orderItems).values(
-          lockedSeatsToProcess.map((s) => ({
-            orderId: finalOrderId!,
-            seatId: s.id,
-            eventId,
-            showId: showIdBySeatId.get(s.id)!,
-            priceSnapshot: s.price.toString(),
-            ticketCode: generateTicketCode(),
-          })),
-        );
+        // Insert từng order_item để có thể retry nếu gặp collision
+        const MAX_SECRET_RETRIES = 5;
+
+        for (const seat of lockedSeatsToProcess) {
+          let inserted = false;
+          for (let attempt = 0; attempt < MAX_SECRET_RETRIES; attempt++) {
+            const secret = generateCheckinSecret(); // normalized, 12 chars
+            const secretHash = hashCheckinSecret(secret); // SHA‑256
+
+            try {
+              await tx.insert(orderItems).values({
+                orderId: finalOrderId!,
+                seatId: seat.id,
+                eventId,
+                showId: showIdBySeatId.get(seat.id)!,
+                priceSnapshot: seat.price.toString(),
+                ticketCode: generateTicketCode(),
+                checkinSecret: secret,
+                checkinSecretHash: secretHash,
+              });
+              inserted = true;
+              break; // thành công, thoát vòng retry
+            } catch (err) {
+              if (isUniqueViolation(err)) {
+                // Chỉ retry nếu là lỗi unique (checkin_secret hoặc checkin_secret_hash)
+                continue;
+              }
+              // Các lỗi khác (FK, lock, ...) ném ra ngoài để rollback toàn bộ transaction
+              throw err;
+            }
+          }
+
+          if (!inserted) {
+            throw new Error(
+              `Không thể tạo checkin_secret duy nhất sau ${MAX_SECRET_RETRIES} lần thử cho seat ${seat.id}`,
+            );
+          }
+        }
 
         const finalResponse: PurchaseResponse = {
           order_id: finalOrderId!,

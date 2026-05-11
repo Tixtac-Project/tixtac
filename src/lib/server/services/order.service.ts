@@ -21,6 +21,8 @@ type OrderListRow = {
   priceSnapshot: string;
   ticketCode: string;
   eventId: number;
+  checkinSecret: string;
+  showId: number;
   eventTitle: string;
   venue: string;
   bannerImageUrl: string | null;
@@ -47,6 +49,9 @@ type PaidTicketEntry = {
     ticket_code: string;
     qr_code: null;
     paid_at: string | null;
+    event_id: number;
+    show_id: number;
+    checkin_secret: string;
   };
 };
 
@@ -308,6 +313,8 @@ export const orderService = {
         itemId: orderItems.id,
         priceSnapshot: orderItems.priceSnapshot,
         ticketCode: orderItems.ticketCode,
+        checkinSecret: orderItems.checkinSecret,
+        showId: orderItems.showId,
         eventId: events.id,
         eventTitle: events.title,
         venue: events.venue,
@@ -401,6 +408,9 @@ export const orderService = {
           ticket_code: row.ticketCode,
           qr_code: null,
           paid_at: row.paidAt ? row.paidAt.toISOString() : null,
+          event_id: row.eventId,
+          show_id: row.showId,
+          checkin_secret: row.checkinSecret,
         });
       }
     }
