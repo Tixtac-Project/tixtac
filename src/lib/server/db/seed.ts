@@ -4,12 +4,17 @@ import { generateCheckinSecret, hashCheckinSecret } from '$lib/server/checkin-se
 import { db } from '$lib/server/db';
 import {
   categories,
+  eventGates,
   events,
   eventShows,
+  eventStaff,
+  eventStaffGates,
   orderItems,
   orders,
   seats,
   seatSections,
+  staffInvitationGates,
+  staffInvitations,
   users,
 } from '$lib/server/db/schema';
 import { getEventSeeds, type ShowSeed } from '$lib/server/db/seed-data';
@@ -211,6 +216,11 @@ export async function seed() {
   await db.delete(seats);
   await db.delete(seatSections);
   await db.delete(eventShows);
+  await db.delete(eventStaffGates);
+  await db.delete(staffInvitationGates);
+  await db.delete(eventStaff);
+  await db.delete(staffInvitations);
+  await db.delete(eventGates);
   await db.delete(events);
   await db.delete(categories);
 
