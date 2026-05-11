@@ -218,29 +218,41 @@ async function seedStaff() {
   ];
 
   for (const inv of invitationDefs) {
-    const tokenHash = generateTokenHash();
-    const [inserted] = await db
-      .insert(staffInvitations)
-      .values({
-        tokenHash,
-        eventId: targetEvent.id,
-        email: inv.email,
-        status: inv.status,
-        invitedBy: createdBy,
-        expiresAt: inv.expiresAt,
-        acceptedBy: inv.acceptedByEmail ? (userMap[inv.acceptedByEmail]?.id ?? null) : null,
-        acceptedAt: inv.acceptedAt ?? null,
-        revokedBy: inv.revokedBy ?? null,
-        revokedAt: inv.revokedAt ?? null,
-      })
-      .onConflictDoNothing({ target: staffInvitations.tokenHash })
-      .returning();
+    // Kiểm tra xem đã có lời mời nào cùng event, email, status chưa
+    let finalInvitation = await db.query.staffInvitations.findFirst({
+      where: and(
+        eq(staffInvitations.eventId, targetEvent.id),
+        eq(staffInvitations.email, inv.email),
+        eq(staffInvitations.status, inv.status),
+      ),
+    });
 
-    const finalInvitation =
-      inserted ||
-      (await db.query.staffInvitations.findFirst({
-        where: eq(staffInvitations.tokenHash, tokenHash),
-      }))!;
+    if (!finalInvitation) {
+      // Chỉ insert nếu chưa tồn tại
+      const tokenHash = generateTokenHash();
+      const [inserted] = await db
+        .insert(staffInvitations)
+        .values({
+          tokenHash,
+          eventId: targetEvent.id,
+          email: inv.email,
+          status: inv.status,
+          invitedBy: createdBy,
+          expiresAt: inv.expiresAt,
+          acceptedBy: inv.acceptedByEmail ? (userMap[inv.acceptedByEmail]?.id ?? null) : null,
+          acceptedAt: inv.acceptedAt ?? null,
+          revokedBy: inv.revokedBy ?? null,
+          revokedAt: inv.revokedAt ?? null,
+        })
+        .onConflictDoNothing({ target: staffInvitations.tokenHash })
+        .returning();
+
+      finalInvitation =
+        inserted ||
+        (await db.query.staffInvitations.findFirst({
+          where: eq(staffInvitations.tokenHash, tokenHash),
+        }))!;
+    }
 
     // Gán gate cho invitation
     for (const gateName of inv.gates) {
@@ -287,5 +299,8 @@ async function seedStaff() {
 }
 
 seedStaff()
-  .catch(console.error)
-  .finally(() => process.exit());
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
