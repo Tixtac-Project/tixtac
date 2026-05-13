@@ -4,44 +4,45 @@ import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 // Schema: single source of truth for env validation + type coercion
-const envSchema = z.object({
-  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
-  JWT_EXPIRES_IN: z.string().default('24h'),
-  SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
-  // Per-event dynamic cap configuration
-  QUEUE_DEFAULT_EVENT_CAP: z.coerce.number().int().positive().default(10),
-  QUEUE_MAX_EVENT_CAP: z.coerce.number().int().positive().default(200),
-  QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().max(1).default(0.1),
-  QUEUE_WAITING_CAP_RATIO: z.coerce.number().positive().default(2),
-  ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
-  CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
-  UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),
-  ENABLE_QUEUE_WORKER: z
-    .enum(['true', 'false'])
-    .default('true')
-    .transform((v) => v === 'true'),
-  ENABLE_BACKGROUND_WORKERS: z
-    .enum(['true', 'false'])
-    .default('true')
-    .transform((v) => v === 'true'),
-  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
-  EMAIL_FROM: z.email().default('no-reply@tixtac.io.vn'),
-  SUPPORT_EMAIL: z.email().default('support@tixtac.io.vn'),
-  APP_URL: z.url().default('https://tixtac.io.vn'),
-  GEO_API_KEY: z.string().default(''),
-  WEB3FORMS_KEY: z.string().default('2fe33d39-dd60-4a96-8beb-3b807daf571e'),
-  RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
-})
-.superRefine((value, ctx) => {
-  if (value.QUEUE_DEFAULT_EVENT_CAP > value.QUEUE_MAX_EVENT_CAP) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['QUEUE_DEFAULT_EVENT_CAP'],
-      message: 'QUEUE_DEFAULT_EVENT_CAP must be <= QUEUE_MAX_EVENT_CAP',
-    });
-  }
-});
+const envSchema = z
+  .object({
+    JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+    JWT_EXPIRES_IN: z.string().default('24h'),
+    SEAT_LOCK_DURATION: z.coerce.number().int().positive().default(600),
+    // Per-event dynamic cap configuration
+    QUEUE_DEFAULT_EVENT_CAP: z.coerce.number().int().positive().default(10),
+    QUEUE_MAX_EVENT_CAP: z.coerce.number().int().positive().default(200),
+    QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().max(1).default(0.1),
+    QUEUE_WAITING_CAP_RATIO: z.coerce.number().positive().default(2),
+    ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
+    CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
+    UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
+    UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),
+    ENABLE_QUEUE_WORKER: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    ENABLE_BACKGROUND_WORKERS: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
+    EMAIL_FROM: z.email().default('no-reply@tixtac.io.vn'),
+    SUPPORT_EMAIL: z.email().default('support@tixtac.io.vn'),
+    APP_URL: z.url().default('https://tixtac.io.vn'),
+    GEO_API_KEY: z.string().default(''),
+    WEB3FORMS_KEY: z.string().default('2fe33d39-dd60-4a96-8beb-3b807daf571e'),
+    RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
+  })
+  .superRefine((value, ctx) => {
+    if (value.QUEUE_DEFAULT_EVENT_CAP > value.QUEUE_MAX_EVENT_CAP) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['QUEUE_DEFAULT_EVENT_CAP'],
+        message: 'QUEUE_DEFAULT_EVENT_CAP must be <= QUEUE_MAX_EVENT_CAP',
+      });
+    }
+  });
 
 // Parse & validate (fail fast in ALL environments)
 const result = envSchema.safeParse({

@@ -8,6 +8,7 @@
   import SeatMapPreview from '$lib/components/customer/event/SeatMapPreview.svelte';
   import CrossQueueModal from '$lib/components/customer/queue/CrossQueueModal.svelte';
   import * as Accordion from '$lib/components/ui/accordion';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index';
   import { queueStore } from '$lib/stores/queue.svelte';
   import { toast } from '$lib/stores/toast';
@@ -43,7 +44,9 @@
   let earliestShow = $derived(visibleShows.length > 0 ? visibleShows[0] : null);
 
   let selectedShowId = $state<number | null>(null);
-  // Cross-queue modal state
+  // Queue status modal states
+  let showQueueFullModal = $state(false);
+  let showSoldOutModal = $state(false);
   let showCrossQueueModal = $state(false);
   let pendingShowId = $state<number | null>(null);
   let activeShow = $derived<EventDetailShow | null>(
@@ -111,7 +114,9 @@
 
   let isSoldOut = $derived(
     visibleShows.length > 0 &&
-      visibleShows.every((show) => show.sections.every((sec) => getAvailable(sec) === 0))
+      visibleShows.every((show: EventDetailShow) =>
+        (show.sections ?? []).every((sec: EventDetailSection) => getAvailable(sec) === 0),
+      )
   );
 
   function seatTypeLabel(type: 'assigned' | 'general'): string {
@@ -160,12 +165,16 @@
     }
 
     if (result.status === 429 || result.error === 'QUEUE_FULL') {
-      toast.error('Hàng chờ hiện đã đầy, vui lòng quay lại sau ít phút!');
+      showQueueFullModal = true;
       return;
     }
 
     if (result.error || !result.data) {
-      toast.error(result.error || 'Đã có lỗi xảy ra, vui lòng thử lại');
+      if (result.error?.includes('hết vé')) {
+        showSoldOutModal = true;
+      } else {
+        toast.error(result.error || 'Đã có lỗi xảy ra, vui lòng thử lại');
+      }
       return;
     }
 
@@ -712,3 +721,35 @@
   onStay={() => (showCrossQueueModal = false)}
   onLeaveAndJoin={handleLeaveAndJoin}
 />
+
+<!-- Queue Full Modal -->
+<AlertDialog.Root bind:open={showQueueFullModal}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>Hàng chờ hiện đã đầy</AlertDialog.Title>
+      <AlertDialog.Description>
+        Rất tiếc, số lượng người xếp hàng đã đạt giới hạn tối đa để đảm bảo ổn định hệ thống. 
+        Vui lòng quay lại sau ít phút khi hàng chờ được giải phóng bớt.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Action onclick={() => (showQueueFullModal = false)}>Đã hiểu</AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
+<!-- Sold Out Modal -->
+<AlertDialog.Root bind:open={showSoldOutModal}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>Sự kiện đã hết vé</AlertDialog.Title>
+      <AlertDialog.Description>
+        Chúng tôi rất tiếc, tất cả số vé của sự kiện này đã được bán hết hoặc đang được giữ bởi người dùng khác. 
+        Bạn có thể quay lại sau để kiểm tra xem có ghế nào được giải phóng hay không.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Action onclick={() => (showSoldOutModal = false)}>Quay lại</AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
