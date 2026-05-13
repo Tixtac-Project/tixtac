@@ -170,7 +170,7 @@
     }
 
     if (result.error || !result.data) {
-      if (result.error?.includes('hết vé')) {
+      if (result.details?.code === 'SOLD_OUT' || result.error === 'SOLD_OUT') {
         showSoldOutModal = true;
       } else {
         toast.error(result.error || 'Đã có lỗi xảy ra, vui lòng thử lại');

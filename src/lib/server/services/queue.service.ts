@@ -101,10 +101,7 @@ export const queueService = {
         return {0, newRank + 1}
       `;
 
-      const [code, value] = await redis.eval<
-        [number, number, number, string, string, number, number, number],
-        [number, number]
-      >(
+      const [code, value] = (await redis.eval(
         joinQueueScript,
         [activeKey, waitingKey, userCurrentKey, 'active_event_ids', capKey],
         [
@@ -117,7 +114,7 @@ export const queueService = {
           waitingTtl,
           config.queueWaitingCapRatio,
         ],
-      );
+      )) as [number, number];
 
       // ── Dispatch based on return code ──
       // code -1: User is already in another event's queue (cross-queue guard)
@@ -127,7 +124,7 @@ export const queueService = {
 
       // code -2: Event is explicitly sold out (cap <= 0)
       if (code === -2) {
-        throwError(Errors.BAD_REQUEST, 'Sự kiện hiện đã hết vé');
+        throwError(Errors.BAD_REQUEST, 'Sự kiện hiện đã hết vé', { code: 'SOLD_OUT' });
       }
 
       // code -3: Waiting list is full
@@ -215,36 +212,26 @@ export const queueService = {
   async leaveQueue(userId: number, eventId: number) {
     return await withRedisErrorHandling(async () => {
       const userCurrentKey = `user_current_queue:${userId}`;
-      const currentEventInRedis = await redis.get(userCurrentKey);
-      console.log(
-        `[QueueService] leaveQueue: userId=${userId}, eventId=${eventId}, redisCurrent=${currentEventInRedis}`,
-      );
+      const activeKey = `active_users:${eventId}`;
 
       const leaveQueueScript = `
-        local currentEvent = redis.call('GET', KEYS[1])
-        -- Use tonumber to safely compare IDs, and allow deletion if the cross-queue key is already gone
-        if not currentEvent or tonumber(currentEvent) == tonumber(ARGV[1]) then
-          redis.call('DEL', KEYS[1])
-          redis.call('ZREM', KEYS[2], ARGV[2])
-          redis.call('ZREM', KEYS[3], ARGV[2])
-          redis.call('DEL', KEYS[4])
+        local currentEvent = redis.call('GET', KEYS[2])
+        if not currentEvent or tonumber(currentEvent) == tonumber(ARGV[2]) then
+          redis.call('DEL', KEYS[2])
+          redis.call('ZREM', KEYS[1], ARGV[1])
+          redis.call('ZREM', 'waiting_queue:'..ARGV[2], ARGV[1])
+          redis.call('DEL', 'confirmed:'..ARGV[2]..':'..ARGV[1])
           return 1
         end
         return 0
       `;
 
-      const result = await redis.eval<[string, string], number>(
+      const result = (await redis.eval(
         leaveQueueScript,
-        [
-          userCurrentKey,
-          `active_users:${eventId}`,
-          `waiting_queue:${eventId}`,
-          `confirmed:${eventId}:${userId}`,
-        ],
-        [String(eventId), String(userId)],
-      );
+        [activeKey, userCurrentKey, 'active_event_ids'],
+        [String(userId), String(eventId)],
+      )) as number;
 
-      console.log(`[QueueService] leaveQueue result: ${result === 1 ? 'SUCCESS' : 'FAILED (ID mismatch)'}`);
       return { success: result === 1 };
     });
   },

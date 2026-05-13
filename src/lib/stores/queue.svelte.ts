@@ -75,12 +75,14 @@ class QueueStore {
           sessionStorage.setItem('tixtac_queue_token', this.token);
           if (browser) {
             const expires = this.expiresAt ? new Date(this.expiresAt).toUTCString() : '';
-            document.cookie = `tixtac_queue_token=${this.token}; ${expires ? `expires=${expires}; ` : ''}path=/; SameSite=Lax`;
+            const secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = `tixtac_queue_token=${this.token}; ${expires ? `expires=${expires}; ` : ''}path=/; SameSite=Lax${secure}`;
           }
         } else {
           sessionStorage.removeItem('tixtac_queue_token');
           if (browser) {
-            document.cookie = 'tixtac_queue_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            const secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = `tixtac_queue_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${secure}`;
           }
         }
       });
@@ -100,7 +102,8 @@ class QueueStore {
     if (browser) {
       localStorage.removeItem('tixtac_queue');
       sessionStorage.removeItem('tixtac_queue_token');
-      document.cookie = 'tixtac_queue_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      const secure = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `tixtac_queue_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${secure}`;
     }
   }
 
