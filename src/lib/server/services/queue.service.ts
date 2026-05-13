@@ -1,13 +1,13 @@
 import { encryptSeatToken } from '$lib/server/auth/jwt';
 import { config } from '$lib/server/config';
-import { Errors, throwError } from '$lib/server/errors';
+import { AppError, Errors, throwError } from '$lib/server/errors';
 import { redis } from '$lib/server/redis';
 
 const withRedisErrorHandling = async <T>(fn: () => Promise<T>): Promise<T> => {
   try {
     return await fn();
   } catch (err) {
-    if (err instanceof Error && err.name === 'AppError') throw err;
+    if (err instanceof AppError) throw err;
     console.error('[Redis Error]', err);
     throwError(Errors.INTERNAL_ERROR, 'Lỗi kết nối hệ thống hàng chờ, vui lòng thử lại sau');
   }
@@ -47,6 +47,7 @@ export const queueService = {
         local eventId = ARGV[5]
         local activeTtl = tonumber(ARGV[6])
         local waitingTtl = tonumber(ARGV[7])
+        local waitingCapRatio = tonumber(ARGV[8])
 
         -- 0. Cross-queue guard
         local currentEvent = redis.call('GET', userCurrentKey)
@@ -71,6 +72,11 @@ export const queueService = {
         local capRaw = redis.call('GET', capKey)
         local cap = capRaw and tonumber(capRaw) or defaultCap
 
+        -- If the event is explicitly sold out (cap 0), prevent joining
+        if cap <= 0 then
+          return {-2, 0}
+        end
+
         -- 4. Available slot → promote immediately ONLY if waiting queue is empty.
         --    Otherwise, user must join the end of the line to preserve FIFO.
         local activeCount = redis.call('ZCOUNT', activeKey, now, '+inf')
@@ -83,7 +89,11 @@ export const queueService = {
           return {1, expiresAt}
         end
 
-        -- 5. Full → enqueue as waiting
+        -- 5. Full → check waiting limit before enqueueing
+        if waitingCount >= math.ceil(cap * waitingCapRatio) then
+          return {-3, 0}
+        end
+
         redis.call('ZADD', waitingKey, 'NX', now, userId)
         redis.call('SET', userCurrentKey, eventId, 'EX', waitingTtl)
         redis.call('SADD', activeEventIdsKey, eventId)
@@ -92,17 +102,37 @@ export const queueService = {
       `;
 
       const [code, value] = await redis.eval<
-        [number, number, number, string, string, number, number],
+        [number, number, number, string, string, number, number, number],
         [number, number]
       >(
         joinQueueScript,
         [activeKey, waitingKey, userCurrentKey, 'active_event_ids', capKey],
-        [now, defaultCap, expiresAt, String(userId), String(eventId), activeTtl, waitingTtl],
+        [
+          now,
+          defaultCap,
+          expiresAt,
+          String(userId),
+          String(eventId),
+          activeTtl,
+          waitingTtl,
+          config.queueWaitingCapRatio,
+        ],
       );
 
       // ── Dispatch based on return code ──
+      // code -1: User is already in another event's queue (cross-queue guard)
       if (code === -1) {
         throwError(Errors.QUEUE_ALREADY_JOINED);
+      }
+
+      // code -2: Event is explicitly sold out (cap <= 0)
+      if (code === -2) {
+        throwError(Errors.BAD_REQUEST, 'Sự kiện hiện đã hết vé');
+      }
+
+      // code -3: Waiting list is full
+      if (code === -3) {
+        throwError(Errors.QUEUE_FULL);
       }
 
       // code 2: User already has an active (unexpired) slot — return its remaining time.
@@ -185,15 +215,15 @@ export const queueService = {
   async leaveQueue(userId: number, eventId: number) {
     return await withRedisErrorHandling(async () => {
       const userCurrentKey = `user_current_queue:${userId}`;
+      const currentEventInRedis = await redis.get(userCurrentKey);
+      console.log(
+        `[QueueService] leaveQueue: userId=${userId}, eventId=${eventId}, redisCurrent=${currentEventInRedis}`,
+      );
 
-      /**
-       * Atomic Lua script: removes the user from both the active sorted set and the
-       * waiting sorted set, but only if `user_current_queue` still maps to this event.
-       * Prevents cross-queue race conditions where a stale cleanup could evict a user
-       * who has already joined a different event.
-       */
       const leaveQueueScript = `
-        if redis.call('GET', KEYS[1]) == ARGV[1] then
+        local currentEvent = redis.call('GET', KEYS[1])
+        -- Use tonumber to safely compare IDs, and allow deletion if the cross-queue key is already gone
+        if not currentEvent or tonumber(currentEvent) == tonumber(ARGV[1]) then
           redis.call('DEL', KEYS[1])
           redis.call('ZREM', KEYS[2], ARGV[2])
           redis.call('ZREM', KEYS[3], ARGV[2])
@@ -203,7 +233,7 @@ export const queueService = {
         return 0
       `;
 
-      await redis.eval<[string, string], number>(
+      const result = await redis.eval<[string, string], number>(
         leaveQueueScript,
         [
           userCurrentKey,
@@ -214,7 +244,8 @@ export const queueService = {
         [String(eventId), String(userId)],
       );
 
-      return { success: true };
+      console.log(`[QueueService] leaveQueue result: ${result === 1 ? 'SUCCESS' : 'FAILED (ID mismatch)'}`);
+      return { success: result === 1 };
     });
   },
 
@@ -230,7 +261,22 @@ export const queueService = {
         // Always mint a fresh token so clients are never stuck with an expired one.
         // The client should cache this token and only call /status again when needed.
         const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
-        return { status: 'active', expiresAt: activeScore, token, remainingSeconds: expiresInSeconds };
+        return {
+          status: 'active',
+          expiresAt: activeScore,
+          token,
+          remainingSeconds: expiresInSeconds,
+        };
+      }
+
+      // ── Check if the queue is closed (Sold Out or Paused) ──
+      const capKey = `queue:cap:${eventId}`;
+      const capRaw = await redis.get(capKey);
+      if (capRaw !== null && Number(capRaw) <= 0) {
+        // We MUST clean up the user here, otherwise they are stuck in cross-queue limbo
+        // even if the frontend redirects them.
+        await this.leaveQueue(userId, eventId);
+        return { status: 'none' };
       }
 
       const position = await redis.zrank(waitingKey, userId);

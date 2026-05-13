@@ -4,6 +4,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { queueStore } from '$lib/stores/queue.svelte';
+  import { toast } from '$lib/stores/toast';
   import { api } from '$lib/utils/api';
   import { Clock, Loader2, Ticket, Users } from 'lucide-svelte';
   import { onMount } from 'svelte';
@@ -74,6 +75,7 @@
       queueStore.position = data.position ?? queueStore.position;
     } else {
       queueStore.clear();
+      toast.error('Sự kiện hiện đã hết vé. Hệ thống đã tự động hủy lượt xếp hàng của bạn.');
       goto(resolve(`/events/${eventId}`));
     }
   }

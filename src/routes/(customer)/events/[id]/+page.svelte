@@ -10,6 +10,7 @@
   import * as Accordion from '$lib/components/ui/accordion';
   import { ScrollArea } from '$lib/components/ui/scroll-area/index';
   import { queueStore } from '$lib/stores/queue.svelte';
+  import { toast } from '$lib/stores/toast';
   import type { EventDetail, EventDetailSection, EventDetailShow } from '$lib/types/event-detail';
   import type { SeatLayoutConfig } from '$lib/types/seat-map';
   import { api } from '$lib/utils/api';
@@ -108,6 +109,11 @@
     return s.type === 'general' ? s.capacity : s.seat_count - s.disabled_count;
   }
 
+  let isSoldOut = $derived(
+    visibleShows.length > 0 &&
+      visibleShows.every((show) => show.sections.every((sec) => getAvailable(sec) === 0))
+  );
+
   function seatTypeLabel(type: 'assigned' | 'general'): string {
     return type === 'assigned' ? 'Ngồi' : 'Đứng';
   }
@@ -153,8 +159,13 @@
       return;
     }
 
+    if (result.status === 429 || result.error === 'QUEUE_FULL') {
+      toast.error('Hàng chờ hiện đã đầy, vui lòng quay lại sau ít phút!');
+      return;
+    }
+
     if (result.error || !result.data) {
-      // api util already showed a toast for non-silent errors
+      toast.error(result.error || 'Đã có lỗi xảy ra, vui lòng thử lại');
       return;
     }
 
@@ -266,12 +277,20 @@
             class="absolute inset-0 bg-gradient-to-t from-[#1a1c20]/80 via-transparent to-transparent"
           ></div>
 
-          {#if event.status === 'published'}
+          {#if event.status === 'published' && !isSoldOut}
             <div class="absolute top-3 left-3 md:top-6 md:left-6">
               <span
                 class="rounded-full bg-primary px-2.5 py-0.5 text-[0.55rem] font-bold tracking-widest text-primary-foreground uppercase md:px-3 md:text-[0.6rem]"
               >
                 Đang mở bán
+              </span>
+            </div>
+          {:else if isSoldOut}
+            <div class="absolute top-3 left-3 md:top-6 md:left-6">
+              <span
+                class="rounded-full bg-destructive px-2.5 py-0.5 text-[0.55rem] font-bold tracking-widest text-white uppercase md:px-3 md:text-[0.6rem]"
+              >
+                Hết vé
               </span>
             </div>
           {/if}
@@ -338,9 +357,10 @@
             <div class="mt-3 md:mt-5">
               <button
                 onclick={() => handleBuyTicket(activeShow?.id ?? earliestShow.id)}
-                class="btn-primary-gradient w-full rounded-lg py-2.5 text-sm md:py-3"
+                disabled={isSoldOut}
+                class="btn-primary-gradient w-full rounded-lg py-2.5 text-sm md:py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Mua vé ngay
+                {isSoldOut ? 'Sự kiện đã hết vé' : 'Mua vé ngay'}
               </button>
             </div>
           {/if}
@@ -610,9 +630,10 @@
                   <div class="rounded-xl bg-surface pb-1">
                     <button
                       onclick={() => handleBuyTicket(activeShow!.id)}
-                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-cta to-cta-hover px-8 py-5 text-lg font-bold text-cta-foreground shadow-xl shadow-cta/25 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+                      disabled={isSoldOut}
+                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-cta to-cta-hover px-8 py-5 text-lg font-bold text-cta-foreground shadow-xl shadow-cta/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
                     >
-                      Tiếp tục chọn chỗ
+                      {isSoldOut ? 'Hết vé' : 'Tiếp tục chọn chỗ'}
                       <ArrowRight class="h-5 w-5" />
                     </button>
                     <p
@@ -672,10 +693,11 @@
       <div class="mx-auto max-w-lg px-4 pb-2">
         <button
           onclick={() => handleBuyTicket(activeShow!.id)}
-          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98] md:py-3.5"
+          disabled={isSoldOut}
+          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98] md:py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Ticket class="size-4" />
-          Tiếp tục chọn chỗ
+          {isSoldOut ? 'Sự kiện đã hết vé' : 'Tiếp tục chọn chỗ'}
         </button>
       </div>
     </div>

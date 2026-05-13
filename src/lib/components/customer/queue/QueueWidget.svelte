@@ -51,7 +51,12 @@
     const poll = async () => {
       try {
         const res = await fetch(`/api/events/${queueStore.eventId}/queue/status`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            queueStore.clear();
+          }
+          return;
+        }
         const { data } = await res.json();
 
         if (data.status === 'active') {

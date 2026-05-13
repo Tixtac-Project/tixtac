@@ -1,3 +1,4 @@
+import { decryptSeatToken } from '$lib/server/auth/jwt';
 import { eventService } from '$lib/server/services/event.service';
 import { orderService } from '$lib/server/services/order.service';
 import { seatService } from '$lib/server/services/seat.service';
@@ -5,7 +6,7 @@ import { handlePageError } from '$lib/server/utils/page-error';
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals, cookies }) => {
   const user = locals.user;
 
   if (!user) {
@@ -17,6 +18,21 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
   if (isNaN(eventId) || isNaN(showId)) {
     error(400, 'ID không hợp lệ');
+  }
+
+  if (user.role === 'customer') {
+    const queueToken = cookies.get('tixtac_queue_token');
+    if (!queueToken) {
+      redirect(302, `/events/${eventId}/queue`);
+    }
+    try {
+      const decoded = await decryptSeatToken(queueToken);
+      if (decoded.eventId !== eventId || decoded.userId !== user.id) {
+        redirect(302, `/events/${eventId}/queue`);
+      }
+    } catch {
+      redirect(302, `/events/${eventId}/queue`);
+    }
   }
 
   try {

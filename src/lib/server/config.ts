@@ -12,6 +12,7 @@ const envSchema = z.object({
   QUEUE_DEFAULT_EVENT_CAP: z.coerce.number().int().positive().default(10),
   QUEUE_MAX_EVENT_CAP: z.coerce.number().int().positive().default(200),
   QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().max(1).default(0.1),
+  QUEUE_WAITING_CAP_RATIO: z.coerce.number().positive().default(2),
   ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
   CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
   UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
@@ -50,6 +51,7 @@ const result = envSchema.safeParse({
   QUEUE_DEFAULT_EVENT_CAP: env.QUEUE_DEFAULT_EVENT_CAP,
   QUEUE_MAX_EVENT_CAP: env.QUEUE_MAX_EVENT_CAP,
   QUEUE_DYNAMIC_CAP_RATIO: env.QUEUE_DYNAMIC_CAP_RATIO,
+  QUEUE_WAITING_CAP_RATIO: env.QUEUE_WAITING_CAP_RATIO,
   ACCESS_TOKEN_DURATION: env.ACCESS_TOKEN_DURATION,
   CLOUDAMQP_URL: env.CLOUDAMQP_URL,
   UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
@@ -105,6 +107,10 @@ export const config = {
    * so the cap reacts faster to late-stage purchases.
    */
   queueDynamicCapRatio: parsed.QUEUE_DYNAMIC_CAP_RATIO,
+  /** Multiplier for the active cap to determine the waiting list limit.
+   * Total waiting slots = ceil(active_cap * queueWaitingCapRatio)
+   */
+  queueWaitingCapRatio: parsed.QUEUE_WAITING_CAP_RATIO,
   /** Access token lifetime in seconds after queue*/
   accessTokenDuration: parsed.ACCESS_TOKEN_DURATION,
   /** CloudAMQP connection URL */
