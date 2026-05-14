@@ -46,7 +46,11 @@
     if (res.status === 200 || res.status === 201) {
       toast.success('Thanh toán thành công!');
       if (queueStore.eventId) {
-        await queueStore.leave({ navigate: false });
+        try {
+          await queueStore.leave({ navigate: false });
+        } catch {
+          queueStore.clear();
+        }
       }
       goto(resolve('/me/tickets'));
       return;
