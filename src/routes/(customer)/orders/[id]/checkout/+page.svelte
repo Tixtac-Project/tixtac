@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { queueStore } from '$lib/stores/queue.svelte';
   import CheckoutTimer from '$lib/components/customer/order/CheckoutTimer.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -44,6 +45,9 @@
 
     if (res.status === 200 || res.status === 201) {
       toast.success('Thanh toán thành công!');
+      if (queueStore.eventId) {
+        await queueStore.leave({ navigate: false });
+      }
       goto(resolve('/me/tickets'));
       return;
     }
