@@ -175,7 +175,14 @@
             <div
               class="overflow-hidden rounded-xl border border-border bg-surface-container-lowest shadow-sm transition hover:border-primary/50 hover:shadow-md"
               onclick={() => openQrModal(ticket)}
-              onkeydown={(e) => e.key === 'Enter' && openQrModal(ticket)}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Space') {
+                  if (e.key === ' ' || e.key === 'Space') {
+                    e.preventDefault();
+                  }
+                  openQrModal(ticket);
+                }
+              }}
               role="button"
               tabindex="0"
             >

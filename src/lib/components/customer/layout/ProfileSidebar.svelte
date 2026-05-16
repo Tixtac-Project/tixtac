@@ -6,8 +6,9 @@
   import { api } from '$lib/utils/api';
   import { Key, LayoutDashboard, LogOut, Mail, ShieldCheck, Ticket, User } from 'lucide-svelte';
 
-  let { onItemClick } = $props<{
+  let { onItemClick, active } = $props<{
     onItemClick?: (id: string) => void;
+    active?: string;
   }>();
 
   const profile = $derived(page.data.profile);
@@ -86,7 +87,8 @@
       <li>
         <button
           onclick={() => onItemClick?.('profile')}
-          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 {active === 'profile' ? 'bg-primary/10 text-foreground font-semibold' : 'text-muted-foreground hover:bg-surface-container-low hover:text-foreground'}"
+          aria-current={active === 'profile' ? 'page' : undefined}
         >
           <User class="size-3.5 shrink-0" />
           Thông tin cá nhân
@@ -95,7 +97,8 @@
       <li>
         <button
           onclick={() => onItemClick?.('email')}
-          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 {active === 'email' ? 'bg-primary/10 text-foreground font-semibold' : 'text-muted-foreground hover:bg-surface-container-low hover:text-foreground'}"
+          aria-current={active === 'email' ? 'page' : undefined}
         >
           <Mail class="size-3.5 shrink-0" />
           Email
@@ -104,7 +107,8 @@
       <li>
         <button
           onclick={() => onItemClick?.('password')}
-          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 {active === 'password' ? 'bg-primary/10 text-foreground font-semibold' : 'text-muted-foreground hover:bg-surface-container-low hover:text-foreground'}"
+          aria-current={active === 'password' ? 'page' : undefined}
         >
           <Key class="size-3.5 shrink-0" />
           Đổi mật khẩu
