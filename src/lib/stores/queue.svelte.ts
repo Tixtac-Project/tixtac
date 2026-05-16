@@ -73,8 +73,17 @@ class QueueStore {
         );
         if (this.token) {
           sessionStorage.setItem('tixtac_queue_token', this.token);
+          if (browser) {
+            const expires = this.expiresAt ? new Date(this.expiresAt).toUTCString() : '';
+            const secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = `tixtac_queue_token=${this.token}; ${expires ? `expires=${expires}; ` : ''}path=/; SameSite=Lax${secure}`;
+          }
         } else {
           sessionStorage.removeItem('tixtac_queue_token');
+          if (browser) {
+            const secure = location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = `tixtac_queue_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${secure}`;
+          }
         }
       });
     });
@@ -93,6 +102,8 @@ class QueueStore {
     if (browser) {
       localStorage.removeItem('tixtac_queue');
       sessionStorage.removeItem('tixtac_queue_token');
+      const secure = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `tixtac_queue_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${secure}`;
     }
   }
 
@@ -128,10 +139,18 @@ class QueueStore {
   async leave(options?: { navigate?: boolean }) {
     const shouldNavigate = options?.navigate ?? true;
     const eventId = this.eventId;
+    
+    if (browser && eventId) {
+      // Must await the DELETE request before clearing state or navigating,
+      // otherwise the browser may cancel the pending fetch during page transition.
+      await fetch(`/api/events/${eventId}/queue`, { method: 'DELETE' }).catch((err) => {
+        console.error('Failed to leave queue on server:', err);
+      });
+    }
+
     this.clear();
-    if (!browser) return;
-    await fetch(`/api/events/${eventId}/queue`, { method: 'DELETE' }).catch(() => {});
-    if (shouldNavigate) {
+
+    if (browser && shouldNavigate) {
       if (eventId) {
         goto(resolve(`/events/${eventId}`));
       } else {
@@ -161,7 +180,8 @@ class QueueStore {
    */
   async leaveForNewEvent() {
     const oldEventId = this.eventId;
-    if (oldEventId) {
+    if (browser && oldEventId) {
+      // Await server-side cleanup before clearing local state
       await fetch(`/api/events/${oldEventId}/queue`, { method: 'DELETE' }).catch(() => {});
     }
     this.clear();

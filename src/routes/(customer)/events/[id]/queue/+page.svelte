@@ -1,9 +1,10 @@
 <!-- src/routes/(customer)/events/[id]/queue/+page.svelte -->
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { queueStore } from '$lib/stores/queue.svelte';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { api } from '$lib/utils/api';
   import { Clock, Loader2, Ticket, Users } from 'lucide-svelte';
   import { onMount } from 'svelte';
@@ -11,6 +12,7 @@
   let eventId = $derived(Number(page.params.id));
   let isConfirming = $state(false);
   let pollingError = $state(false);
+  let showEjectedModal = $state(false);
 
   // Countdown — used for both 'ready' (60s grace) and 'holding' (300s full)
   let timeLeft = $state(0);
@@ -74,7 +76,7 @@
       queueStore.position = data.position ?? queueStore.position;
     } else {
       queueStore.clear();
-      goto(resolve(`/events/${eventId}`));
+      showEjectedModal = true;
     }
   }
 
@@ -96,9 +98,8 @@
   }
 
   onMount(() => {
-    if (queueStore.status !== 'ready' && queueStore.status !== 'holding') pollStatus();
+    pollStatus(); // Initial check
     const interval = setInterval(() => {
-      if (queueStore.status === 'ready' || queueStore.status === 'holding') return;
       pollStatus();
     }, 5000);
     return () => clearInterval(interval);
@@ -443,3 +444,35 @@
     {/if}
   </div>
 </div>
+
+<!-- Ejected Modal -->
+<AlertDialog.Root
+  open={showEjectedModal}
+  onOpenChange={(open) => {
+    if (!open) {
+      invalidateAll().then(() => {
+        goto(resolve(`/events/${eventId}`));
+      });
+    }
+  }}
+>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>Hết vé hoặc Phiên kết thúc</AlertDialog.Title>
+      <AlertDialog.Description>
+        Rất tiếc, sự kiện hiện đã hết vé hoặc phiên xếp hàng của bạn đã kết thúc.
+        Hệ thống đã tự động hủy lượt xếp hàng của bạn.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Action
+        onclick={async () => {
+          await invalidateAll();
+          goto(resolve(`/events/${eventId}`));
+        }}
+      >
+        Quay lại trang sự kiện
+      </AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>

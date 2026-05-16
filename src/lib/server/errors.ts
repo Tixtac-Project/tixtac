@@ -116,6 +116,7 @@ export const Errors = {
     409,
     'Bạn đang tham gia hàng chờ của một sự kiện khác',
   ),
+  QUEUE_FULL: new AppError('QUEUE_FULL', 429, 'Hàng chờ hiện đã đầy, vui lòng thử lại sau'),
 
   // General
   NOT_FOUND: new AppError('NOT_FOUND', 404, 'Không tìm thấy'),

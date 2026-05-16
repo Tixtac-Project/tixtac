@@ -1,9 +1,10 @@
 <!-- src/lib/components/customer/queue/QueueWidget.svelte -->
 <script lang="ts">
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { queueStore } from '$lib/stores/queue.svelte';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import { fly } from 'svelte/transition';
   import { tick } from 'svelte';
   import QueueWaiting from './QueueWaiting.svelte';
@@ -16,6 +17,8 @@
   let showExitConfirm = $state(false);
   /** True while the leave-queue API call is in-flight. */
   let isLeaving = $state(false);
+  /** Shows a modal when the user is ejected from the queue (e.g. sold out). */
+  let showEjectedModal = $state(false);
 
   /**
    * Countdown effect — ticks every second while the queue is active.
@@ -41,17 +44,24 @@
   });
 
   /**
-   * Background polling effect — runs every 5 seconds while the user is
-   * in `waiting` status. Ensures the widget updates to `ready` (green)
-   * even when the user has navigated away from the /queue page.
+   * in `waiting` or `ready` status. Ensures the widget updates or 
+   * reacts to ejection (sold out) even when navigated away.
    */
   $effect(() => {
-    if (queueStore.status !== 'waiting' || !queueStore.eventId) return;
+    // Nếu đang ở trang hàng chờ lớn, hãy để trang đó tự xử lý, widget không hiện thông báo chồng lên
+    if (page.url.pathname.endsWith('/queue')) return;
+
+    if ((queueStore.status !== 'waiting' && queueStore.status !== 'ready') || !queueStore.eventId) return;
 
     const poll = async () => {
       try {
         const res = await fetch(`/api/events/${queueStore.eventId}/queue/status`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            queueStore.clear();
+          }
+          return;
+        }
         const { data } = await res.json();
 
         if (data.status === 'active') {
@@ -62,6 +72,7 @@
           queueStore.position = data.position;
         } else if (data.status === 'none') {
           queueStore.clear();
+          showEjectedModal = true;
         }
       } catch (err) {
         console.error('[Widget Poll Error]', err);
@@ -424,3 +435,29 @@
     </div>
   </div>
 {/if}
+
+<!-- Ejected/Sold-out Alert Modal (Global via Widget) -->
+<AlertDialog.Root 
+  bind:open={showEjectedModal}
+  onOpenChange={(open) => {
+    if (!open) invalidateAll();
+  }}
+>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>Hết vé hoặc Phiên kết thúc</AlertDialog.Title>
+      <AlertDialog.Description>
+        Rất tiếc, sự kiện hiện đã hết vé hoặc phiên làm việc của bạn đã kết thúc. 
+        Hệ thống đã tự động giải phóng vị trí của bạn.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Action onclick={async () => {
+        await invalidateAll();
+        showEjectedModal = false;
+      }}>
+        Đã hiểu
+      </AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>

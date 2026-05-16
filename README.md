@@ -113,6 +113,7 @@ Mở file `.env` và điền các thông tin sau:
   - `QUEUE_DEFAULT_EVENT_CAP`: Giới hạn người vào thẳng khi hệ thống chưa tính toán xong (mặc định 10).
   - `QUEUE_MAX_EVENT_CAP`: Giới hạn tối đa cho một sự kiện, kể cả khi sự kiện đó còn rất nhiều vé (mặc định 200).
   - `QUEUE_DYNAMIC_CAP_RATIO`: Tỉ lệ cấp quyền vào dựa trên số ghế còn lại (ví dụ 0.1 = cho phép 10% số ghế còn lại vào Active cùng lúc).
+  - `QUEUE_WAITING_CAP_RATIO`: Tỷ lệ giới hạn độ dài hàng chờ dựa trên sức chứa hiện tại (mặc định 2). Ví dụ: Nếu sự kiện đang cho phép 100 người chọn ghế, thì tối đa 200 người được phép đứng đợi. Người vượt quá giới hạn này sẽ nhận thông báo "Hàng chờ đã đầy".
 - **RESEND_API_KEY (Email):**
   Đăng ký tại [Resend.com](https://resend.com) -> Mục API Keys -> Create API Key.
 - **GEO_API_KEY (Optional):**
