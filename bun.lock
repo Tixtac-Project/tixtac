@@ -15,6 +15,7 @@
         "amqplib": "^1.0.7",
         "bits-ui": "^2.18.1",
         "drizzle-orm": "^0.45.2",
+        "etiket": "^0.11.0",
         "isomorphic-dompurify": "^3.12.0",
         "jose": "^6.2.3",
         "motion-sv": "^0.1.12",
@@ -757,6 +758,8 @@
     "estree-walker": ["estree-walker@2.0.2", "", {}, "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="],
 
     "esutils": ["esutils@2.0.3", "", {}, "sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g=="],
+
+    "etiket": ["etiket@0.11.0", "", { "bin": { "etiket": "dist/cli.mjs" } }, "sha512-Ylk7LqDUwcjhp805fF5bbpwdBToPGWHiV2wLY9x1QZt3QcUKRpyrUympRZ2m6MUFVNk4Z7d3Be25jXTCxrzOfg=="],
 
     "execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
 
