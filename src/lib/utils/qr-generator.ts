@@ -14,6 +14,7 @@ export function generateTicketQrSvg(payload: TicketQrPayload, size = 200): strin
     size,
     ecLevel: 'M',
     dotType: 'rounded',
+    ariaLabel: `QR code for event ${payload.e}, show ${payload.s}`,
   });
 }
 

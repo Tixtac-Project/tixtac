@@ -3,7 +3,6 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { toast } from '$lib/stores/toast';
-  import { cn } from '$lib/utils';
   import { api } from '$lib/utils/api';
   import { Key, LayoutDashboard, LogOut, Mail, ShieldCheck, Ticket, User } from 'lucide-svelte';
 
@@ -24,40 +23,11 @@
       .toUpperCase() || 'U',
   );
   const isAdmin = $derived(user?.role === 'admin');
-  const currentPath = $derived(page.url.pathname);
-  const currentHash = $derived(page.url.hash);
-  const inProfile = $derived(currentPath === '/me/profile');
-
-  // Derive active section once, use everywhere
-  type Section = 'profile' | 'email' | 'password' | 'tickets' | 'admin' | null;
-  const activeSection = $derived<Section>(
-    currentPath.startsWith('/admin')
-      ? 'admin'
-      : currentPath.startsWith('/me/tickets')
-        ? 'tickets'
-        : inProfile && currentHash === '#email'
-          ? 'email'
-          : inProfile && currentHash === '#password'
-            ? 'password'
-            : inProfile
-              ? 'profile'
-              : null,
-  );
 
   function handleLogout() {
     api.post('/auth/logout', {}).catch(() => {});
     toast.success('Đăng xuất thành công!');
     goto(resolve('/'), { invalidateAll: true });
-  }
-
-  // Reusable nav item class helper
-  function navCls(section: Section) {
-    return cn(
-      'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150',
-      activeSection === section
-        ? 'bg-primary/10 text-primary'
-        : 'text-muted-foreground hover:bg-surface-container-low hover:text-foreground',
-    );
   }
 </script>
 
@@ -114,19 +84,28 @@
 
     <ul class="space-y-0.5">
       <li>
-        <button onclick={() => onItemClick?.('profile')} class={navCls('profile')}>
+        <button
+          onclick={() => onItemClick?.('profile')}
+          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+        >
           <User class="size-3.5 shrink-0" />
           Thông tin cá nhân
         </button>
       </li>
       <li>
-        <button onclick={() => onItemClick?.('email')} class={navCls('email')}>
+        <button
+          onclick={() => onItemClick?.('email')}
+          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+        >
           <Mail class="size-3.5 shrink-0" />
           Email
         </button>
       </li>
       <li>
-        <button onclick={() => onItemClick?.('password')} class={navCls('password')}>
+        <button
+          onclick={() => onItemClick?.('password')}
+          class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+        >
           <Key class="size-3.5 shrink-0" />
           Đổi mật khẩu
         </button>
@@ -143,14 +122,20 @@
     <ul class="space-y-0.5">
       {#if isAdmin}
         <li>
-          <a href={resolve('/admin')} class={navCls('admin')}>
+          <a
+            href={resolve('/admin')}
+            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+          >
             <LayoutDashboard class="size-3.5 shrink-0" />
             Trang quản trị
           </a>
         </li>
       {:else}
         <li>
-          <a href={resolve('/me/tickets')} class={navCls('tickets')}>
+          <a
+            href={resolve('/me/tickets')}
+            class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-surface-container-low hover:text-foreground"
+          >
             <Ticket class="size-3.5 shrink-0" />
             Vé của tôi
           </a>
