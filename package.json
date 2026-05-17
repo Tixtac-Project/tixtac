@@ -80,6 +80,7 @@
     "amqplib": "^1.0.7",
     "bits-ui": "^2.18.1",
     "drizzle-orm": "^0.45.2",
+    "etiket": "^0.11.0",
     "isomorphic-dompurify": "^3.12.0",
     "jose": "^6.2.3",
     "motion-sv": "^0.1.12",
