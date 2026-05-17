@@ -174,7 +174,7 @@ export const load: PageServerLoad = async ({ params }) => {
       id: s.id,
       name: s.name,
       type: s.type,
-      price: String(Number(s.price)),
+      price: Number(s.price),
       capacity: s.capacity,
       sort_order: s.sortOrder,
       layout_config: {
