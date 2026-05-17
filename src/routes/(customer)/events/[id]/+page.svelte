@@ -116,7 +116,7 @@
     visibleShows.length > 0 &&
       visibleShows.every((show: EventDetailShow) =>
         (show.sections ?? []).every((sec: EventDetailSection) => getAvailable(sec) === 0),
-      )
+      ),
   );
 
   function seatTypeLabel(type: 'assigned' | 'general'): string {
@@ -367,7 +367,7 @@
               <button
                 onclick={() => handleBuyTicket(activeShow?.id ?? earliestShow.id)}
                 disabled={isSoldOut}
-                class="btn-primary-gradient w-full rounded-lg py-2.5 text-sm md:py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-primary-gradient w-full rounded-lg py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 md:py-3"
               >
                 {isSoldOut ? 'Sự kiện đã hết vé' : 'Mua vé ngay'}
               </button>
@@ -640,7 +640,7 @@
                     <button
                       onclick={() => handleBuyTicket(activeShow!.id)}
                       disabled={isSoldOut}
-                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-cta to-cta-hover px-8 py-5 text-lg font-bold text-cta-foreground shadow-xl shadow-cta/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
+                      class="flex w-full cursor-pointer items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-cta to-cta-hover px-8 py-5 text-lg font-bold text-cta-foreground shadow-xl shadow-cta/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:active:scale-100"
                     >
                       {isSoldOut ? 'Hết vé' : 'Tiếp tục chọn chỗ'}
                       <ArrowRight class="h-5 w-5" />
@@ -703,7 +703,7 @@
         <button
           onclick={() => handleBuyTicket(activeShow!.id)}
           disabled={isSoldOut}
-          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98] md:py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cta px-6 py-3 text-sm font-bold text-cta-foreground shadow-lg shadow-cta/25 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 md:py-3.5"
         >
           <Ticket class="size-4" />
           {isSoldOut ? 'Sự kiện đã hết vé' : 'Tiếp tục chọn chỗ'}
@@ -728,8 +728,8 @@
     <AlertDialog.Header>
       <AlertDialog.Title>Hàng chờ hiện đã đầy</AlertDialog.Title>
       <AlertDialog.Description>
-        Rất tiếc, số lượng người xếp hàng đã đạt giới hạn tối đa để đảm bảo ổn định hệ thống. 
-        Vui lòng quay lại sau ít phút khi hàng chờ được giải phóng bớt.
+        Rất tiếc, số lượng người xếp hàng đã đạt giới hạn tối đa để đảm bảo ổn định hệ thống. Vui
+        lòng quay lại sau ít phút khi hàng chờ được giải phóng bớt.
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>
@@ -744,8 +744,9 @@
     <AlertDialog.Header>
       <AlertDialog.Title>Sự kiện đã hết vé</AlertDialog.Title>
       <AlertDialog.Description>
-        Chúng tôi rất tiếc, tất cả số vé của sự kiện này đã được bán hết hoặc đang được giữ bởi người dùng khác. 
-        Bạn có thể quay lại sau để kiểm tra xem có ghế nào được giải phóng hay không.
+        Chúng tôi rất tiếc, tất cả số vé của sự kiện này đã được bán hết hoặc đang được giữ bởi
+        người dùng khác. Bạn có thể quay lại sau để kiểm tra xem có ghế nào được giải phóng hay
+        không.
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>

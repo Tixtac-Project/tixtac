@@ -1,18 +1,22 @@
 <!-- src/routes/(customer)/events/[id]/queue/+page.svelte -->
 <script lang="ts">
+  import { browser } from '$app/environment';
   import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { queueStore } from '$lib/stores/queue.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
+  import { queueStore } from '$lib/stores/queue.svelte';
   import { api } from '$lib/utils/api';
-  import { Clock, Loader2, Ticket, Users } from 'lucide-svelte';
+  import { Bell, BellRing, Clock, Loader2, Ticket } from 'lucide-svelte';
   import { onMount } from 'svelte';
 
   let eventId = $derived(Number(page.params.id));
   let isConfirming = $state(false);
   let pollingError = $state(false);
   let showEjectedModal = $state(false);
+  let pushSubscribed = $state(false);
+  let pushPermissionDenied = $state(false);
+  let isSubscribing = $state(false);
 
   // Countdown — used for both 'ready' (60s grace) and 'holding' (300s full)
   let timeLeft = $state(0);
@@ -97,13 +101,86 @@
     }
   }
 
+  function syncPushState() {
+    if (browser && 'Notification' in window) {
+      pushSubscribed =
+        sessionStorage.getItem('tixtac_push_subscribed') === 'true' &&
+        Notification.permission === 'granted';
+      pushPermissionDenied = Notification.permission === 'denied';
+    }
+  }
+
   onMount(() => {
+    // Register Service Worker locally inside the queue page
+    if (browser && 'serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/service-worker.js', {
+          type: 'module',
+        })
+        .then((reg) => {
+          console.log('[SW] ServiceWorker registered locally with scope:', reg.scope);
+        })
+        .catch((err) => {
+          console.error('[SW] ServiceWorker registration failed:', err);
+        });
+    }
+
+    syncPushState();
     pollStatus(); // Initial check
     const interval = setInterval(() => {
       pollStatus();
     }, 5000);
     return () => clearInterval(interval);
   });
+  async function subscribeToPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    syncPushState();
+    if (pushPermissionDenied) return;
+
+    try {
+      isSubscribing = true;
+      if (Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission === 'denied') {
+          syncPushState();
+          return;
+        }
+      }
+
+      const vapidRes = await api.get<{ publicKey: string }>('/config/vapid', { silent: true });
+      if (!vapidRes.data?.publicKey) throw new Error('No VAPID key');
+
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker activation timed out')), 5000)
+        )
+      ]);
+
+      const padding = '='.repeat((4 - (vapidRes.data.publicKey.length % 4)) % 4);
+      const base64 = (vapidRes.data.publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const applicationServerKey = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        applicationServerKey[i] = rawData.charCodeAt(i);
+      }
+
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+
+      await api.post('/me/push-subscription', subscription, { silent: true });
+      sessionStorage.setItem('tixtac_push_subscribed', 'true');
+      pushSubscribed = true;
+    } catch (err) {
+      console.error('Push subscribe error:', err);
+    } finally {
+      isSubscribing = false;
+      syncPushState();
+    }
+  }
 </script>
 
 <svelte:head>
@@ -194,13 +271,56 @@
             </p>
           {/if}
 
+          <!-- Notification Widget (Vibrant & Premium) -->
           <div
-            class="mb-4 flex items-start gap-3 rounded-2xl bg-zinc-800/60 p-4 ring-1 ring-white/5"
+            class="mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900/90 via-indigo-950/20 to-zinc-900/80 p-4.5 shadow-xl ring-1 ring-white/10"
           >
-            <Users class="mt-0.5 size-4 shrink-0 text-primary" />
-            <p class="text-xs leading-relaxed text-zinc-400">
-              Hệ thống tự động thông báo khi tới lượt. Bạn có thể thu nhỏ phòng chờ và lướt web.
-            </p>
+            <div class="flex items-start gap-3.5">
+              <div
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 shadow-inner ring-1 ring-indigo-500/20"
+              >
+                <Bell class="size-4.5" />
+              </div>
+              <div class="flex-1 space-y-3">
+                <div>
+                  <h3 class="text-xs font-black tracking-wide text-white uppercase">
+                    Nhận thông báo xếp hàng
+                  </h3>
+                  <p class="mt-1 text-[11px] leading-relaxed text-zinc-400">
+                    Hệ thống sẽ đẩy tin nhắn trực tiếp lên thiết bị khi tới lượt. Bạn có thể thu nhỏ
+                    tab này và làm việc khác thoải mái.
+                  </p>
+                </div>
+
+                {#if pushSubscribed}
+                  <div
+                    class="inline-flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-950/40 px-3.5 py-2 text-[11px] font-bold text-emerald-400 shadow-sm"
+                  >
+                    <span class="relative flex h-2 w-2">
+                      <span
+                        class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+                      ></span>
+                      <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                    </span>
+                    <span>Đã bật thông báo thành công</span>
+                  </div>
+                {:else if !pushPermissionDenied}
+                  <button
+                    onclick={subscribeToPush}
+                    disabled={isSubscribing}
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-[11px] font-black text-white
+                           shadow-lg ring-1 shadow-indigo-950/50 ring-indigo-400/30 transition-all duration-300
+                           hover:scale-[1.02] hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-900/50 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {#if isSubscribing}
+                      <Loader2 class="size-3.5 animate-spin" /> Đang kích hoạt...
+                    {:else}
+                      <BellRing class="size-3.5 animate-pulse" /> Bật thông báo ngay
+                    {/if}
+                  </button>
+                {/if}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -460,8 +580,8 @@
     <AlertDialog.Header>
       <AlertDialog.Title>Hết vé hoặc Phiên kết thúc</AlertDialog.Title>
       <AlertDialog.Description>
-        Rất tiếc, sự kiện hiện đã hết vé hoặc phiên xếp hàng của bạn đã kết thúc.
-        Hệ thống đã tự động hủy lượt xếp hàng của bạn.
+        Rất tiếc, sự kiện hiện đã hết vé hoặc phiên xếp hàng của bạn đã kết thúc. Hệ thống đã tự
+        động hủy lượt xếp hàng của bạn.
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>

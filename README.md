@@ -105,8 +105,8 @@ Mở file `.env` và điền các thông tin sau:
   Đăng ký tại [CloudAMQP](https://www.cloudamqp.com) -> Tạo instance RabbitMQ -> Copy chuỗi AMQP URL.
 - **JWT_SECRET:**
   Chuỗi bảo mật để ký token. Mở terminal chạy lệnh `bun -e "console.log(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex'))"` và copy kết quả vào.
-- **VAPID Keys (Web Push):**
-  Mở terminal chạy lệnh `bunx @pushforge/builder vapid`. Copy `VAPID_PUBLIC_KEY` và `VAPID_PRIVATE_KEY_JWK` từ màn hình kết quả.
+- **VAPID_PUBLIC_KEY & VAPID_PRIVATE_KEY_JWK (Web Push Keys):**
+  Mở terminal chạy lệnh `bunx @pushforge/builder vapid`. Copy giá trị `VAPID_PUBLIC_KEY` và `VAPID_PRIVATE_KEY_JWK` từ màn hình kết quả dán tương ứng vào `.env`.
 - **UPSTASH_REDIS (Queue & Cache):**
   Đăng ký tại [Upstash.com](https://upstash.com) -> Tạo Redis Database -> Copy `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`.
 - **Virtual Queue (Cấu hình hàng chờ):**

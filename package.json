@@ -74,6 +74,7 @@
     "@better-svelte-email/server": "^2.0.0",
     "@internationalized/date": "^3.12.1",
     "@neondatabase/serverless": "^1.1.0",
+    "@pushforge/builder": "^2.0.5",
     "@types/d3-scale": "^4.0.9",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",

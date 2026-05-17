@@ -1,4 +1,8 @@
-import { updateEmailSchema, updatePasswordSchema, updateProfileSchema } from '$lib/shared/schemas/auth.schema';
+import {
+  updateEmailSchema,
+  updatePasswordSchema,
+  updateProfileSchema,
+} from '$lib/shared/schemas/auth.schema';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { redirect } from '@sveltejs/kit';
