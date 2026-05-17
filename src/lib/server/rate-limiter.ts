@@ -23,3 +23,16 @@ export const contactFormLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(3, '10 m'),
   prefix: 'contact-form',
 });
+
+export const pushSubscriptionLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+  prefix: 'push-sub',
+});
+
+export const vapidConfigLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+  prefix: 'vapid-config',
+});
+

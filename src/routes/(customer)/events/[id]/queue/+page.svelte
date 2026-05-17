@@ -151,7 +151,12 @@
       const vapidRes = await api.get<{ publicKey: string }>('/config/vapid', { silent: true });
       if (!vapidRes.data?.publicKey) throw new Error('No VAPID key');
 
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker activation timed out')), 5000)
+        )
+      ]);
 
       const padding = '='.repeat((4 - (vapidRes.data.publicKey.length % 4)) % 4);
       const base64 = (vapidRes.data.publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
