@@ -139,7 +139,7 @@ class QueueStore {
   async leave(options?: { navigate?: boolean }) {
     const shouldNavigate = options?.navigate ?? true;
     const eventId = this.eventId;
-    
+
     if (browser && eventId) {
       // Must await the DELETE request before clearing state or navigating,
       // otherwise the browser may cancel the pending fetch during page transition.

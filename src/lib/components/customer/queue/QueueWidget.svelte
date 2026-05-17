@@ -44,14 +44,15 @@
   });
 
   /**
-   * in `waiting` or `ready` status. Ensures the widget updates or 
+   * in `waiting` or `ready` status. Ensures the widget updates or
    * reacts to ejection (sold out) even when navigated away.
    */
   $effect(() => {
     // Nếu đang ở trang hàng chờ lớn, hãy để trang đó tự xử lý, widget không hiện thông báo chồng lên
     if (page.url.pathname.endsWith('/queue')) return;
 
-    if ((queueStore.status !== 'waiting' && queueStore.status !== 'ready') || !queueStore.eventId) return;
+    if ((queueStore.status !== 'waiting' && queueStore.status !== 'ready') || !queueStore.eventId)
+      return;
 
     const poll = async () => {
       try {
@@ -437,7 +438,7 @@
 {/if}
 
 <!-- Ejected/Sold-out Alert Modal (Global via Widget) -->
-<AlertDialog.Root 
+<AlertDialog.Root
   bind:open={showEjectedModal}
   onOpenChange={(open) => {
     if (!open) invalidateAll();
@@ -447,15 +448,17 @@
     <AlertDialog.Header>
       <AlertDialog.Title>Hết vé hoặc Phiên kết thúc</AlertDialog.Title>
       <AlertDialog.Description>
-        Rất tiếc, sự kiện hiện đã hết vé hoặc phiên làm việc của bạn đã kết thúc. 
-        Hệ thống đã tự động giải phóng vị trí của bạn.
+        Rất tiếc, sự kiện hiện đã hết vé hoặc phiên làm việc của bạn đã kết thúc. Hệ thống đã tự
+        động giải phóng vị trí của bạn.
       </AlertDialog.Description>
     </AlertDialog.Header>
     <AlertDialog.Footer>
-      <AlertDialog.Action onclick={async () => {
-        await invalidateAll();
-        showEjectedModal = false;
-      }}>
+      <AlertDialog.Action
+        onclick={async () => {
+          await invalidateAll();
+          showEjectedModal = false;
+        }}
+      >
         Đã hiểu
       </AlertDialog.Action>
     </AlertDialog.Footer>

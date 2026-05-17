@@ -9,6 +9,7 @@ import { db } from '$lib/server/db';
 import { eventShows, seatSections } from '$lib/server/db/schema';
 import { redis } from '$lib/server/redis';
 import { eq, sql } from 'drizzle-orm';
+import { buildPushHTTPRequest } from '@pushforge/builder';
 
 // ── Lua Scripts ──────────────────────────────────────────────────────────────
 
@@ -190,16 +191,76 @@ async function runQueueWorker(): Promise<WorkerResult> {
           );
         }
         const results = await pipeline.exec();
-        const promotedCount = results.filter((r) => Number(r) === 1).length;
-        // r === -1 means cap was full mid-pipeline; harmless, those users stay in waiting.
 
-        if (promotedCount > 0) {
+        const promotedUserIds: string[] = [];
+        results.forEach((r: unknown, idx: number) => {
+          if (Number(r) === 1) {
+            promotedUserIds.push(String(nextUserIds[idx]));
+          }
+        });
+
+        if (promotedUserIds.length > 0) {
           didWork = true;
-          console.log(`[QueueWorker] 🚪 Xả ${promotedCount} users vào Active (Event ${eventId})`);
-          // TODO: Notify promoted users via SSE/pub-sub so they don't have to
-          // wait for the next polling cycle (~3-5s). Requires a Redis pub-sub
-          // channel (e.g. PUBLISH queue:promoted:{userId} '1') and an SSE
-          // endpoint that subscribes per-user.
+          console.log(
+            `[QueueWorker] 🚪 Xả ${promotedUserIds.length} users vào Active (Event ${eventId})`,
+          );
+
+          // Send Web Push Notifications
+          try {
+            const subsPipeline = redis.pipeline();
+            for (const uId of promotedUserIds) {
+              subsPipeline.get(`push_sub:${uId}`);
+            }
+            const subsRaw = await subsPipeline.exec();
+
+            const fetchPromises = [];
+            for (const subRaw of subsRaw) {
+              if (!subRaw) continue;
+              try {
+                const subscription = typeof subRaw === 'string' ? JSON.parse(subRaw) : subRaw;
+                const request = await buildPushHTTPRequest({
+                  privateJWK: JSON.parse(config.vapidPrivateKeyJwk),
+                  subscription,
+                  message: {
+                    payload: JSON.stringify({
+                      title: 'TỚI LƯỢT RỒI!',
+                      body: 'Lượt mua vé của bạn đã sẵn sàng. Bạn có 1 phút để xác nhận trước khi bị hủy bỏ.',
+                      data: { url: `/events/${eventId}/queue` },
+                    }),
+                    adminContact: `mailto:${config.supportEmail}`,
+                    options: {
+                      ttl: 60,
+                      urgency: 'high',
+                    },
+                  },
+                });
+
+                fetchPromises.push(
+                  fetch(request.endpoint, {
+                    method: 'POST',
+                    body: request.body,
+                    headers: request.headers as HeadersInit,
+                  }),
+                );
+              } catch (e) {
+                console.error('[QueueWorker] Failed to parse push sub or build req', e);
+              }
+            }
+
+            if (fetchPromises.length > 0) {
+              // Fire and forget
+              Promise.allSettled(fetchPromises).then((promisesRes) => {
+                const success = promisesRes.filter(
+                  (r) => r.status === 'fulfilled' && r.value.ok,
+                ).length;
+                console.log(
+                  `[QueueWorker] 🔔 Sent ${success}/${fetchPromises.length} push notifications`,
+                );
+              });
+            }
+          } catch (pushErr) {
+            console.error('[QueueWorker] Web Push error:', pushErr);
+          }
         }
       }
 
@@ -229,7 +290,9 @@ async function runQueueWorker(): Promise<WorkerResult> {
   } finally {
     // Safe release: only delete if the lock still holds our token.
     if (lockHeld) {
-      await redis.eval(SAFE_DEL_IF_VALUE_SCRIPT, ['worker_lock:queue'], [lockToken]).catch(() => {});
+      await redis
+        .eval(SAFE_DEL_IF_VALUE_SCRIPT, ['worker_lock:queue'], [lockToken])
+        .catch(() => {});
     }
   }
 }
