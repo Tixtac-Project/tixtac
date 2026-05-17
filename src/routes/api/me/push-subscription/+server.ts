@@ -11,8 +11,8 @@ const pushSubscriptionSchema = z.object({
   expirationTime: z.number().nullable().optional(),
   keys: z.object({
     p256dh: z.string().min(1),
-    auth: z.string().min(1)
-  })
+    auth: z.string().min(1),
+  }),
 });
 
 export const POST = apiHandler(async ({ request, locals }) => {
@@ -50,4 +50,3 @@ export const POST = apiHandler(async ({ request, locals }) => {
 
   return json({ data: { success: true } }, { status: 201 });
 });
-

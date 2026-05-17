@@ -12,13 +12,12 @@
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
-  const superform = $derived(
+
+  const { form, enhance, errors, constraints, message, submitting, reset } = $derived(
     superForm(data.form, {
       validators: zod4Client(contactSchema),
     }),
   );
-
-  const { form, enhance, errors, constraints, message, submitting, reset } = superform;
 
   let submitted = $state(false);
   let errorMessage = $state<string | undefined>(undefined);

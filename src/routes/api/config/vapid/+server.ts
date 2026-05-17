@@ -13,4 +13,3 @@ export const GET = apiHandler(async ({ request }) => {
 
   return json({ data: { publicKey: config.vapidPublicKey } }, { status: 200 });
 });
-

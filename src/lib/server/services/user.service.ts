@@ -10,8 +10,9 @@ import { parseUserAgent } from '$lib/server/utils/parse-user-agent';
 import {
   loginSchema,
   registerSchema,
+  updateEmailSchema,
+  updatePasswordSchema,
   updateProfileSchema,
-  updateSecuritySchema,
   type UpdateProfileInput,
 } from '$lib/shared/schemas';
 import { validateInput } from '$lib/shared/validation';
@@ -229,16 +230,63 @@ export const userService = {
   },
 
   async updateSecurity(userId: number, rawBody: unknown, cookies: Cookies) {
-    const parsed = updateSecuritySchema.safeParse(rawBody);
-    if (!parsed.success) {
-      const details: Record<string, string> = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path.join('.');
-        if (!details[field]) details[field] = issue.message;
+    // Validate with both schemas to collect all errors upfront.
+    // We validate each schema conditionally based on which fields are present.
+    const body = rawBody as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object') {
+      throw Errors.VALIDATION({ _form: 'Dữ liệu không hợp lệ' });
+    }
+
+    const changingEmail =
+      'new_email' in body && body.new_email !== '' && body.new_email !== undefined;
+    const changingPassword =
+      'new_password' in body && body.new_password !== '' && body.new_password !== undefined;
+
+    if (!changingEmail && !changingPassword) {
+      throw Errors.VALIDATION({
+        _form: 'Vui lòng cung cấp email mới hoặc mật khẩu mới để thay đổi',
+      });
+    }
+
+    // Collect validation errors from both schemas
+    const details: Record<string, string> = {};
+
+    if (changingEmail) {
+      const emailParsed = updateEmailSchema.safeParse(rawBody);
+      if (!emailParsed.success) {
+        for (const issue of emailParsed.error.issues) {
+          const field = issue.path.join('.');
+          if (!details[field]) details[field] = issue.message;
+        }
       }
+    }
+
+    if (changingPassword) {
+      const passwordParsed = updatePasswordSchema.safeParse(rawBody);
+      if (!passwordParsed.success) {
+        for (const issue of passwordParsed.error.issues) {
+          const field = issue.path.join('.');
+          if (!details[field]) details[field] = issue.message;
+        }
+      }
+    }
+
+    // Also require current_password for either operation
+    if (
+      !body.current_password ||
+      typeof body.current_password !== 'string' ||
+      body.current_password.trim() === ''
+    ) {
+      if (!details['current_password']) {
+        details['current_password'] = 'Vui lòng nhập mật khẩu hiện tại';
+      }
+    }
+
+    if (Object.keys(details).length > 0) {
       throw Errors.VALIDATION(details);
     }
-    const { current_password, new_password, new_email } = parsed.data;
+
+    const currentPassword = (body.current_password as string).trim();
 
     const [userRecord] = await userById.execute({ id: userId });
 
@@ -246,28 +294,29 @@ export const userService = {
       throwError(Errors.USER_INACTIVE);
     }
 
-    const valid = await verifyPassword(userRecord.passwordHash, current_password);
+    const valid = await verifyPassword(userRecord.passwordHash, currentPassword);
     if (!valid) {
       throw Errors.VALIDATION({ current_password: 'Mật khẩu hiện tại không đúng' });
     }
 
     const updates: Record<string, unknown> = {};
 
-    if (new_email) {
-      if (new_email !== userRecord.email) {
+    if (changingEmail) {
+      const newEmail = (body.new_email as string).trim().toLowerCase();
+      if (newEmail !== userRecord.email) {
         const [existing] = await db
           .select({ id: users.id })
           .from(users)
-          .where(eq(users.email, new_email));
+          .where(eq(users.email, newEmail));
         if (existing && existing.id !== userId) {
           throw Errors.VALIDATION({ new_email: 'Email đã tồn tại' });
         }
-        updates.email = new_email;
+        updates.email = newEmail;
       }
     }
 
-    if (new_password) {
-      updates.passwordHash = await hashPassword(new_password);
+    if (changingPassword) {
+      updates.passwordHash = await hashPassword(body.new_password as string);
     }
 
     if (Object.keys(updates).length === 0) {

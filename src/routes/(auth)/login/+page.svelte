@@ -17,13 +17,11 @@
 
   let { data }: { data: PageData } = $props();
 
-  const sf = $derived(
+  const { form, errors, validateForm, validate } = $derived(
     superForm(data.form, {
       validators: zod4Client(loginSchema),
     }),
   );
-
-  const { form, errors, validateForm, validate } = sf;
 
   let submitting = $state(false);
   let apiMessage = $state<string | undefined>(undefined);

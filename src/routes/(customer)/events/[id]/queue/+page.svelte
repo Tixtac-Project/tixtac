@@ -154,8 +154,8 @@
       const reg = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker activation timed out')), 5000)
-        )
+          setTimeout(() => reject(new Error('Service worker activation timed out')), 5000),
+        ),
       ]);
 
       const padding = '='.repeat((4 - (vapidRes.data.publicKey.length % 4)) % 4);

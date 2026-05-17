@@ -35,4 +35,3 @@ export const vapidConfigLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(10, '10 s'),
   prefix: 'vapid-config',
 });
-

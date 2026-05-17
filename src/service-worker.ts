@@ -59,7 +59,11 @@ sw.addEventListener('notificationclick', (event: NotificationEvent) => {
           // Note: client.url is absolute. We check if it ends with our relative url
           const target = new URL(url, sw.location.origin);
           const current = new URL(client.url);
-          if (current.origin === target.origin && current.pathname === target.pathname && 'focus' in client) {
+          if (
+            current.origin === target.origin &&
+            current.pathname === target.pathname &&
+            'focus' in client
+          ) {
             return client.focus();
           }
         }
