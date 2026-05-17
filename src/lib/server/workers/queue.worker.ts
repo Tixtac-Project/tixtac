@@ -240,6 +240,7 @@ async function runQueueWorker(): Promise<WorkerResult> {
                     method: 'POST',
                     body: request.body,
                     headers: request.headers as HeadersInit,
+                    signal: AbortSignal.timeout(5000),
                   }),
                 );
               } catch (e) {

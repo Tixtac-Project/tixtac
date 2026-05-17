@@ -33,8 +33,30 @@ const envSchema = z
     GEO_API_KEY: z.string().default(''),
     WEB3FORMS_KEY: z.string().default('2fe33d39-dd60-4a96-8beb-3b807daf571e'),
     RESET_TOKEN_SECRET: z.string().min(1, 'RESET_TOKEN_SECRET is required'),
+const vapidPrivateJwkSchema = z
+  .string()
+  .min(1, 'VAPID_PRIVATE_KEY_JWK is required')
+  .refine((raw) => {
+    try {
+      const jwk = JSON.parse(raw) as Record<string, unknown>;
+      return (
+        jwk &&
+        jwk.kty === 'EC' &&
+        jwk.crv === 'P-256' &&
+        typeof jwk.x === 'string' &&
+        typeof jwk.y === 'string' &&
+        typeof jwk.d === 'string'
+      );
+    } catch {
+      return false;
+    }
+  }, 'VAPID_PRIVATE_KEY_JWK must be a valid P-256 private JWK JSON');
+
+const envSchema = z
+  .object({
     VAPID_PUBLIC_KEY: z.string().min(1, 'VAPID_PUBLIC_KEY is required'),
-    VAPID_PRIVATE_KEY_JWK: z.string().min(1, 'VAPID_PRIVATE_KEY_JWK is required'),
+    VAPID_PRIVATE_KEY_JWK: vapidPrivateJwkSchema,
+  })
   })
   .superRefine((value, ctx) => {
     if (value.QUEUE_DEFAULT_EVENT_CAP > value.QUEUE_MAX_EVENT_CAP) {
