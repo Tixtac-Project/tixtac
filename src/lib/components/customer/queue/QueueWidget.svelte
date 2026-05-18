@@ -1,15 +1,15 @@
 <!-- src/lib/components/customer/queue/QueueWidget.svelte -->
 <script lang="ts">
-  import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { queueStore } from '$lib/stores/queue.svelte';
+  import { page } from '$app/state';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
-  import { fly } from 'svelte/transition';
+  import { queueStore } from '$lib/stores/queue.svelte';
   import { tick } from 'svelte';
-  import QueueWaiting from './QueueWaiting.svelte';
-  import QueueReady from './QueueReady.svelte';
+  import { fly } from 'svelte/transition';
   import QueueHolding from './QueueHolding.svelte';
+  import QueueReady from './QueueReady.svelte';
+  import QueueWaiting from './QueueWaiting.svelte';
 
   /** Remaining seconds, derived from `queueStore.expiresAt`. */
   let timeLeft = $state(0);
@@ -51,6 +51,9 @@
     // Nếu đang ở trang hàng chờ lớn, hãy để trang đó tự xử lý, widget không hiện thông báo chồng lên
     if (page.url.pathname.endsWith('/queue')) return;
 
+    // Only poll in waiting or ready (grace period) states.
+    // 'holding' is managed by the seats page countdown; polling would
+    // redundantly hit the API and risk overwriting the local state.
     if ((queueStore.status !== 'waiting' && queueStore.status !== 'ready') || !queueStore.eventId)
       return;
 
@@ -66,7 +69,16 @@
         const { data } = await res.json();
 
         if (data.status === 'active') {
+          // Grace period (not yet confirmed) — 60s countdown
           queueStore.status = 'ready';
+          queueStore.expiresAt = data.expiresAt;
+          if (data.token) queueStore.token = data.token;
+        } else if (data.status === 'confirmed') {
+          // Confirmed holding session — do NOT overwrite 'holding' if already set
+          // by commitHolding(), but ensure expiresAt is in sync
+          if (queueStore.status !== 'holding') {
+            queueStore.status = 'holding';
+          }
           queueStore.expiresAt = data.expiresAt;
           if (data.token) queueStore.token = data.token;
         } else if (data.status === 'waiting') {

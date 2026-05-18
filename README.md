@@ -1,3 +1,15 @@
+# **THE COURSE PROJECT HAS BEEN ENDED.**
+
+**THE CONTINUATION OF THIS PROJECT IS PRIVATE**
+
+## **IF YOU USE THIS PROJECT/CODE. DO MENTION THE AUTHORS. AND YOU MUST NOT USE ANY OF OUR BRANDING/ASSETS.**
+
+> **COURSE END COMMENT:** While this project has fully satisfied the requirements of the course request, it still has some tech debt: inconsistent code style, function usage, and maybe some unknown edge cases.
+>
+> - **Techstack**: The DX is nice, despite the immaturity of some libraries (Drizzle, Bun), but it may not be the most stable/reliable stack for a production system but it is promising and fun to work with for a course project.
+
+<br>
+
 # TixTac
 
 Nền tảng đặt vé sự kiện trực tuyến với khả năng chống tranh chấp ghế (Race Condition), tự động nhả ghế hết hạn và hàng chờ ảo (Virtual Queue) khi quá tải.

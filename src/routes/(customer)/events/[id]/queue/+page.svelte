@@ -58,7 +58,7 @@
 
   async function pollStatus() {
     const result = await api.get<{
-      status: 'active' | 'waiting' | 'none';
+      status: 'active' | 'confirmed' | 'waiting' | 'none';
       position?: number;
       expiresAt?: number;
       token?: string;
@@ -73,6 +73,14 @@
     const { data } = result;
     if (data.status === 'active') {
       queueStore.status = 'ready';
+      queueStore.expiresAt = data.expiresAt ?? null;
+      if (data.token) queueStore.token = data.token;
+    } else if (data.status === 'confirmed') {
+      // User already confirmed — holding session.
+      // Only overwrite if not already 'holding' (set by commitHolding/confirm flow).
+      if (queueStore.status !== 'holding') {
+        queueStore.status = 'holding';
+      }
       queueStore.expiresAt = data.expiresAt ?? null;
       if (data.token) queueStore.token = data.token;
     } else if (data.status === 'waiting') {

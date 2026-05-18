@@ -8,8 +8,8 @@ import { config } from '$lib/server/config';
 import { db } from '$lib/server/db';
 import { eventShows, seatSections } from '$lib/server/db/schema';
 import { redis } from '$lib/server/redis';
-import { eq, sql } from 'drizzle-orm';
 import { buildPushHTTPRequest } from '@pushforge/builder';
+import { eq, sql } from 'drizzle-orm';
 
 // ── Lua Scripts ──────────────────────────────────────────────────────────────
 
@@ -159,9 +159,10 @@ async function runQueueWorker(): Promise<WorkerResult> {
           `[QueueWorker] 📊 Event ${eventId}: remaining=${remaining}, cap=${eventCap}, cacheTtl=${cacheTtl}s`,
         );
       } catch (capErr) {
-        // Non-fatal: fallback to cached cap or default
+        // Non-fatal: fallback to cached cap or default (clamped to maxCap)
         const cached = await redis.get(capKey);
-        eventCap = cached !== null && cached !== undefined ? Number(cached) : defaultCap;
+        const fallbackCap = cached !== null && cached !== undefined ? Number(cached) : defaultCap;
+        eventCap = Math.min(fallbackCap, maxCap);
         console.warn(
           `[QueueWorker] ⚠️ Cap computation failed for Event ${eventId}, using ${eventCap}`,
           capErr,
@@ -222,11 +223,14 @@ async function runQueueWorker(): Promise<WorkerResult> {
                   privateJWK: JSON.parse(config.vapidPrivateKeyJwk),
                   subscription,
                   message: {
-                    payload: JSON.stringify({
+                    // Pass raw object — PushForge serializes internally.
+                    // JSON.stringify here would cause double-encoding, resulting
+                    // in the service worker receiving a string instead of an object.
+                    payload: {
                       title: 'TỚI LƯỢT RỒI!',
                       body: 'Lượt mua vé của bạn đã sẵn sàng. Bạn có 1 phút để xác nhận trước khi bị hủy bỏ.',
                       data: { url: `/events/${eventId}/queue` },
-                    }),
+                    },
                     adminContact: `mailto:${config.supportEmail}`,
                     options: {
                       ttl: 60,

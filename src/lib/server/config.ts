@@ -33,7 +33,7 @@ const envSchema = z
     QUEUE_MAX_EVENT_CAP: z.coerce.number().int().positive().default(200),
     QUEUE_DYNAMIC_CAP_RATIO: z.coerce.number().positive().max(1).default(0.1),
     QUEUE_WAITING_CAP_RATIO: z.coerce.number().positive().max(10).default(2),
-    ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(300),
+    ACCESS_TOKEN_DURATION: z.coerce.number().int().positive().default(600),
     CLOUDAMQP_URL: z.string().min(1, 'CLOUDAMQP_URL is required'),
     UPSTASH_REDIS_REST_URL: z.string().min(1, 'UPSTASH_REDIS_REST_URL is required'),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1, 'UPSTASH_REDIS_REST_TOKEN is required'),

@@ -32,7 +32,8 @@ export const queueService = {
       // ── Atomic Lua script: cross-queue guard, already‑active check,
       //     already‑waiting check, promote-or-queue — all in one round‑trip.
       //     Reads per-event cap from Redis (queue:cap:{eventId}); falls back
-      //     to DEFAULT_CAP when the Worker hasn't computed it yet.
+      //     to DEFAULT_CAP (clamped by MAX_CAP) when the Worker hasn't
+      //     computed it yet.
       const joinQueueScript = `
         local activeKey = KEYS[1]
         local waitingKey = KEYS[2]
@@ -48,6 +49,7 @@ export const queueService = {
         local activeTtl = tonumber(ARGV[6])
         local waitingTtl = tonumber(ARGV[7])
         local waitingCapRatio = tonumber(ARGV[8])
+        local maxCap = tonumber(ARGV[9])
 
         -- 0. Cross-queue guard
         local currentEvent = redis.call('GET', userCurrentKey)
@@ -68,9 +70,17 @@ export const queueService = {
           return {3, waitingRank + 1}
         end
 
-        -- 3. Read per-event cap; fall back to defaultCap if not set yet
+        -- 3. Read per-event cap, ALWAYS clamp to maxCap.
+        --    Even if the Worker stored a value, a stale cap from before a
+        --    config change could exceed the current QUEUE_MAX_EVENT_CAP.
+        --    Fall back to defaultCap (also clamped) if not set yet.
         local capRaw = redis.call('GET', capKey)
-        local cap = capRaw and tonumber(capRaw) or defaultCap
+        local cap
+        if capRaw then
+          cap = math.min(tonumber(capRaw), maxCap)
+        else
+          cap = math.min(defaultCap, maxCap)
+        end
 
         -- If the event is explicitly sold out (cap 0), prevent joining
         if cap <= 0 then
@@ -113,6 +123,7 @@ export const queueService = {
           activeTtl,
           waitingTtl,
           config.queueWaitingCapRatio,
+          config.queueMaxEventCap,
         ],
       )) as [number, number];
 
@@ -240,6 +251,7 @@ export const queueService = {
     return await withRedisErrorHandling(async () => {
       const activeKey = `active_users:${eventId}`;
       const waitingKey = `waiting_queue:${eventId}`;
+      const confirmedKey = `confirmed:${eventId}:${userId}`;
       const now = Date.now();
 
       const activeScore = await redis.zscore(activeKey, userId);
@@ -248,8 +260,13 @@ export const queueService = {
         // Always mint a fresh token so clients are never stuck with an expired one.
         // The client should cache this token and only call /status again when needed.
         const token = await encryptSeatToken({ userId, eventId }, expiresInSeconds);
+
+        // Distinguish grace period (not confirmed) from confirmed holding session.
+        // Without this, the floating widget would overwrite 'holding' → 'ready'
+        // on every poll, causing the countdown to show the wrong total duration.
+        const isConfirmed = !!(await redis.get(confirmedKey));
         return {
-          status: 'active',
+          status: isConfirmed ? 'confirmed' : 'active',
           expiresAt: activeScore,
           token,
           remainingSeconds: expiresInSeconds,
